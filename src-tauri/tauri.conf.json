@@ -16,8 +16,8 @@
       {
         "label": "main",
         "title": "NoWayLM Voice",
-        "width": 320,
-        "height": 64,
+        "width": 400,
+        "height": 100,
         "x": null,
         "y": 0,
         "center": true,
