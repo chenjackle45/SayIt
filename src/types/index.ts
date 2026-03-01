@@ -12,8 +12,3 @@ export interface HudState {
 }
 
 export type TriggerMode = "hold" | "toggle";
-
-export interface TranscriptionResult {
-  text: string;
-  duration: number;
-}

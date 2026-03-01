@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { HudStatus, HudState, TranscriptionResult } from "@/types";
+import type { HudStatus, HudState } from "@/types";
+import type { TranscriptionRecord } from "@/types/transcription";
 
 describe("Type Definitions", () => {
   it("[P0] HudStatus accepts valid statuses", () => {
@@ -8,6 +9,7 @@ describe("Type Definitions", () => {
       "idle",
       "recording",
       "transcribing",
+      "enhancing",
       "success",
       "error",
     ];
@@ -30,15 +32,25 @@ describe("Type Definitions", () => {
     expect(state.message).toBe("Recording...");
   });
 
-  it("[P1] TranscriptionResult has correct structure", () => {
-    // Given: a transcription result
-    const result: TranscriptionResult = {
-      text: "Hello world",
-      duration: 1500,
+  it("[P1] TranscriptionRecord has correct structure", () => {
+    // Given: a transcription record
+    const record: TranscriptionRecord = {
+      id: "record-1",
+      timestamp: 1_700_000_000_000,
+      rawText: "Hello world",
+      processedText: null,
+      recordingDurationMs: 1200,
+      transcriptionDurationMs: 1500,
+      enhancementDurationMs: null,
+      charCount: 11,
+      triggerMode: "hold",
+      wasEnhanced: false,
+      wasModified: null,
+      createdAt: "2026-03-01T00:00:00.000Z",
     };
 
     // Then: properties should be correctly typed
-    expect(result.text).toBe("Hello world");
-    expect(result.duration).toBe(1500);
+    expect(record.rawText).toBe("Hello world");
+    expect(record.transcriptionDurationMs).toBe(1500);
   });
 });

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from "vue";
+import { onMounted, onUnmounted, ref, computed } from "vue";
 import NotchHud from "./components/NotchHud.vue";
-import { useVoiceFlow } from "./composables/useVoiceFlow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useVoiceFlowStore } from "./stores/useVoiceFlowStore";
 
-const { state, initialize } = useVoiceFlow();
+const voiceFlowStore = useVoiceFlowStore();
 const startupPhase = ref<
   "hidden" | "closed" | "expanded" | "collapsing" | "fading"
 >("hidden");
@@ -48,7 +48,7 @@ onMounted(async () => {
 
   const appWindow = getCurrentWindow();
   await appWindow.show();
-  await initialize();
+  await voiceFlowStore.initialize();
 
   startupPhase.value = "closed";
 
@@ -66,10 +66,14 @@ onMounted(async () => {
 
   setTimeout(async () => {
     startupPhase.value = "hidden";
-    if (state.value.status === "idle") {
+    if (voiceFlowStore.status === "idle") {
       await appWindow.hide();
     }
   }, 3700);
+});
+
+onUnmounted(() => {
+  voiceFlowStore.cleanup();
 });
 </script>
 
@@ -77,7 +81,7 @@ onMounted(async () => {
   <div class="h-screen w-screen bg-transparent">
     <!-- Notch Extension Startup -->
     <div
-      v-if="startupPhase !== 'hidden' && state.status === 'idle'"
+      v-if="startupPhase !== 'hidden' && voiceFlowStore.status === 'idle'"
       class="notch-wrapper"
       :class="{ 'has-shadow': isExpanded }"
     >
@@ -97,7 +101,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <NotchHud :status="state.status" :message="state.message" />
+    <NotchHud :status="voiceFlowStore.status" :message="voiceFlowStore.message" />
   </div>
 </template>
 

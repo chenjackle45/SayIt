@@ -1,8 +1,10 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import type { TranscriptionResult } from "../types";
+import type { TranscriptionRecord } from "../types/transcription";
 import { API_KEY_MISSING_ERROR } from "./errorUtils";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
+const GROQ_MODEL = "whisper-large-v3";
+const TRANSCRIPTION_LANGUAGE = "zh";
 
 function getFileExtensionFromMime(mimeType: string): string {
   if (mimeType.includes("webm")) return "webm";
@@ -15,7 +17,7 @@ function getFileExtensionFromMime(mimeType: string): string {
 export async function transcribeAudio(
   audioBlob: Blob,
   apiKey: string,
-): Promise<TranscriptionResult> {
+): Promise<Pick<TranscriptionRecord, "rawText" | "transcriptionDurationMs">> {
   if (apiKey.trim() === "") {
     throw new Error(API_KEY_MISSING_ERROR);
   }
@@ -25,8 +27,8 @@ export async function transcribeAudio(
   const extension = getFileExtensionFromMime(audioBlob.type);
   const formData = new FormData();
   formData.append("file", audioBlob, `recording.${extension}`);
-  formData.append("model", "whisper-large-v3");
-  formData.append("language", "zh");
+  formData.append("model", GROQ_MODEL);
+  formData.append("language", TRANSCRIPTION_LANGUAGE);
   formData.append("response_format", "text");
 
   console.log(
@@ -46,12 +48,12 @@ export async function transcribeAudio(
     throw new Error(`Groq API error (${response.status}): ${errorBody}`);
   }
 
-  const text = (await response.text()).trim();
-  const duration = performance.now() - startTime;
+  const rawText = (await response.text()).trim();
+  const transcriptionDurationMs = performance.now() - startTime;
 
   console.log(
-    `[transcriber] Got response in ${Math.round(duration)}ms: "${text}"`,
+    `[transcriber] Got response in ${Math.round(transcriptionDurationMs)}ms: "${rawText}"`,
   );
 
-  return { text, duration };
+  return { rawText, transcriptionDurationMs };
 }

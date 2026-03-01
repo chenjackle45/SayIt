@@ -209,7 +209,7 @@ describe("transcriber.ts", () => {
   // ========================================================================
 
   describe("response parsing", () => {
-    it("[P0] should return trimmed text and duration", async () => {
+    it("[P0] should return trimmed text and transcription duration", async () => {
       // Given: API returns text with whitespace
       const audioBlob = new Blob(["audio"], { type: "audio/webm" });
       mockFetch.mockResolvedValue({
@@ -223,10 +223,10 @@ describe("transcriber.ts", () => {
       const result = await transcribeAudio(audioBlob, TEST_API_KEY);
 
       // Then: text should be trimmed
-      expect(result.text).toBe("Hello World");
+      expect(result.rawText).toBe("Hello World");
       // And: duration should be a positive number
-      expect(result.duration).toBeGreaterThan(0);
-      expect(typeof result.duration).toBe("number");
+      expect(result.transcriptionDurationMs).toBeGreaterThan(0);
+      expect(typeof result.transcriptionDurationMs).toBe("number");
     });
 
     it("[P0] should return empty string when API returns only whitespace", async () => {
@@ -243,7 +243,7 @@ describe("transcriber.ts", () => {
       const result = await transcribeAudio(audioBlob, TEST_API_KEY);
 
       // Then: text should be empty after trim
-      expect(result.text).toBe("");
+      expect(result.rawText).toBe("");
     });
   });
 
@@ -270,7 +270,7 @@ describe("transcriber.ts", () => {
       const result = await transcribeAudio(audioBlob, TEST_API_KEY);
 
       // Then: duration should be the difference
-      expect(result.duration).toBe(1500);
+      expect(result.transcriptionDurationMs).toBe(1500);
 
       perfNowSpy.mockRestore();
     });
