@@ -13,6 +13,7 @@ use tauri::{
 
 /// 設定 macOS 視窗為瀏海覆蓋層級（與 BoringNotch 相同）
 #[cfg(target_os = "macos")]
+#[allow(unexpected_cfgs)]
 fn configure_macos_notch_window(window: &tauri::WebviewWindow) {
     match window.ns_window() {
         Ok(ns_ptr) => {

@@ -8,6 +8,7 @@ pub enum ClipboardError {
     #[error("Clipboard access failed: {0}")]
     ClipboardAccess(String),
     #[error("Keyboard simulation failed: {0}")]
+    #[allow(dead_code)]
     KeyboardSimulation(String),
 }
 
