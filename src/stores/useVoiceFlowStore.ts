@@ -1,9 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Window, getCurrentWindow } from "@tauri-apps/api/window";
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { API_KEY_MISSING_ERROR, extractErrorMessage } from "../lib/errorUtils";
+import {
+  API_KEY_MISSING_ERROR,
+  extractErrorMessage,
+  getMicrophoneErrorMessage,
+  getTranscriptionErrorMessage,
+} from "../lib/errorUtils";
 import {
   initializeMicrophone,
   startRecording,
@@ -17,7 +22,11 @@ import {
   HOTKEY_TOGGLED,
   VOICE_FLOW_STATE_CHANGED,
 } from "../composables/useTauriEvents";
-import type { HotkeyErrorPayload, HotkeyEventPayload } from "../types/events";
+import {
+  HOTKEY_ERROR_CODES,
+  type HotkeyErrorPayload,
+  type HotkeyEventPayload,
+} from "../types/events";
 import type { HudStatus } from "../types";
 import type { VoiceFlowStateChangedPayload } from "../types/events";
 import { useSettingsStore } from "./useSettingsStore";
@@ -148,10 +157,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       transitionTo("recording", RECORDING_MESSAGE);
       writeInfoLog("useVoiceFlowStore: recording started");
     } catch (error) {
-      const errorMessage = extractErrorMessage(error);
+      const errorMessage = getMicrophoneErrorMessage(error);
+      const technicalErrorMessage = extractErrorMessage(error);
       failRecordingFlow(
         errorMessage,
-        `useVoiceFlowStore: start recording failed: ${errorMessage}`,
+        `useVoiceFlowStore: start recording failed: ${technicalErrorMessage}`,
       );
     }
   }
@@ -195,10 +205,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         )}, transcriptionDurationMs=${Math.round(result.transcriptionDurationMs)}`,
       );
     } catch (error) {
-      const errorMessage = extractErrorMessage(error);
+      const userMessage = getTranscriptionErrorMessage(error);
+      const technicalMessage = extractErrorMessage(error);
       failRecordingFlow(
-        errorMessage,
-        `useVoiceFlowStore: stop recording failed: ${errorMessage}`,
+        userMessage,
+        `useVoiceFlowStore: stop recording failed: ${technicalMessage}`,
       );
     }
   }
@@ -238,6 +249,22 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       }),
       listen<HotkeyErrorPayload>(HOTKEY_ERROR, (event) => {
         const errorMessage = event.payload.message;
+        if (
+          event.payload.error === HOTKEY_ERROR_CODES.ACCESSIBILITY_PERMISSION
+        ) {
+          void (async () => {
+            try {
+              const mainWindow = await Window.getByLabel("main-window");
+              if (!mainWindow) return;
+              await mainWindow.show();
+              await mainWindow.setFocus();
+            } catch (err) {
+              writeErrorLog(
+                `useVoiceFlowStore: show/focus main-window failed: ${extractErrorMessage(err)}`,
+              );
+            }
+          })();
+        }
         transitionTo("error", errorMessage);
         writeErrorLog(`useVoiceFlowStore: hotkey error: ${errorMessage}`);
       }),

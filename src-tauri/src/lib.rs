@@ -132,7 +132,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             debug_log,
             update_hotkey_config,
-            plugins::clipboard_paste::paste_text
+            plugins::clipboard_paste::paste_text,
+            plugins::hotkey_listener::check_accessibility_permission_command,
+            plugins::hotkey_listener::open_accessibility_settings
         ])
         .setup(|app| {
             let open_dashboard_item =

@@ -45,7 +45,7 @@ development_status:
   1-2-rdev-cross-platform-hotkey: done
   1-3-api-key-storage-system-tray: in-progress
   1-4-voice-record-transcribe-paste: in-progress
-  1-5-hud-status-permission-guide: backlog
+  1-5-hud-status-permission-guide: in-progress
   epic-1-retrospective: optional
 
   epic-2: backlog

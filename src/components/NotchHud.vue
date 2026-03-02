@@ -44,34 +44,34 @@ const notchStyle = computed(() => {
       <div v-if="status === 'recording'" class="notch-content">
         <div class="notch-left">
           <span class="recording-dot" />
-          <span class="text-white text-xs font-medium">Recording...</span>
+          <span class="text-white text-xs font-medium">{{ message }}</span>
         </div>
         <div class="notch-camera-gap" />
         <div class="notch-right" />
       </div>
 
       <!-- Transcribing -->
-      <div v-if="status === 'transcribing'" class="notch-content">
+      <div v-else-if="status === 'transcribing'" class="notch-content">
         <div class="notch-left">
           <span class="spinner" />
-          <span class="text-white text-xs font-medium">Transcribing...</span>
+          <span class="text-white text-xs font-medium">{{ message }}</span>
         </div>
         <div class="notch-camera-gap" />
         <div class="notch-right" />
       </div>
 
       <!-- Success -->
-      <div v-if="status === 'success'" class="notch-content">
+      <div v-else-if="status === 'success'" class="notch-content">
         <div class="notch-left">
           <span class="text-green-400 text-sm">&#10003;</span>
-          <span class="text-green-400 text-xs font-medium">Pasted!</span>
+          <span class="text-green-400 text-xs font-medium">{{ message }}</span>
         </div>
         <div class="notch-camera-gap" />
         <div class="notch-right" />
       </div>
 
       <!-- Error -->
-      <div v-if="status === 'error'" class="notch-content">
+      <div v-else-if="status === 'error'" class="notch-content">
         <div class="notch-left">
           <span class="text-orange-400 text-sm">&#9888;</span>
         </div>

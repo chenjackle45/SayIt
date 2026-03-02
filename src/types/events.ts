@@ -33,7 +33,15 @@ export interface HotkeyEventPayload {
   action: "start" | "stop";
 }
 
+export const HOTKEY_ERROR_CODES = {
+  ACCESSIBILITY_PERMISSION: "accessibility_permission",
+  HOOK_INSTALL_FAILED: "hook_install_failed",
+} as const;
+
+export type HotkeyErrorCode =
+  (typeof HOTKEY_ERROR_CODES)[keyof typeof HOTKEY_ERROR_CODES];
+
 export interface HotkeyErrorPayload {
-  error: string;
+  error: HotkeyErrorCode;
   message: string;
 }

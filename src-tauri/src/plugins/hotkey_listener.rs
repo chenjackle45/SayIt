@@ -155,6 +155,34 @@ fn check_accessibility_permission() -> bool {
     trusted
 }
 
+#[tauri::command]
+pub fn check_accessibility_permission_command() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        return check_accessibility_permission();
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+}
+
+#[tauri::command]
+pub fn open_accessibility_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
+            )
+            .spawn()
+            .map_err(|err| err.to_string())?;
+    }
+
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 fn prompt_accessibility_permission() {
     use core_foundation::base::TCFType;

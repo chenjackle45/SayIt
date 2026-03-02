@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { API_KEY_MISSING_ERROR } from "@/lib/errorUtils";
+import { HOTKEY_ERROR_CODES } from "@/types/events";
 
 const {
   mockListen,
@@ -11,6 +12,9 @@ const {
   mockStopRecording,
   mockTranscribeAudio,
   mockGetCurrentWindow,
+  mockWebviewWindowGetByLabel,
+  mockMainWindowShow,
+  mockMainWindowSetFocus,
   mockLoadSettings,
   mockSettingsState,
   listenerCallbackMap,
@@ -28,6 +32,15 @@ const {
       return unlisten;
     },
   );
+  const mockMainWindowShow = vi.fn().mockResolvedValue(undefined);
+  const mockMainWindowSetFocus = vi.fn().mockResolvedValue(undefined);
+  const mockWebviewWindowGetByLabel = vi.fn(async (label: string) => {
+    if (label !== "main-window") return null;
+    return {
+      show: mockMainWindowShow,
+      setFocus: mockMainWindowSetFocus,
+    };
+  });
 
   return {
     mockListen,
@@ -46,6 +59,9 @@ const {
       hide: vi.fn().mockResolvedValue(undefined),
       setIgnoreCursorEvents: vi.fn().mockResolvedValue(undefined),
     })),
+    mockMainWindowShow,
+    mockMainWindowSetFocus,
+    mockWebviewWindowGetByLabel,
     mockLoadSettings: vi.fn().mockResolvedValue(undefined),
     mockSettingsState: {
       apiKey: "test-api-key-123",
@@ -66,6 +82,9 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: mockGetCurrentWindow,
+  Window: {
+    getByLabel: mockWebviewWindowGetByLabel,
+  },
 }));
 
 vi.mock("../../src/lib/recorder", () => ({
@@ -124,6 +143,9 @@ describe("useVoiceFlowStore", () => {
     mockLoadSettings.mockClear().mockResolvedValue(undefined);
     mockSettingsState.apiKey = "test-api-key-123";
     mockGetCurrentWindow.mockClear();
+    mockWebviewWindowGetByLabel.mockClear();
+    mockMainWindowShow.mockClear().mockResolvedValue(undefined);
+    mockMainWindowSetFocus.mockClear().mockResolvedValue(undefined);
   });
 
   it("[P0] initialize 應載入設定、初始化麥克風並註冊所有熱鍵事件", async () => {
@@ -278,7 +300,7 @@ describe("useVoiceFlowStore", () => {
     );
   });
 
-  it("[P0] 轉錄失敗時應回報人類可讀錯誤訊息", async () => {
+  it("[P0] 轉錄失敗時應回報中文錯誤訊息", async () => {
     mockTranscribeAudio.mockRejectedValueOnce(
       new Error("Groq API error (500)"),
     );
@@ -296,10 +318,10 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("error");
     });
 
-    expect(store.message).toBe("Groq API error (500)");
+    expect(store.message).toBe("語音轉錄服務暫時無法使用");
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "error",
-      message: "Groq API error (500)",
+      message: "語音轉錄服務暫時無法使用",
     });
   });
 
@@ -364,6 +386,24 @@ describe("useVoiceFlowStore", () => {
       status: "error",
       message: "請授予輔助使用權限",
     });
+  });
+
+  it("[P0] HOTKEY_ERROR 為 accessibility_permission 時應開啟 main-window", async () => {
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:error", {
+      error: HOTKEY_ERROR_CODES.ACCESSIBILITY_PERMISSION,
+      message: "請授予輔助使用權限",
+    });
+    await vi.waitFor(() => {
+      expect(mockMainWindowSetFocus).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockWebviewWindowGetByLabel).toHaveBeenCalledWith("main-window");
+    expect(mockMainWindowShow).toHaveBeenCalledTimes(1);
+    expect(store.status).toBe("error");
+    expect(store.message).toBe("請授予輔助使用權限");
   });
 
   it("[P1] success auto-hide 應廣播 idle 事件", async () => {

@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { invoke } from "@tauri-apps/api/core";
+import { onMounted, ref } from "vue";
 import { RouterLink, RouterView } from "vue-router";
+import AccessibilityGuide from "./components/AccessibilityGuide.vue";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: "📊" },
@@ -7,6 +10,25 @@ const navItems = [
   { path: "/dictionary", label: "自訂字典", icon: "📖" },
   { path: "/settings", label: "設定", icon: "⚙️" },
 ];
+
+const showAccessibilityGuide = ref(false);
+
+onMounted(async () => {
+  const isMacOS = navigator.userAgent.includes("Macintosh");
+  if (!isMacOS) return;
+
+  try {
+    const hasAccessibilityPermission = await invoke<boolean>(
+      "check_accessibility_permission_command",
+    );
+    showAccessibilityGuide.value = !hasAccessibilityPermission;
+  } catch (error) {
+    console.error(
+      "[main-window] Failed to check accessibility permission:",
+      error,
+    );
+  }
+});
 </script>
 
 <template>
@@ -34,5 +56,10 @@ const navItems = [
     <main class="flex-1 overflow-y-auto">
       <RouterView />
     </main>
+
+    <AccessibilityGuide
+      :visible="showAccessibilityGuide"
+      @close="showAccessibilityGuide = false"
+    />
   </div>
 </template>
