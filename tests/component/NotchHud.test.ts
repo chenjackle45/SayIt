@@ -9,6 +9,7 @@ describe("NotchHud", () => {
         status: "recording",
         analyserHandle: null,
         recordingElapsedSeconds: 3,
+        message: "",
       },
     });
 
@@ -23,6 +24,7 @@ describe("NotchHud", () => {
         status: "recording",
         analyserHandle: null,
         recordingElapsedSeconds: 0,
+        message: "",
       },
     });
 
@@ -36,6 +38,7 @@ describe("NotchHud", () => {
         status: "success",
         analyserHandle: null,
         recordingElapsedSeconds: 0,
+        message: "",
       },
     });
 
@@ -46,17 +49,40 @@ describe("NotchHud", () => {
     expect(wrapper.findAll(".waveform-converge").length).toBe(6);
   });
 
-  it("[P0] error 狀態應顯示 scatter dots 和 retry icon", () => {
+  it("[P0] error 狀態無 message 應顯示 scatter dots 和 retry icon", () => {
     const wrapper = mount(NotchHud, {
       props: {
         status: "error",
         analyserHandle: null,
         recordingElapsedSeconds: 0,
+        message: "",
       },
     });
 
     expect(wrapper.findAll(".waveform-scatter").length).toBe(6);
     expect(wrapper.find(".retry-icon").exists()).toBe(true);
+    expect(wrapper.find(".error-message").exists()).toBe(false);
+  });
+
+  it("[P0] error 狀態有 message 應在瀏海下方顯示錯誤訊息", () => {
+    const wrapper = mount(NotchHud, {
+      props: {
+        status: "error",
+        analyserHandle: null,
+        recordingElapsedSeconds: 0,
+        message: "API Key 未設定",
+      },
+    });
+
+    // scatter dots 仍在上排顯示
+    expect(wrapper.findAll(".waveform-scatter").length).toBe(6);
+    // 訊息在獨立的下排
+    expect(wrapper.find(".error-message-row").exists()).toBe(true);
+    expect(wrapper.find(".error-message").text()).toBe("API Key 未設定");
+    // notch 應展開
+    expect(wrapper.find(".notch-hud").classes()).toContain(
+      "notch-hud-expanded",
+    );
   });
 
   it("[P0] idle 狀態應隱藏整個 HUD", () => {
@@ -65,6 +91,7 @@ describe("NotchHud", () => {
         status: "idle",
         analyserHandle: null,
         recordingElapsedSeconds: 0,
+        message: "",
       },
     });
 
@@ -77,6 +104,7 @@ describe("NotchHud", () => {
         status: "error",
         analyserHandle: null,
         recordingElapsedSeconds: 0,
+        message: "",
       },
     });
 
@@ -90,6 +118,7 @@ describe("NotchHud", () => {
         status: "success",
         analyserHandle: null,
         recordingElapsedSeconds: 0,
+        message: "",
       },
     });
 
@@ -102,6 +131,7 @@ describe("NotchHud", () => {
         status: "error",
         analyserHandle: null,
         recordingElapsedSeconds: 0,
+        message: "",
       },
     });
 

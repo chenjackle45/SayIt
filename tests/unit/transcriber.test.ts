@@ -67,7 +67,10 @@ describe("transcriber.ts", () => {
         const audioBlob = new Blob(["audio"], { type: mimeType });
         mockFetch.mockResolvedValue({
           ok: true,
-          text: vi.fn().mockResolvedValue("transcribed text"),
+          json: vi.fn().mockResolvedValue({
+            text: "transcribed text",
+            segments: [{ no_speech_prob: 0.01 }],
+          }),
         });
 
         const { transcribeAudio } = await import("../../src/lib/transcriber");
@@ -94,7 +97,10 @@ describe("transcriber.ts", () => {
       const audioBlob = new Blob(["audio-data"], { type: "audio/webm" });
       mockFetch.mockResolvedValue({
         ok: true,
-        text: vi.fn().mockResolvedValue("hello world"),
+        json: vi.fn().mockResolvedValue({
+          text: "hello world",
+          segments: [{ no_speech_prob: 0.01 }],
+        }),
       });
 
       const { transcribeAudio } = await import("../../src/lib/transcriber");
@@ -107,7 +113,7 @@ describe("transcriber.ts", () => {
       const formData = callArgs[1].body as FormData;
       expect(formData.get("model")).toBe("whisper-large-v3");
       expect(formData.get("language")).toBe("zh");
-      expect(formData.get("response_format")).toBe("text");
+      expect(formData.get("response_format")).toBe("verbose_json");
       expect(formData.get("file")).toBeInstanceOf(Blob);
     });
 
@@ -116,7 +122,10 @@ describe("transcriber.ts", () => {
       const audioBlob = new Blob(["audio"], { type: "audio/webm" });
       mockFetch.mockResolvedValue({
         ok: true,
-        text: vi.fn().mockResolvedValue("text"),
+        json: vi.fn().mockResolvedValue({
+          text: "text",
+          segments: [{ no_speech_prob: 0.01 }],
+        }),
       });
 
       const { transcribeAudio } = await import("../../src/lib/transcriber");
@@ -134,7 +143,10 @@ describe("transcriber.ts", () => {
       const audioBlob = new Blob(["audio"], { type: "audio/webm" });
       mockFetch.mockResolvedValue({
         ok: true,
-        text: vi.fn().mockResolvedValue("text"),
+        json: vi.fn().mockResolvedValue({
+          text: "text",
+          segments: [{ no_speech_prob: 0.01 }],
+        }),
       });
 
       const { transcribeAudio } = await import("../../src/lib/transcriber");
@@ -209,12 +221,15 @@ describe("transcriber.ts", () => {
   // ========================================================================
 
   describe("response parsing", () => {
-    it("[P0] should return trimmed text and transcription duration", async () => {
-      // Given: API returns text with whitespace
+    it("[P0] should return trimmed text, transcription duration, and noSpeechProbability", async () => {
+      // Given: API returns verbose_json with whitespace in text
       const audioBlob = new Blob(["audio"], { type: "audio/webm" });
       mockFetch.mockResolvedValue({
         ok: true,
-        text: vi.fn().mockResolvedValue("  Hello World  \n"),
+        json: vi.fn().mockResolvedValue({
+          text: "  Hello World  \n",
+          segments: [{ no_speech_prob: 0.05 }],
+        }),
       });
 
       const { transcribeAudio } = await import("../../src/lib/transcriber");
@@ -227,14 +242,19 @@ describe("transcriber.ts", () => {
       // And: duration should be a positive number
       expect(result.transcriptionDurationMs).toBeGreaterThan(0);
       expect(typeof result.transcriptionDurationMs).toBe("number");
+      // And: noSpeechProbability should match the segment value
+      expect(result.noSpeechProbability).toBe(0.05);
     });
 
-    it("[P0] should return empty string when API returns only whitespace", async () => {
-      // Given: API returns whitespace-only
+    it("[P0] should return empty string when API returns only whitespace text", async () => {
+      // Given: API returns verbose_json with whitespace-only text
       const audioBlob = new Blob(["audio"], { type: "audio/webm" });
       mockFetch.mockResolvedValue({
         ok: true,
-        text: vi.fn().mockResolvedValue("   \n  "),
+        json: vi.fn().mockResolvedValue({
+          text: "   \n  ",
+          segments: [{ no_speech_prob: 0.95 }],
+        }),
       });
 
       const { transcribeAudio } = await import("../../src/lib/transcriber");
@@ -244,6 +264,203 @@ describe("transcriber.ts", () => {
 
       // Then: text should be empty after trim
       expect(result.rawText).toBe("");
+      expect(result.noSpeechProbability).toBe(0.95);
+    });
+
+    it("[P0] should return max no_speech_prob across multiple segments", async () => {
+      // Given: API returns verbose_json with multiple segments
+      const audioBlob = new Blob(["audio"], { type: "audio/webm" });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          text: "谢谢大家",
+          segments: [
+            { no_speech_prob: 0.3 },
+            { no_speech_prob: 0.95 },
+            { no_speech_prob: 0.1 },
+          ],
+        }),
+      });
+
+      const { transcribeAudio } = await import("../../src/lib/transcriber");
+
+      // When: transcribing
+      const result = await transcribeAudio(audioBlob, TEST_API_KEY);
+
+      // Then: noSpeechProbability should be the max across segments
+      expect(result.noSpeechProbability).toBe(0.95);
+    });
+
+    it("[P0] should return noSpeechProbability=1.0 when segments array is empty", async () => {
+      // Given: API returns verbose_json with no segments
+      const audioBlob = new Blob(["audio"], { type: "audio/webm" });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          text: "",
+          segments: [],
+        }),
+      });
+
+      const { transcribeAudio } = await import("../../src/lib/transcriber");
+
+      // When: transcribing
+      const result = await transcribeAudio(audioBlob, TEST_API_KEY);
+
+      // Then: noSpeechProbability should default to 1.0
+      expect(result.noSpeechProbability).toBe(1.0);
+    });
+
+    it("[P0] normal speech should return noSpeechProbability close to 0", async () => {
+      // Given: API returns verbose_json for normal speech
+      const audioBlob = new Blob(["audio"], { type: "audio/webm" });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          text: "今天天氣很好",
+          segments: [{ no_speech_prob: 0.02 }],
+        }),
+      });
+
+      const { transcribeAudio } = await import("../../src/lib/transcriber");
+
+      // When: transcribing
+      const result = await transcribeAudio(audioBlob, TEST_API_KEY);
+
+      // Then: noSpeechProbability should be close to 0
+      expect(result.noSpeechProbability).toBe(0.02);
+      expect(result.rawText).toBe("今天天氣很好");
+    });
+  });
+
+  // ========================================================================
+  // Vocabulary prompt injection (Story 3.2)
+  // ========================================================================
+
+  describe("vocabulary prompt injection", () => {
+    it("[P0] should format vocabulary as Whisper prompt and append to FormData", async () => {
+      const audioBlob = new Blob(["audio"], { type: "audio/webm" });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          text: "transcribed text",
+          segments: [{ no_speech_prob: 0.01 }],
+        }),
+      });
+
+      const { transcribeAudio } = await import("../../src/lib/transcriber");
+
+      await transcribeAudio(audioBlob, TEST_API_KEY, [
+        "TypeScript",
+        "Vue.js",
+        "Tauri",
+      ]);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const formData = callArgs[1].body as FormData;
+      expect(formData.get("prompt")).toBe(
+        "Important Vocabulary: TypeScript, Vue.js, Tauri",
+      );
+    });
+
+    it("[P0] should not append prompt field when vocabulary is undefined", async () => {
+      const audioBlob = new Blob(["audio"], { type: "audio/webm" });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          text: "transcribed text",
+          segments: [{ no_speech_prob: 0.01 }],
+        }),
+      });
+
+      const { transcribeAudio } = await import("../../src/lib/transcriber");
+
+      await transcribeAudio(audioBlob, TEST_API_KEY);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const formData = callArgs[1].body as FormData;
+      expect(formData.get("prompt")).toBeNull();
+    });
+
+    it("[P0] should not append prompt field when vocabulary is empty array", async () => {
+      const audioBlob = new Blob(["audio"], { type: "audio/webm" });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          text: "transcribed text",
+          segments: [{ no_speech_prob: 0.01 }],
+        }),
+      });
+
+      const { transcribeAudio } = await import("../../src/lib/transcriber");
+
+      await transcribeAudio(audioBlob, TEST_API_KEY, []);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const formData = callArgs[1].body as FormData;
+      expect(formData.get("prompt")).toBeNull();
+    });
+
+    it("[P0] should truncate vocabulary to MAX_WHISPER_PROMPT_TERMS (50)", async () => {
+      const audioBlob = new Blob(["audio"], { type: "audio/webm" });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          text: "transcribed text",
+          segments: [{ no_speech_prob: 0.01 }],
+        }),
+      });
+
+      const { transcribeAudio } = await import("../../src/lib/transcriber");
+
+      const largeVocabulary = Array.from(
+        { length: 60 },
+        (_, i) => `Term${i + 1}`,
+      );
+
+      await transcribeAudio(audioBlob, TEST_API_KEY, largeVocabulary);
+
+      const callArgs = mockFetch.mock.calls[0];
+      const formData = callArgs[1].body as FormData;
+      const promptValue = formData.get("prompt") as string;
+      expect(promptValue).toContain("Term1");
+      expect(promptValue).toContain("Term50");
+      expect(promptValue).not.toContain("Term51");
+    });
+  });
+
+  // ========================================================================
+  // formatWhisperPrompt (Story 3.2)
+  // ========================================================================
+
+  describe("formatWhisperPrompt", () => {
+    it("[P0] should format terms as comma-separated list with prefix", async () => {
+      const { formatWhisperPrompt } = await import("../../src/lib/transcriber");
+
+      expect(formatWhisperPrompt(["Tauri", "Pinia"])).toBe(
+        "Important Vocabulary: Tauri, Pinia",
+      );
+    });
+
+    it("[P0] should handle single term", async () => {
+      const { formatWhisperPrompt } = await import("../../src/lib/transcriber");
+
+      expect(formatWhisperPrompt(["TypeScript"])).toBe(
+        "Important Vocabulary: TypeScript",
+      );
+    });
+
+    it("[P0] should truncate to 50 terms", async () => {
+      const { formatWhisperPrompt } = await import("../../src/lib/transcriber");
+
+      const terms = Array.from({ length: 60 }, (_, i) => `T${i}`);
+      const result = formatWhisperPrompt(terms);
+      const resultTerms = result
+        .replace("Important Vocabulary: ", "")
+        .split(", ");
+      expect(resultTerms).toHaveLength(50);
+      expect(resultTerms[0]).toBe("T0");
+      expect(resultTerms[49]).toBe("T49");
     });
   });
 
@@ -256,12 +473,15 @@ describe("transcriber.ts", () => {
       // Given: controlled performance.now
       const perfNowSpy = vi.spyOn(performance, "now");
       perfNowSpy.mockReturnValueOnce(1000); // startTime
-      perfNowSpy.mockReturnValueOnce(2500); // endTime (after response.text())
+      perfNowSpy.mockReturnValueOnce(2500); // endTime (after response.json())
 
       const audioBlob = new Blob(["audio"], { type: "audio/webm" });
       mockFetch.mockResolvedValue({
         ok: true,
-        text: vi.fn().mockResolvedValue("result"),
+        json: vi.fn().mockResolvedValue({
+          text: "result",
+          segments: [{ no_speech_prob: 0.01 }],
+        }),
       });
 
       const { transcribeAudio } = await import("../../src/lib/transcriber");

@@ -11,12 +11,15 @@ const {
   mockStartRecording,
   mockStopRecording,
   mockTranscribeAudio,
+  mockEnhanceText,
   mockGetCurrentWindow,
   mockWebviewWindowGetByLabel,
   mockMainWindowShow,
   mockMainWindowSetFocus,
   mockLoadSettings,
   mockSettingsState,
+  mockVocabularyState,
+  mockAddTranscription,
   listenerCallbackMap,
   unlistenFunctionList,
 } = vi.hoisted(() => {
@@ -51,9 +54,12 @@ const {
     mockStopRecording: vi
       .fn()
       .mockResolvedValue(new Blob(["audio"], { type: "audio/webm" })),
-    mockTranscribeAudio: vi
-      .fn()
-      .mockResolvedValue({ rawText: "測試轉錄", transcriptionDurationMs: 320 }),
+    mockTranscribeAudio: vi.fn().mockResolvedValue({
+      rawText: "測試轉錄",
+      transcriptionDurationMs: 320,
+      noSpeechProbability: 0.01,
+    }),
+    mockEnhanceText: vi.fn().mockResolvedValue("AI 整理後的書面語文字"),
     mockGetCurrentWindow: vi.fn(() => ({
       show: vi.fn().mockResolvedValue(undefined),
       hide: vi.fn().mockResolvedValue(undefined),
@@ -65,7 +71,13 @@ const {
     mockLoadSettings: vi.fn().mockResolvedValue(undefined),
     mockSettingsState: {
       apiKey: "test-api-key-123",
+      aiPrompt: "自訂 prompt 內容",
+      triggerMode: "hold" as string,
     },
+    mockVocabularyState: {
+      termList: [] as Array<{ id: string; term: string; createdAt: string }>,
+    },
+    mockAddTranscription: vi.fn().mockResolvedValue(undefined),
     listenerCallbackMap,
     unlistenFunctionList,
   };
@@ -102,11 +114,29 @@ vi.mock("../../src/lib/transcriber", () => ({
   transcribeAudio: mockTranscribeAudio,
 }));
 
+vi.mock("../../src/lib/enhancer", () => ({
+  enhanceText: mockEnhanceText,
+}));
+
 vi.mock("../../src/stores/useSettingsStore", () => ({
   useSettingsStore: () => ({
     loadSettings: mockLoadSettings,
     getApiKey: () => mockSettingsState.apiKey,
+    getAiPrompt: () => mockSettingsState.aiPrompt,
     refreshApiKey: vi.fn().mockResolvedValue(undefined),
+    triggerMode: mockSettingsState.triggerMode,
+  }),
+}));
+
+vi.mock("../../src/stores/useVocabularyStore", () => ({
+  useVocabularyStore: () => ({
+    termList: mockVocabularyState.termList,
+  }),
+}));
+
+vi.mock("../../src/stores/useHistoryStore", () => ({
+  useHistoryStore: () => ({
+    addTranscription: mockAddTranscription,
   }),
 }));
 
@@ -143,11 +173,23 @@ describe("useVoiceFlowStore", () => {
     mockStopRecording
       .mockClear()
       .mockResolvedValue(new Blob(["audio"], { type: "audio/webm" }));
-    mockTranscribeAudio
-      .mockClear()
-      .mockResolvedValue({ rawText: "測試轉錄", transcriptionDurationMs: 320 });
+    mockTranscribeAudio.mockClear().mockResolvedValue({
+      rawText: "測試轉錄",
+      transcriptionDurationMs: 320,
+      noSpeechProbability: 0.01,
+    });
+    mockEnhanceText.mockClear().mockResolvedValue("AI 整理後的書面語文字");
     mockLoadSettings.mockClear().mockResolvedValue(undefined);
     mockSettingsState.apiKey = "test-api-key-123";
+    mockSettingsState.aiPrompt = "自訂 prompt 內容";
+    mockSettingsState.triggerMode = "hold";
+    mockVocabularyState.termList = [];
+    mockAddTranscription.mockClear().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        readText: vi.fn().mockResolvedValue(""),
+      },
+    });
     mockGetCurrentWindow.mockClear();
     mockWebviewWindowGetByLabel.mockClear();
     mockMainWindowShow.mockClear().mockResolvedValue(undefined);
@@ -195,7 +237,7 @@ describe("useVoiceFlowStore", () => {
 
     store.transitionTo("error", "網路異常");
     expect(store.status).toBe("error");
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(3000);
     await Promise.resolve();
     expect(store.status).toBe("idle");
 
@@ -242,6 +284,7 @@ describe("useVoiceFlowStore", () => {
     expect(mockTranscribeAudio).toHaveBeenCalledWith(
       expect.any(Blob),
       "test-api-key-123",
+      undefined,
     );
     expect(store.status).toBe("success");
     expect(store.message).toBe("已貼上 ✓");
@@ -280,6 +323,7 @@ describe("useVoiceFlowStore", () => {
     mockTranscribeAudio.mockResolvedValueOnce({
       rawText: "",
       transcriptionDurationMs: 280,
+      noSpeechProbability: 1.0,
     });
 
     const store = useVoiceFlowStore();
@@ -302,6 +346,112 @@ describe("useVoiceFlowStore", () => {
     );
   });
 
+  it("[P0] 高 noSpeechProbability 時應觸發「未偵測到語音」", async () => {
+    mockTranscribeAudio.mockResolvedValueOnce({
+      rawText: "谢谢大家",
+      transcriptionDurationMs: 280,
+      noSpeechProbability: 0.95,
+    });
+
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(mockStartRecording).toHaveBeenCalledTimes(1);
+    });
+
+    triggerHotkeyEvent("hotkey:released");
+    await vi.waitFor(() => {
+      expect(store.status).toBe("error");
+    });
+
+    expect(store.message).toBe("未偵測到語音");
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "paste_text",
+      expect.anything(),
+    );
+  });
+
+  it("[P0] 已知幻覺短語「谢谢大家」應觸發「未偵測到語音」", async () => {
+    mockTranscribeAudio.mockResolvedValueOnce({
+      rawText: "谢谢大家",
+      transcriptionDurationMs: 280,
+      noSpeechProbability: 0.5,
+    });
+
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(mockStartRecording).toHaveBeenCalledTimes(1);
+    });
+
+    triggerHotkeyEvent("hotkey:released");
+    await vi.waitFor(() => {
+      expect(store.status).toBe("error");
+    });
+
+    expect(store.message).toBe("未偵測到語音");
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "paste_text",
+      expect.anything(),
+    );
+  });
+
+  it("[P0] 含幻覺子字串的長句應觸發「未偵測到語音」", async () => {
+    mockTranscribeAudio.mockResolvedValueOnce({
+      rawText: "請點贊、訂閱、轉發、打賞，支持《明鏡》和《點點》欄目。",
+      transcriptionDurationMs: 280,
+      noSpeechProbability: 0.5,
+    });
+
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(mockStartRecording).toHaveBeenCalledTimes(1);
+    });
+
+    triggerHotkeyEvent("hotkey:released");
+    await vi.waitFor(() => {
+      expect(store.status).toBe("error");
+    });
+
+    expect(store.message).toBe("未偵測到語音");
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "paste_text",
+      expect.anything(),
+    );
+  });
+
+  it("[P0] 正常語音 + 低 noSpeechProbability 應正常貼上", async () => {
+    mockTranscribeAudio.mockResolvedValueOnce({
+      rawText: "你好",
+      transcriptionDurationMs: 280,
+      noSpeechProbability: 0.05,
+    });
+
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(mockStartRecording).toHaveBeenCalledTimes(1);
+    });
+
+    triggerHotkeyEvent("hotkey:released");
+    await vi.waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+        text: "你好",
+      });
+    });
+
+    expect(store.status).toBe("success");
+  });
+
   it("[P0] 轉錄失敗時應回報中文錯誤訊息", async () => {
     mockTranscribeAudio.mockRejectedValueOnce(
       new Error("Groq API error (500)"),
@@ -320,10 +470,10 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("error");
     });
 
-    expect(store.message).toBe("語音轉錄服務暫時無法使用");
+    expect(store.message).toBe("轉錄服務暫時無法使用");
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "error",
-      message: "語音轉錄服務暫時無法使用",
+      message: "轉錄服務暫時無法使用",
     });
   });
 
@@ -351,6 +501,7 @@ describe("useVoiceFlowStore", () => {
     deferredTranscription.resolvePromise({
       rawText: "完成轉錄",
       transcriptionDurationMs: 100,
+      noSpeechProbability: 0.01,
     });
 
     await vi.waitFor(() => {
@@ -373,30 +524,30 @@ describe("useVoiceFlowStore", () => {
     });
   });
 
-  it("[P0] HOTKEY_ERROR 應轉為 error 狀態並廣播事件", async () => {
+  it("[P0] HOTKEY_ERROR 應轉為 error 狀態並顯示中文 HUD 訊息", async () => {
     const store = useVoiceFlowStore();
     await store.initialize();
 
     triggerHotkeyEvent("hotkey:error", {
       error: "ACCESSIBILITY_DENIED",
-      message: "請授予輔助使用權限",
+      message: "CGEventTap creation failed",
     });
 
     expect(store.status).toBe("error");
-    expect(store.message).toBe("請授予輔助使用權限");
+    expect(store.message).toBe("快捷鍵發生錯誤");
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "error",
-      message: "請授予輔助使用權限",
+      message: "快捷鍵發生錯誤",
     });
   });
 
-  it("[P0] HOTKEY_ERROR 為 accessibility_permission 時應開啟 main-window", async () => {
+  it("[P0] HOTKEY_ERROR 為 accessibility_permission 時應開啟 main-window 並顯示權限訊息", async () => {
     const store = useVoiceFlowStore();
     await store.initialize();
 
     triggerHotkeyEvent("hotkey:error", {
       error: HOTKEY_ERROR_CODES.ACCESSIBILITY_PERMISSION,
-      message: "請授予輔助使用權限",
+      message: "CGEventTap creation failed. Grant Accessibility permission.",
     });
     await vi.waitFor(() => {
       expect(mockMainWindowSetFocus).toHaveBeenCalledTimes(1);
@@ -405,7 +556,7 @@ describe("useVoiceFlowStore", () => {
     expect(mockWebviewWindowGetByLabel).toHaveBeenCalledWith("main-window");
     expect(mockMainWindowShow).toHaveBeenCalledTimes(1);
     expect(store.status).toBe("error");
-    expect(store.message).toBe("請授予輔助使用權限");
+    expect(store.message).toBe("需要輔助使用權限");
   });
 
   it("[P1] success auto-hide 應廣播 idle 事件", async () => {
@@ -441,5 +592,786 @@ describe("useVoiceFlowStore", () => {
       expect(unlisten).toHaveBeenCalledTimes(1);
     });
     vi.useRealTimers();
+  });
+
+  // ==========================================================================
+  // AI 文字整理 (Story 2.1)
+  // ==========================================================================
+
+  describe("AI 文字整理", () => {
+    it("[P0] >= 10 字應走 AI 整理流程：recording → transcribing → enhancing → success", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce("整理後的書面語文字");
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "整理後的書面語文字",
+        });
+      });
+
+      expect(mockEnhanceText).toHaveBeenCalledWith(
+        longText,
+        "test-api-key-123",
+        expect.objectContaining({
+          systemPrompt: "自訂 prompt 內容",
+        }),
+      );
+      expect(store.status).toBe("success");
+      expect(store.message).toBe("已貼上 ✓");
+
+      expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
+        status: "enhancing",
+        message: "整理中...",
+      });
+      expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
+        status: "success",
+        message: "已貼上 ✓",
+      });
+    });
+
+    it("[P0] < 10 字應跳過 AI 整理，直接貼上原始文字", async () => {
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: "短文字",
+        transcriptionDurationMs: 200,
+        noSpeechProbability: 0.01,
+      });
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "短文字",
+        });
+      });
+
+      expect(mockEnhanceText).not.toHaveBeenCalled();
+      expect(store.status).toBe("success");
+      expect(store.message).toBe("已貼上 ✓");
+
+      const enhancingCalls = mockEmit.mock.calls.filter(
+        (call: unknown[]) =>
+          call[0] === "voice-flow:state-changed" &&
+          (call[1] as { status: string }).status === "enhancing",
+      );
+      expect(enhancingCalls).toHaveLength(0);
+    });
+
+    it("[P0] AI 整理 timeout 應 fallback 至原始文字並顯示「已貼上（未整理）」", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockRejectedValueOnce(new Error("AI 整理逾時"));
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: longText,
+        });
+      });
+
+      expect(store.status).toBe("success");
+      expect(store.message).toBe("已貼上（未整理）");
+    });
+
+    it("[P0] AI 整理 API 錯誤應 fallback 至原始文字並顯示「已貼上（未整理）」", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockRejectedValueOnce(new Error("AI 整理失敗：500"));
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: longText,
+        });
+      });
+
+      expect(store.status).toBe("success");
+      expect(store.message).toBe("已貼上（未整理）");
+      expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
+        status: "success",
+        message: "已貼上（未整理）",
+      });
+    });
+
+    it("[P0] 恰好 10 字應走 AI 整理流程", async () => {
+      const exactTenChars = "一二三四五六七八九十";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: exactTenChars,
+        transcriptionDurationMs: 300,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce("整理後十個字");
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "整理後十個字",
+        });
+      });
+
+      expect(mockEnhanceText).toHaveBeenCalledTimes(1);
+    });
+
+    it("[P0] 9 字應跳過 AI 整理", async () => {
+      const nineChars = "一二三四五六七八九";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: nineChars,
+        transcriptionDurationMs: 300,
+        noSpeechProbability: 0.01,
+      });
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: nineChars,
+        });
+      });
+
+      expect(mockEnhanceText).not.toHaveBeenCalled();
+    });
+
+    // ========================================================================
+    // Story 2.2: Prompt 自訂與上下文注入
+    // ========================================================================
+
+    it("[P0] AI 整理應傳遞 systemPrompt 參數", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockEnhanceText).toHaveBeenCalledTimes(1);
+      });
+
+      expect(mockEnhanceText).toHaveBeenCalledWith(
+        longText,
+        "test-api-key-123",
+        expect.objectContaining({
+          systemPrompt: "自訂 prompt 內容",
+        }),
+      );
+    });
+
+    it("[P0] AI 整理應注入剪貼簿內容", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+
+      Object.assign(navigator, {
+        clipboard: {
+          readText: vi.fn().mockResolvedValue("剪貼簿測試內容"),
+        },
+      });
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockEnhanceText).toHaveBeenCalledTimes(1);
+      });
+
+      expect(mockEnhanceText).toHaveBeenCalledWith(
+        longText,
+        "test-api-key-123",
+        expect.objectContaining({
+          clipboardContent: "剪貼簿測試內容",
+        }),
+      );
+    });
+
+    it("[P0] AI 整理應注入詞彙清單", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+
+      mockVocabularyState.termList = [
+        { id: "1", term: "TypeScript", createdAt: "2026-01-01" },
+        { id: "2", term: "Vue.js", createdAt: "2026-01-01" },
+      ];
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockEnhanceText).toHaveBeenCalledTimes(1);
+      });
+
+      expect(mockEnhanceText).toHaveBeenCalledWith(
+        longText,
+        "test-api-key-123",
+        expect.objectContaining({
+          vocabularyTermList: ["TypeScript", "Vue.js"],
+        }),
+      );
+    });
+
+    it("[P0] 空詞彙清單不應傳遞 vocabularyTermList (Story 2.2)", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+
+      mockVocabularyState.termList = [];
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockEnhanceText).toHaveBeenCalledTimes(1);
+      });
+
+      expect(mockEnhanceText).toHaveBeenCalledWith(
+        longText,
+        "test-api-key-123",
+        expect.objectContaining({
+          vocabularyTermList: undefined,
+        }),
+      );
+    });
+  });
+
+  // ==========================================================================
+  // 詞彙注入 Whisper (Story 3.2)
+  // ==========================================================================
+
+  describe("詞彙注入 Whisper", () => {
+    it("[P0] 有詞彙時應將詞彙清單傳入 transcribeAudio", async () => {
+      mockVocabularyState.termList = [
+        { id: "1", term: "TypeScript", createdAt: "2026-01-01" },
+        { id: "2", term: "Tauri", createdAt: "2026-01-01" },
+      ];
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockTranscribeAudio).toHaveBeenCalledTimes(1);
+      });
+
+      expect(mockTranscribeAudio).toHaveBeenCalledWith(
+        expect.any(Blob),
+        "test-api-key-123",
+        ["TypeScript", "Tauri"],
+      );
+    });
+
+    it("[P0] 空詞彙時應傳 undefined 給 transcribeAudio", async () => {
+      mockVocabularyState.termList = [];
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockTranscribeAudio).toHaveBeenCalledTimes(1);
+      });
+
+      expect(mockTranscribeAudio).toHaveBeenCalledWith(
+        expect.any(Blob),
+        "test-api-key-123",
+        undefined,
+      );
+    });
+
+    it("[P0] 詞彙清單應同時傳給 transcriber 和 enhancer", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+
+      mockVocabularyState.termList = [
+        { id: "1", term: "Pinia", createdAt: "2026-01-01" },
+        { id: "2", term: "Vitest", createdAt: "2026-01-01" },
+      ];
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockEnhanceText).toHaveBeenCalledTimes(1);
+      });
+
+      // transcriber 收到詞彙
+      expect(mockTranscribeAudio).toHaveBeenCalledWith(
+        expect.any(Blob),
+        "test-api-key-123",
+        ["Pinia", "Vitest"],
+      );
+
+      // enhancer 也收到詞彙
+      expect(mockEnhanceText).toHaveBeenCalledWith(
+        longText,
+        "test-api-key-123",
+        expect.objectContaining({
+          vocabularyTermList: ["Pinia", "Vitest"],
+        }),
+      );
+    });
+  });
+
+  // ==========================================================================
+  // 貼上後品質監控 (Story 2.3)
+  // ==========================================================================
+
+  describe("貼上後品質監控", () => {
+    it("[P0] AI 整理成功貼上後應呼叫 start_quality_monitor", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce("整理後的書面語文字");
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "整理後的書面語文字",
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_quality_monitor");
+      });
+    });
+
+    it("[P0] AI fallback 貼上後應呼叫 start_quality_monitor", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockRejectedValueOnce(new Error("AI 整理逾時"));
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: longText,
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_quality_monitor");
+      });
+    });
+
+    it("[P0] 跳過 AI 直接貼上後應呼叫 start_quality_monitor", async () => {
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: "短文字",
+        transcriptionDurationMs: 200,
+        noSpeechProbability: 0.01,
+      });
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "短文字",
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_quality_monitor");
+      });
+    });
+
+    it("[P0] 收到 quality-monitor:result 事件應更新 lastWasModified", async () => {
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      expect(store.lastWasModified).toBeNull();
+
+      triggerHotkeyEvent("quality-monitor:result", { wasModified: true });
+      expect(store.lastWasModified).toBe(true);
+
+      triggerHotkeyEvent("quality-monitor:result", { wasModified: false });
+      expect(store.lastWasModified).toBe(false);
+    });
+
+    it("[P0] 開始錄音時應重置 lastWasModified 為 null", async () => {
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      // 先模擬收到品質監控結果
+      triggerHotkeyEvent("quality-monitor:result", { wasModified: true });
+      expect(store.lastWasModified).toBe(true);
+
+      // 開始新一輪錄音
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      expect(store.lastWasModified).toBeNull();
+    });
+
+    it("[P0] initialize 應註冊 quality-monitor:result 事件監聽", async () => {
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      expect(mockListen).toHaveBeenCalledWith(
+        "quality-monitor:result",
+        expect.any(Function),
+      );
+    });
+
+    it("[P0] 轉錄失敗時不應呼叫 start_quality_monitor", async () => {
+      mockTranscribeAudio.mockRejectedValueOnce(
+        new Error("Groq API error (500)"),
+      );
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(store.status).toBe("error");
+      });
+
+      expect(mockInvoke).not.toHaveBeenCalledWith("start_quality_monitor");
+    });
+  });
+
+  // ==========================================================================
+  // 轉錄記錄自動儲存 (Story 4.1)
+  // ==========================================================================
+
+  describe("轉錄記錄自動儲存", () => {
+    it("[P0] AI 整理成功路徑應呼叫 addTranscription（wasEnhanced=true, processedText 有值）", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce("整理後的書面語文字");
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "整理後的書面語文字",
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockAddTranscription).toHaveBeenCalledTimes(1);
+      });
+
+      const record = mockAddTranscription.mock.calls[0][0];
+      expect(record.rawText).toBe(longText);
+      expect(record.processedText).toBe("整理後的書面語文字");
+      expect(record.wasEnhanced).toBe(true);
+      expect(record.enhancementDurationMs).toBeGreaterThanOrEqual(0);
+      expect(record.charCount).toBe("整理後的書面語文字".length);
+      expect(record.triggerMode).toBe("hold");
+      expect(record.wasModified).toBeNull();
+      expect(record.id).toBeTruthy();
+      expect(record.timestamp).toBeGreaterThan(0);
+    });
+
+    it("[P0] AI fallback 路徑應呼叫 addTranscription（wasEnhanced=false, processedText=null, enhancementDurationMs 有值）", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockRejectedValueOnce(new Error("AI 整理逾時"));
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: longText,
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockAddTranscription).toHaveBeenCalledTimes(1);
+      });
+
+      const record = mockAddTranscription.mock.calls[0][0];
+      expect(record.rawText).toBe(longText);
+      expect(record.processedText).toBeNull();
+      expect(record.wasEnhanced).toBe(false);
+      expect(record.enhancementDurationMs).toBeGreaterThanOrEqual(0);
+      expect(record.charCount).toBe(longText.length);
+      expect(record.wasModified).toBeNull();
+    });
+
+    it("[P0] 跳過 AI 路徑應呼叫 addTranscription（wasEnhanced=false, processedText=null, enhancementDurationMs=null）", async () => {
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: "短文字",
+        transcriptionDurationMs: 200,
+        noSpeechProbability: 0.01,
+      });
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "短文字",
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockAddTranscription).toHaveBeenCalledTimes(1);
+      });
+
+      const record = mockAddTranscription.mock.calls[0][0];
+      expect(record.rawText).toBe("短文字");
+      expect(record.processedText).toBeNull();
+      expect(record.wasEnhanced).toBe(false);
+      expect(record.enhancementDurationMs).toBeNull();
+      expect(record.charCount).toBe("短文字".length);
+      expect(record.wasModified).toBeNull();
+    });
+
+    it("[P0] 轉錄失敗時不應呼叫 addTranscription", async () => {
+      mockTranscribeAudio.mockRejectedValueOnce(
+        new Error("Groq API error (500)"),
+      );
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(store.status).toBe("error");
+      });
+
+      expect(mockAddTranscription).not.toHaveBeenCalled();
+    });
+
+    it("[P0] 空白轉錄結果不應呼叫 addTranscription", async () => {
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: "",
+        transcriptionDurationMs: 280,
+        noSpeechProbability: 0.01,
+      });
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(store.status).toBe("error");
+      });
+
+      expect(mockAddTranscription).not.toHaveBeenCalled();
+    });
+
+    it("[P0] addTranscription 失敗不應影響主流程（fire-and-forget）", async () => {
+      mockAddTranscription.mockRejectedValueOnce(
+        new Error("SQLite write failed"),
+      );
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: "短文字",
+        transcriptionDurationMs: 200,
+        noSpeechProbability: 0.01,
+      });
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "短文字",
+        });
+      });
+
+      // 主流程仍然成功
+      expect(store.status).toBe("success");
+      expect(mockAddTranscription).toHaveBeenCalledTimes(1);
+    });
   });
 });
