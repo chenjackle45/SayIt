@@ -46,3 +46,12 @@ export function formatDurationMs(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)} ms`;
   return `${(ms / 1000).toFixed(1)} 秒`;
 }
+
+export function formatNumber(n: number): string {
+  return n.toLocaleString("zh-TW");
+}
+
+export function formatCostCeiling(cost: number): string {
+  if (cost === 0) return "$0";
+  return `≤ $${cost.toFixed(4)}`;
+}

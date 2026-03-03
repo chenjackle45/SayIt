@@ -7,11 +7,22 @@ vi.mock("@tauri-apps/plugin-http", () => ({
 
 const TEST_API_KEY = "test-api-key-123";
 
-function createSuccessResponse(content: string) {
+function createSuccessResponse(
+  content: string,
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    prompt_time: number;
+    completion_time: number;
+    total_time: number;
+  },
+) {
   return {
     ok: true,
     json: vi.fn().mockResolvedValue({
       choices: [{ message: { content } }],
+      usage,
     }),
   };
 }
@@ -38,7 +49,34 @@ describe("enhancer.ts", () => {
         TEST_API_KEY,
       );
 
-      expect(result).toBe("這是整理後的書面語文字。");
+      expect(result.text).toBe("這是整理後的書面語文字。");
+      expect(result.usage).toBeNull();
+    });
+
+    it("[P0] 有 usage 時應回傳解析後的 ChatUsageData", async () => {
+      mockFetch.mockResolvedValue(
+        createSuccessResponse("整理後文字", {
+          prompt_tokens: 100,
+          completion_tokens: 50,
+          total_tokens: 150,
+          prompt_time: 0.2,
+          completion_time: 0.3,
+          total_time: 0.5,
+        }),
+      );
+
+      const { enhanceText } = await import("../../src/lib/enhancer");
+      const result = await enhanceText("測試輸入文字測試", TEST_API_KEY);
+
+      expect(result.text).toBe("整理後文字");
+      expect(result.usage).toEqual({
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
+        promptTimeMs: 200,
+        completionTimeMs: 300,
+        totalTimeMs: 500,
+      });
     });
 
     it("[P0] 應傳送正確的請求 body 格式", async () => {
@@ -76,7 +114,7 @@ describe("enhancer.ts", () => {
         TEST_API_KEY,
       );
 
-      expect(result).toBe("整理後文字有空白");
+      expect(result.text).toBe("整理後文字有空白");
     });
   });
 
@@ -106,7 +144,7 @@ describe("enhancer.ts", () => {
       const { enhanceText } = await import("../../src/lib/enhancer");
       const result = await enhanceText("原始口語文字測試", TEST_API_KEY);
 
-      expect(result).toBe("原始口語文字測試");
+      expect(result.text).toBe("原始口語文字測試");
     });
 
     it("[P0] message content 為空字串時應回傳原始文字", async () => {
@@ -120,7 +158,7 @@ describe("enhancer.ts", () => {
       const { enhanceText } = await import("../../src/lib/enhancer");
       const result = await enhanceText("原始口語文字測試", TEST_API_KEY);
 
-      expect(result).toBe("原始口語文字測試");
+      expect(result.text).toBe("原始口語文字測試");
     });
   });
 

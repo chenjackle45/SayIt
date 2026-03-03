@@ -20,6 +20,7 @@ const {
   mockSettingsState,
   mockVocabularyState,
   mockAddTranscription,
+  mockAddApiUsage,
   listenerCallbackMap,
   unlistenFunctionList,
 } = vi.hoisted(() => {
@@ -59,7 +60,9 @@ const {
       transcriptionDurationMs: 320,
       noSpeechProbability: 0.01,
     }),
-    mockEnhanceText: vi.fn().mockResolvedValue("AI 整理後的書面語文字"),
+    mockEnhanceText: vi
+      .fn()
+      .mockResolvedValue({ text: "AI 整理後的書面語文字", usage: null }),
     mockGetCurrentWindow: vi.fn(() => ({
       show: vi.fn().mockResolvedValue(undefined),
       hide: vi.fn().mockResolvedValue(undefined),
@@ -78,6 +81,7 @@ const {
       termList: [] as Array<{ id: string; term: string; createdAt: string }>,
     },
     mockAddTranscription: vi.fn().mockResolvedValue(undefined),
+    mockAddApiUsage: vi.fn().mockResolvedValue(undefined),
     listenerCallbackMap,
     unlistenFunctionList,
   };
@@ -112,10 +116,17 @@ vi.mock("../../src/lib/recorder", () => ({
 
 vi.mock("../../src/lib/transcriber", () => ({
   transcribeAudio: mockTranscribeAudio,
+  GROQ_MODEL: "whisper-large-v3",
 }));
 
 vi.mock("../../src/lib/enhancer", () => ({
   enhanceText: mockEnhanceText,
+  GROQ_LLM_MODEL: "llama-3.3-70b-versatile",
+}));
+
+vi.mock("../../src/lib/apiPricing", () => ({
+  calculateWhisperCostCeiling: vi.fn(() => 0.000308),
+  calculateChatCostCeiling: vi.fn(() => 0.000118),
 }));
 
 vi.mock("../../src/stores/useSettingsStore", () => ({
@@ -137,6 +148,7 @@ vi.mock("../../src/stores/useVocabularyStore", () => ({
 vi.mock("../../src/stores/useHistoryStore", () => ({
   useHistoryStore: () => ({
     addTranscription: mockAddTranscription,
+    addApiUsage: mockAddApiUsage,
   }),
 }));
 
@@ -178,13 +190,16 @@ describe("useVoiceFlowStore", () => {
       transcriptionDurationMs: 320,
       noSpeechProbability: 0.01,
     });
-    mockEnhanceText.mockClear().mockResolvedValue("AI 整理後的書面語文字");
+    mockEnhanceText
+      .mockClear()
+      .mockResolvedValue({ text: "AI 整理後的書面語文字", usage: null });
     mockLoadSettings.mockClear().mockResolvedValue(undefined);
     mockSettingsState.apiKey = "test-api-key-123";
     mockSettingsState.aiPrompt = "自訂 prompt 內容";
     mockSettingsState.triggerMode = "hold";
     mockVocabularyState.termList = [];
     mockAddTranscription.mockClear().mockResolvedValue(undefined);
+    mockAddApiUsage.mockClear().mockResolvedValue(undefined);
     Object.assign(navigator, {
       clipboard: {
         readText: vi.fn().mockResolvedValue(""),
@@ -606,7 +621,10 @@ describe("useVoiceFlowStore", () => {
         transcriptionDurationMs: 400,
         noSpeechProbability: 0.01,
       });
-      mockEnhanceText.mockResolvedValueOnce("整理後的書面語文字");
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後的書面語文字",
+        usage: null,
+      });
 
       const store = useVoiceFlowStore();
       await store.initialize();
@@ -744,7 +762,10 @@ describe("useVoiceFlowStore", () => {
         transcriptionDurationMs: 300,
         noSpeechProbability: 0.01,
       });
-      mockEnhanceText.mockResolvedValueOnce("整理後十個字");
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後十個字",
+        usage: null,
+      });
 
       const store = useVoiceFlowStore();
       await store.initialize();
@@ -801,7 +822,10 @@ describe("useVoiceFlowStore", () => {
         transcriptionDurationMs: 400,
         noSpeechProbability: 0.01,
       });
-      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後文字",
+        usage: null,
+      });
 
       const store = useVoiceFlowStore();
       await store.initialize();
@@ -832,7 +856,10 @@ describe("useVoiceFlowStore", () => {
         transcriptionDurationMs: 400,
         noSpeechProbability: 0.01,
       });
-      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後文字",
+        usage: null,
+      });
 
       Object.assign(navigator, {
         clipboard: {
@@ -869,7 +896,10 @@ describe("useVoiceFlowStore", () => {
         transcriptionDurationMs: 400,
         noSpeechProbability: 0.01,
       });
-      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後文字",
+        usage: null,
+      });
 
       mockVocabularyState.termList = [
         { id: "1", term: "TypeScript", createdAt: "2026-01-01" },
@@ -905,7 +935,10 @@ describe("useVoiceFlowStore", () => {
         transcriptionDurationMs: 400,
         noSpeechProbability: 0.01,
       });
-      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後文字",
+        usage: null,
+      });
 
       mockVocabularyState.termList = [];
 
@@ -993,7 +1026,10 @@ describe("useVoiceFlowStore", () => {
         transcriptionDurationMs: 400,
         noSpeechProbability: 0.01,
       });
-      mockEnhanceText.mockResolvedValueOnce("整理後文字");
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後文字",
+        usage: null,
+      });
 
       mockVocabularyState.termList = [
         { id: "1", term: "Pinia", createdAt: "2026-01-01" },
@@ -1043,7 +1079,10 @@ describe("useVoiceFlowStore", () => {
         transcriptionDurationMs: 400,
         noSpeechProbability: 0.01,
       });
-      mockEnhanceText.mockResolvedValueOnce("整理後的書面語文字");
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後的書面語文字",
+        usage: null,
+      });
 
       const store = useVoiceFlowStore();
       await store.initialize();
@@ -1195,7 +1234,10 @@ describe("useVoiceFlowStore", () => {
         transcriptionDurationMs: 400,
         noSpeechProbability: 0.01,
       });
-      mockEnhanceText.mockResolvedValueOnce("整理後的書面語文字");
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後的書面語文字",
+        usage: null,
+      });
 
       const store = useVoiceFlowStore();
       await store.initialize();
@@ -1372,6 +1414,127 @@ describe("useVoiceFlowStore", () => {
       // 主流程仍然成功
       expect(store.status).toBe("success");
       expect(mockAddTranscription).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ==========================================================================
+  // API Usage 記錄 (saveApiUsageRecordList)
+  // ==========================================================================
+
+  describe("API Usage 記錄", () => {
+    it("[P0] 跳過 AI 路徑應只呼叫 addApiUsage 一次（Whisper）", async () => {
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: "短文字",
+        transcriptionDurationMs: 200,
+        noSpeechProbability: 0.01,
+      });
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "短文字",
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockAddApiUsage).toHaveBeenCalledTimes(1);
+      });
+
+      const whisperRecord = mockAddApiUsage.mock.calls[0][0];
+      expect(whisperRecord.apiType).toBe("whisper");
+      expect(whisperRecord.model).toBe("whisper-large-v3");
+      expect(whisperRecord.audioDurationMs).toBeGreaterThanOrEqual(0);
+      expect(whisperRecord.estimatedCostCeiling).toBe(0.000308);
+    });
+
+    it("[P0] AI 整理成功應呼叫 addApiUsage 兩次（Whisper + Chat）", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockResolvedValueOnce({
+        text: "整理後的書面語文字",
+        usage: {
+          promptTokens: 100,
+          completionTokens: 50,
+          totalTokens: 150,
+          promptTimeMs: 200,
+          completionTimeMs: 300,
+          totalTimeMs: 500,
+        },
+      });
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "整理後的書面語文字",
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockAddApiUsage).toHaveBeenCalledTimes(2);
+      });
+
+      const whisperRecord = mockAddApiUsage.mock.calls[0][0];
+      expect(whisperRecord.apiType).toBe("whisper");
+
+      const chatRecord = mockAddApiUsage.mock.calls[1][0];
+      expect(chatRecord.apiType).toBe("chat");
+      expect(chatRecord.model).toBe("llama-3.3-70b-versatile");
+      expect(chatRecord.promptTokens).toBe(100);
+      expect(chatRecord.completionTokens).toBe(50);
+      expect(chatRecord.totalTokens).toBe(150);
+      expect(chatRecord.estimatedCostCeiling).toBe(0.000118);
+    });
+
+    it("[P0] AI 整理失敗 fallback 應只呼叫 addApiUsage 一次（Whisper）", async () => {
+      const longText = "這是一段超過十個字的測試轉錄文字內容";
+      mockTranscribeAudio.mockResolvedValueOnce({
+        rawText: longText,
+        transcriptionDurationMs: 400,
+        noSpeechProbability: 0.01,
+      });
+      mockEnhanceText.mockRejectedValueOnce(new Error("AI 整理逾時"));
+
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockStartRecording).toHaveBeenCalledTimes(1);
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: longText,
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(mockAddApiUsage).toHaveBeenCalledTimes(1);
+      });
+
+      const whisperRecord = mockAddApiUsage.mock.calls[0][0];
+      expect(whisperRecord.apiType).toBe("whisper");
     });
   });
 });

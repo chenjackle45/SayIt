@@ -17,7 +17,7 @@ export interface TranscriptionResult {
 }
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
-const GROQ_MODEL = "whisper-large-v3";
+export const GROQ_MODEL = "whisper-large-v3";
 const TRANSCRIPTION_LANGUAGE = "zh";
 const MAX_WHISPER_PROMPT_TERMS = 50;
 

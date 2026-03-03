@@ -12,10 +12,19 @@ import {
   getMicrophoneErrorMessage,
   getTranscriptionErrorMessage,
 } from "../lib/errorUtils";
-import { enhanceText } from "../lib/enhancer";
+import { enhanceText, GROQ_LLM_MODEL } from "../lib/enhancer";
 import { useVocabularyStore } from "./useVocabularyStore";
 import { useHistoryStore } from "./useHistoryStore";
-import type { TranscriptionRecord } from "../types/transcription";
+import type {
+  TranscriptionRecord,
+  ChatUsageData,
+  ApiUsageRecord,
+} from "../types/transcription";
+import {
+  calculateWhisperCostCeiling,
+  calculateChatCostCeiling,
+} from "../lib/apiPricing";
+import { GROQ_MODEL as WHISPER_MODEL } from "../lib/transcriber";
 import {
   initializeMicrophone,
   startRecording,
@@ -340,34 +349,72 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   async function completePasteFlow(params: {
     text: string;
     successMessage: string;
-    rawText: string;
-    processedText: string | null;
-    recordingDurationMs: number;
-    transcriptionDurationMs: number;
-    enhancementDurationMs: number | null;
-    wasEnhanced: boolean;
+    record: TranscriptionRecord;
+    chatUsage: ChatUsageData | null;
   }) {
     try {
       await invoke("paste_text", { text: params.text });
       isRecording.value = false;
       transitionTo("success", params.successMessage);
       startQualityMonitorAfterPaste();
-      saveTranscriptionRecord(
-        buildTranscriptionRecord({
-          rawText: params.rawText,
-          processedText: params.processedText,
-          recordingDurationMs: params.recordingDurationMs,
-          transcriptionDurationMs: params.transcriptionDurationMs,
-          enhancementDurationMs: params.enhancementDurationMs,
-          wasEnhanced: params.wasEnhanced,
-        }),
-      );
+      saveTranscriptionRecord(params.record);
+      saveApiUsageRecordList(params.record, params.chatUsage);
     } catch (pasteError) {
       isRecording.value = false;
       failRecordingFlow(
         "貼上失敗",
         `useVoiceFlowStore: paste_text failed: ${extractErrorMessage(pasteError)}`,
       );
+    }
+  }
+
+  function saveApiUsageRecordList(
+    record: TranscriptionRecord,
+    chatUsage: ChatUsageData | null,
+  ) {
+    const historyStore = useHistoryStore();
+    const roundedAudioMs = record.recordingDurationMs;
+
+    function fireAndForget(usageRecord: ApiUsageRecord) {
+      historyStore
+        .addApiUsage(usageRecord)
+        .catch((err) =>
+          writeErrorLog(
+            `useVoiceFlowStore: addApiUsage(${usageRecord.apiType}) failed: ${extractErrorMessage(err)}`,
+          ),
+        );
+    }
+
+    fireAndForget({
+      id: crypto.randomUUID(),
+      transcriptionId: record.id,
+      apiType: "whisper",
+      model: WHISPER_MODEL,
+      promptTokens: null,
+      completionTokens: null,
+      totalTokens: null,
+      promptTimeMs: null,
+      completionTimeMs: null,
+      totalTimeMs: null,
+      audioDurationMs: roundedAudioMs,
+      estimatedCostCeiling: calculateWhisperCostCeiling(roundedAudioMs),
+    });
+
+    if (chatUsage) {
+      fireAndForget({
+        id: crypto.randomUUID(),
+        transcriptionId: record.id,
+        apiType: "chat",
+        model: GROQ_LLM_MODEL,
+        promptTokens: chatUsage.promptTokens,
+        completionTokens: chatUsage.completionTokens,
+        totalTokens: chatUsage.totalTokens,
+        promptTimeMs: chatUsage.promptTimeMs,
+        completionTimeMs: chatUsage.completionTimeMs,
+        totalTimeMs: chatUsage.totalTimeMs,
+        audioDurationMs: null,
+        estimatedCostCeiling: calculateChatCostCeiling(chatUsage.totalTokens),
+      });
     }
   }
 
@@ -456,7 +503,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         const clipboardContent = await readClipboardText();
 
         try {
-          const enhancedText = await enhanceText(result.rawText, apiKey, {
+          const enhanceResult = await enhanceText(result.rawText, apiKey, {
             systemPrompt: settingsStore.getAiPrompt(),
             clipboardContent,
             vocabularyTermList:
@@ -465,15 +512,20 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           const enhancementDurationMs =
             performance.now() - enhancementStartTime;
 
-          await completePasteFlow({
-            text: enhancedText,
-            successMessage: PASTE_SUCCESS_MESSAGE,
+          const record = buildTranscriptionRecord({
             rawText: result.rawText,
-            processedText: enhancedText,
+            processedText: enhanceResult.text,
             recordingDurationMs,
             transcriptionDurationMs: result.transcriptionDurationMs,
             enhancementDurationMs,
             wasEnhanced: true,
+          });
+
+          await completePasteFlow({
+            text: enhanceResult.text,
+            successMessage: PASTE_SUCCESS_MESSAGE,
+            record,
+            chatUsage: enhanceResult.usage,
           });
 
           writeInfoLog(
@@ -491,9 +543,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             `useVoiceFlowStore: AI enhancement failed: ${enhanceErrorDetail}`,
           );
 
-          await completePasteFlow({
-            text: result.rawText,
-            successMessage: PASTE_SUCCESS_UNENHANCED_MESSAGE,
+          const fallbackRecord = buildTranscriptionRecord({
             rawText: result.rawText,
             processedText: null,
             recordingDurationMs,
@@ -501,17 +551,29 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             enhancementDurationMs: fallbackEnhancementDurationMs,
             wasEnhanced: false,
           });
+
+          await completePasteFlow({
+            text: result.rawText,
+            successMessage: PASTE_SUCCESS_UNENHANCED_MESSAGE,
+            record: fallbackRecord,
+            chatUsage: null,
+          });
         }
       } else {
-        await completePasteFlow({
-          text: result.rawText,
-          successMessage: PASTE_SUCCESS_MESSAGE,
+        const record = buildTranscriptionRecord({
           rawText: result.rawText,
           processedText: null,
           recordingDurationMs,
           transcriptionDurationMs: result.transcriptionDurationMs,
           enhancementDurationMs: null,
           wasEnhanced: false,
+        });
+
+        await completePasteFlow({
+          text: result.rawText,
+          successMessage: PASTE_SUCCESS_MESSAGE,
+          record,
+          chatUsage: null,
         });
 
         writeInfoLog(

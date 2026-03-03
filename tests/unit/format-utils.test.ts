@@ -6,6 +6,8 @@ import {
   formatDurationFromMs,
   formatDuration,
   formatDurationMs,
+  formatNumber,
+  formatCostCeiling,
 } from "../../src/lib/formatUtils";
 import type { TranscriptionRecord } from "../../src/types/transcription";
 
@@ -135,6 +137,42 @@ describe("formatUtils.ts", () => {
 
     it("999ms 應回傳 '999 ms'", () => {
       expect(formatDurationMs(999)).toBe("999 ms");
+    });
+  });
+
+  describe("formatNumber", () => {
+    it("0 應格式化為 '0'", () => {
+      expect(formatNumber(0)).toBe("0");
+    });
+
+    it("小數字不應加分隔符", () => {
+      expect(formatNumber(999)).toBe("999");
+    });
+
+    it("千位以上應加分隔符", () => {
+      const result = formatNumber(1234567);
+      expect(result).toContain("1");
+      expect(result).toContain("234");
+      expect(result).toContain("567");
+      expect(result.length).toBeGreaterThan(7);
+    });
+  });
+
+  describe("formatCostCeiling", () => {
+    it("費用為 0 時應回傳 '$0'", () => {
+      expect(formatCostCeiling(0)).toBe("$0");
+    });
+
+    it("正數費用應回傳帶 ≤ 前綴的四位小數", () => {
+      expect(formatCostCeiling(0.0042)).toBe("≤ $0.0042");
+    });
+
+    it("極小費用應正確顯示四位小數", () => {
+      expect(formatCostCeiling(0.000308)).toBe("≤ $0.0003");
+    });
+
+    it("較大費用應正確顯示", () => {
+      expect(formatCostCeiling(1.5)).toBe("≤ $1.5000");
     });
   });
 });

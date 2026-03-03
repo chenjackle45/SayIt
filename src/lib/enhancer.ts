@@ -1,7 +1,8 @@
 import { fetch } from "@tauri-apps/plugin-http";
+import type { ChatUsageData, EnhanceResult } from "../types/transcription";
 
 const GROQ_CHAT_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_LLM_MODEL = "llama-3.3-70b-versatile";
+export const GROQ_LLM_MODEL = "llama-3.3-70b-versatile";
 const ENHANCEMENT_TIMEOUT_MS = 5000;
 const MAX_VOCABULARY_TERMS = 100;
 
@@ -28,8 +29,18 @@ interface GroqChatChoice {
   };
 }
 
+interface GroqChatUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  prompt_time: number;
+  completion_time: number;
+  total_time: number;
+}
+
 interface GroqChatResponse {
   choices: GroqChatChoice[];
+  usage?: GroqChatUsage;
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -63,11 +74,23 @@ export function buildSystemPrompt(
   return prompt;
 }
 
+function parseUsage(usage?: GroqChatUsage): ChatUsageData | null {
+  if (!usage) return null;
+  return {
+    promptTokens: usage.prompt_tokens,
+    completionTokens: usage.completion_tokens,
+    totalTokens: usage.total_tokens,
+    promptTimeMs: Math.round(usage.prompt_time * 1000),
+    completionTimeMs: Math.round(usage.completion_time * 1000),
+    totalTimeMs: Math.round(usage.total_time * 1000),
+  };
+}
+
 export async function enhanceText(
   rawText: string,
   apiKey: string,
   options?: EnhanceOptions,
-): Promise<string> {
+): Promise<EnhanceResult> {
   if (!apiKey || apiKey.trim() === "") {
     throw new Error("API Key 未設定");
   }
@@ -106,15 +129,16 @@ export async function enhanceText(
   }
 
   const data = (await response.json()) as GroqChatResponse;
+  const usage = parseUsage(data.usage);
 
   if (!data.choices || data.choices.length === 0) {
-    return rawText;
+    return { text: rawText, usage };
   }
 
   const enhancedContent = data.choices[0].message.content?.trim();
   if (!enhancedContent) {
-    return rawText;
+    return { text: rawText, usage };
   }
 
-  return enhancedContent;
+  return { text: enhancedContent, usage };
 }

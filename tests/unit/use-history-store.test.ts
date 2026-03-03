@@ -313,14 +313,16 @@ describe("useHistoryStore", () => {
 
   describe("fetchDashboardStats", () => {
     it("[P0] 無記錄時應回傳零值統計", async () => {
+      // DASHBOARD_STATS_SQL
       mockDbSelect.mockResolvedValueOnce([
         {
           total_count: 0,
           total_characters: 0,
           total_recording_duration_ms: 0,
-          enhanced_count: 0,
         },
       ]);
+      // TOTAL_COST_CEILING_SQL
+      mockDbSelect.mockResolvedValueOnce([{ total_cost_ceiling: 0 }]);
 
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
@@ -332,9 +334,8 @@ describe("useHistoryStore", () => {
       expect(stats.totalTranscriptions).toBe(0);
       expect(stats.totalCharacters).toBe(0);
       expect(stats.totalRecordingDurationMs).toBe(0);
-      expect(stats.averageSpeedCharsPerMin).toBe(0);
       expect(stats.estimatedTimeSavedMs).toBe(0);
-      expect(stats.enhancedCount).toBe(0);
+      expect(stats.totalCostCeiling).toBe(0);
     });
 
     it("[P0] 應使用 SQL 聚合查詢", async () => {
@@ -343,9 +344,9 @@ describe("useHistoryStore", () => {
           total_count: 0,
           total_characters: 0,
           total_recording_duration_ms: 0,
-          enhanced_count: 0,
         },
       ]);
+      mockDbSelect.mockResolvedValueOnce([{ total_cost_ceiling: 0 }]);
 
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
@@ -360,17 +361,16 @@ describe("useHistoryStore", () => {
       expect(sql).toContain("SUM(recording_duration_ms)");
     });
 
-    it("[P0] 應正確計算平均速度和節省時間", async () => {
-      // 600 字 / 2 分鐘（120000ms）= 300 字/分鐘
+    it("[P0] 應正確計算節省時間和整合費用上限", async () => {
       // 節省時間 = 600 / 40 * 60000 = 900000ms
       mockDbSelect.mockResolvedValueOnce([
         {
           total_count: 10,
           total_characters: 600,
           total_recording_duration_ms: 120000,
-          enhanced_count: 3,
         },
       ]);
+      mockDbSelect.mockResolvedValueOnce([{ total_cost_ceiling: 0.0042 }]);
 
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
@@ -382,9 +382,8 @@ describe("useHistoryStore", () => {
       expect(stats.totalTranscriptions).toBe(10);
       expect(stats.totalCharacters).toBe(600);
       expect(stats.totalRecordingDurationMs).toBe(120000);
-      expect(stats.averageSpeedCharsPerMin).toBe(300);
       expect(stats.estimatedTimeSavedMs).toBe(900000);
-      expect(stats.enhancedCount).toBe(3);
+      expect(stats.totalCostCeiling).toBe(0.0042);
     });
   });
 
@@ -446,20 +445,25 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("refreshDashboard", () => {
-    it("[P0] 應同時載入統計和最近列表並更新 refs", async () => {
-      // 第一次 select: fetchDashboardStats
+    it("[P0] 應同時載入統計、最近列表和趨勢並更新 refs", async () => {
+      // fetchDashboardStats → DASHBOARD_STATS_SQL
       mockDbSelect.mockResolvedValueOnce([
         {
           total_count: 5,
           total_characters: 200,
           total_recording_duration_ms: 60000,
-          enhanced_count: 2,
         },
       ]);
-      // 第二次 select: fetchRecentTranscriptionList
+      // fetchDashboardStats → TOTAL_COST_CEILING_SQL
+      mockDbSelect.mockResolvedValueOnce([{ total_cost_ceiling: 0.001 }]);
+      // fetchRecentTranscriptionList
       mockDbSelect.mockResolvedValueOnce([
         createRawRow({ id: "recent-1" }),
         createRawRow({ id: "recent-2" }),
+      ]);
+      // fetchDailyUsageTrend
+      mockDbSelect.mockResolvedValueOnce([
+        { date: "2026-03-01", count: 3, total_chars: 100 },
       ]);
 
       const { useHistoryStore } = await import(
@@ -471,8 +475,13 @@ describe("useHistoryStore", () => {
 
       expect(store.dashboardStats.totalTranscriptions).toBe(5);
       expect(store.dashboardStats.totalCharacters).toBe(200);
+      expect(store.dashboardStats.totalCostCeiling).toBe(0.001);
       expect(store.recentTranscriptionList).toHaveLength(2);
       expect(store.recentTranscriptionList[0].id).toBe("recent-1");
+      expect(store.dailyUsageTrendList).toHaveLength(1);
+      expect(store.dailyUsageTrendList[0].date).toBe("2026-03-01");
+      expect(store.dailyUsageTrendList[0].count).toBe(3);
+      expect(store.dailyUsageTrendList[0].totalChars).toBe(100);
     });
 
     it("[P0] dashboardStats 初始值應全為零", async () => {
@@ -484,10 +493,10 @@ describe("useHistoryStore", () => {
       expect(store.dashboardStats.totalTranscriptions).toBe(0);
       expect(store.dashboardStats.totalCharacters).toBe(0);
       expect(store.dashboardStats.totalRecordingDurationMs).toBe(0);
-      expect(store.dashboardStats.averageSpeedCharsPerMin).toBe(0);
       expect(store.dashboardStats.estimatedTimeSavedMs).toBe(0);
-      expect(store.dashboardStats.enhancedCount).toBe(0);
+      expect(store.dashboardStats.totalCostCeiling).toBe(0);
       expect(store.recentTranscriptionList).toHaveLength(0);
+      expect(store.dailyUsageTrendList).toHaveLength(0);
     });
   });
 
@@ -732,6 +741,151 @@ describe("useHistoryStore", () => {
       const params = mockDbSelect.mock.calls[1][1];
       // 第二次呼叫的 offset 應該是 20（第一頁的結果數）
       expect(params).toEqual([20, 20]);
+    });
+  });
+
+  // ==========================================================================
+  // addApiUsage
+  // ==========================================================================
+
+  describe("addApiUsage", () => {
+    it("[P0] 應執行 INSERT SQL 並傳入正確參數", async () => {
+      const { useHistoryStore } = await import(
+        "../../src/stores/useHistoryStore"
+      );
+      const store = useHistoryStore();
+
+      await store.addApiUsage({
+        id: "usage-001",
+        transcriptionId: "tx-001",
+        apiType: "whisper",
+        model: "whisper-large-v3",
+        promptTokens: null,
+        completionTokens: null,
+        totalTokens: null,
+        promptTimeMs: null,
+        completionTimeMs: null,
+        totalTimeMs: null,
+        audioDurationMs: 5000,
+        estimatedCostCeiling: 0.000154,
+      });
+
+      expect(mockDbExecute).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockDbExecute.mock.calls[0];
+      expect(sql).toContain("INSERT INTO api_usage");
+      expect(params).toEqual([
+        "usage-001",
+        "tx-001",
+        "whisper",
+        "whisper-large-v3",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        5000,
+        0.000154,
+      ]);
+    });
+
+    it("[P0] chat 類型應正確傳入 token 欄位", async () => {
+      const { useHistoryStore } = await import(
+        "../../src/stores/useHistoryStore"
+      );
+      const store = useHistoryStore();
+
+      await store.addApiUsage({
+        id: "usage-002",
+        transcriptionId: "tx-001",
+        apiType: "chat",
+        model: "llama-3.3-70b-versatile",
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
+        promptTimeMs: 200,
+        completionTimeMs: 300,
+        totalTimeMs: 500,
+        audioDurationMs: null,
+        estimatedCostCeiling: 0.000118,
+      });
+
+      const params = mockDbExecute.mock.calls[0][1];
+      expect(params[4]).toBe(100); // promptTokens
+      expect(params[5]).toBe(50); // completionTokens
+      expect(params[6]).toBe(150); // totalTokens
+      expect(params[10]).toBeNull(); // audioDurationMs
+    });
+  });
+
+  // ==========================================================================
+  // fetchDailyUsageTrend
+  // ==========================================================================
+
+  describe("fetchDailyUsageTrend", () => {
+    it("[P0] 應回傳 camelCase 映射後的趨勢陣列", async () => {
+      const { useHistoryStore } = await import(
+        "../../src/stores/useHistoryStore"
+      );
+      const store = useHistoryStore();
+      // fetchDashboardStats → DASHBOARD_STATS_SQL
+      mockDbSelect.mockResolvedValueOnce([
+        { total_count: 0, total_characters: 0, total_recording_duration_ms: 0 },
+      ]);
+      // fetchDashboardStats → TOTAL_COST_CEILING_SQL
+      mockDbSelect.mockResolvedValueOnce([{ total_cost_ceiling: 0 }]);
+      // fetchRecentTranscriptionList
+      mockDbSelect.mockResolvedValueOnce([]);
+      // fetchDailyUsageTrend
+      mockDbSelect.mockResolvedValueOnce([
+        { date: "2026-03-01", count: 5, total_chars: 250 },
+        { date: "2026-02-28", count: 3, total_chars: 120 },
+      ]);
+
+      await store.refreshDashboard();
+
+      expect(store.dailyUsageTrendList).toHaveLength(2);
+      expect(store.dailyUsageTrendList[0]).toEqual({
+        date: "2026-03-01",
+        count: 5,
+        totalChars: 250,
+      });
+      expect(store.dailyUsageTrendList[1]).toEqual({
+        date: "2026-02-28",
+        count: 3,
+        totalChars: 120,
+      });
+    });
+
+    it("[P0] DAILY_USAGE_TREND_SQL 應包含 GROUP BY 和 LIMIT", async () => {
+      // fetchDashboardStats → DASHBOARD_STATS_SQL
+      mockDbSelect.mockResolvedValueOnce([
+        { total_count: 0, total_characters: 0, total_recording_duration_ms: 0 },
+      ]);
+      // fetchDashboardStats → TOTAL_COST_CEILING_SQL
+      mockDbSelect.mockResolvedValueOnce([{ total_cost_ceiling: 0 }]);
+      // fetchRecentTranscriptionList
+      mockDbSelect.mockResolvedValueOnce([]);
+      // fetchDailyUsageTrend
+      mockDbSelect.mockResolvedValueOnce([]);
+
+      const { useHistoryStore } = await import(
+        "../../src/stores/useHistoryStore"
+      );
+      const store = useHistoryStore();
+
+      await store.refreshDashboard();
+
+      // fetchDailyUsageTrend 是第 4 次 select 呼叫
+      const trendCall = mockDbSelect.mock.calls[3];
+      const sql = trendCall[0] as string;
+      expect(sql).toContain("WHERE timestamp >=");
+      expect(sql).toContain("GROUP BY date");
+      expect(sql).toContain("LIMIT");
+      const params = trendCall[1] as number[];
+      expect(params[0]).toBeLessThanOrEqual(Date.now());
+      expect(params[0]).toBeGreaterThan(Date.now() - 31 * 86_400_000);
+      expect(params[1]).toBe(30);
     });
   });
 });

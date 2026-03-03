@@ -12,21 +12,15 @@ import {
   truncateText,
   getDisplayText,
   formatDurationFromMs,
+  formatNumber,
+  formatCostCeiling,
 } from "../lib/formatUtils";
+import DashboardUsageChart from "../components/DashboardUsageChart.vue";
 
 const historyStore = useHistoryStore();
 const router = useRouter();
 
 let unlistenTranscriptionCompleted: UnlistenFn | null = null;
-
-function formatNumber(n: number): string {
-  return n.toLocaleString("zh-TW");
-}
-
-function formatPercentage(count: number, total: number): string {
-  if (total === 0) return "0%";
-  return `${Math.round((count / total) * 100)}%`;
-}
 
 function navigateToHistory() {
   void router.push("/history");
@@ -70,13 +64,6 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="rounded-xl border border-zinc-700 bg-zinc-900 p-4">
-        <p class="text-sm text-zinc-400">平均口述速度</p>
-        <p class="mt-1 text-2xl font-bold text-white">
-          {{ formatNumber(historyStore.dashboardStats.averageSpeedCharsPerMin) }} 字/分鐘
-        </p>
-      </div>
-
-      <div class="rounded-xl border border-zinc-700 bg-zinc-900 p-4">
         <p class="text-sm text-zinc-400">節省時間</p>
         <p class="mt-1 text-2xl font-bold text-white">
           {{ formatDurationFromMs(historyStore.dashboardStats.estimatedTimeSavedMs) }}
@@ -91,12 +78,25 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="rounded-xl border border-zinc-700 bg-zinc-900 p-4">
-        <p class="text-sm text-zinc-400">AI 整理使用率</p>
+        <p class="text-sm text-zinc-400">平均每次字數</p>
         <p class="mt-1 text-2xl font-bold text-white">
-          {{ formatPercentage(historyStore.dashboardStats.enhancedCount, historyStore.dashboardStats.totalTranscriptions) }}
+          {{ historyStore.dashboardStats.totalTranscriptions > 0 ? formatNumber(Math.round(historyStore.dashboardStats.totalCharacters / historyStore.dashboardStats.totalTranscriptions)) : 0 }} 字
         </p>
       </div>
+
+      <div class="rounded-xl border border-zinc-700 bg-zinc-900 p-4">
+        <p class="text-sm text-zinc-400">API 費用上限</p>
+        <p class="mt-1 text-2xl font-bold text-white">
+          {{ formatCostCeiling(historyStore.dashboardStats.totalCostCeiling) }}
+        </p>
+        <p class="mt-1 text-xs text-zinc-500">實際費用不超過此金額</p>
+      </div>
     </div>
+
+    <!-- 每日使用趨勢圖表 -->
+    <section v-if="historyStore.dailyUsageTrendList.length > 0" class="mt-6">
+      <DashboardUsageChart :data="historyStore.dailyUsageTrendList" />
+    </section>
 
     <!-- 最近轉錄 -->
     <section class="mt-8 rounded-xl border border-zinc-700 bg-zinc-900 p-5">

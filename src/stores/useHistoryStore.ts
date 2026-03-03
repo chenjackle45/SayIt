@@ -3,6 +3,8 @@ import { ref } from "vue";
 import type {
   TranscriptionRecord,
   DashboardStats,
+  ApiUsageRecord,
+  DailyUsageTrend,
 } from "../types/transcription";
 import type { TriggerMode } from "../types";
 import type { TranscriptionCompletedPayload } from "../types/events";
@@ -85,9 +87,33 @@ const DASHBOARD_STATS_SQL = `
   SELECT
     COUNT(*) as total_count,
     COALESCE(SUM(char_count), 0) as total_characters,
-    COALESCE(SUM(recording_duration_ms), 0) as total_recording_duration_ms,
-    COALESCE(SUM(CASE WHEN was_enhanced = 1 THEN 1 ELSE 0 END), 0) as enhanced_count
+    COALESCE(SUM(recording_duration_ms), 0) as total_recording_duration_ms
   FROM transcriptions
+`;
+
+const INSERT_API_USAGE_SQL = `
+  INSERT INTO api_usage (
+    id, transcription_id, api_type, model,
+    prompt_tokens, completion_tokens, total_tokens,
+    prompt_time_ms, completion_time_ms, total_time_ms,
+    audio_duration_ms, estimated_cost_ceiling
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+`;
+
+const TOTAL_COST_CEILING_SQL = `
+  SELECT COALESCE(SUM(estimated_cost_ceiling), 0) as total_cost_ceiling FROM api_usage
+`;
+
+const DAILY_USAGE_TREND_SQL = `
+  SELECT
+    DATE(datetime(timestamp / 1000, 'unixepoch', 'localtime')) as date,
+    COUNT(*) as count,
+    COALESCE(SUM(char_count), 0) as total_chars
+  FROM transcriptions
+  WHERE timestamp >= $1
+  GROUP BY date
+  ORDER BY date DESC
+  LIMIT $2
 `;
 
 const SELECT_RECENT_SQL = `
@@ -105,7 +131,16 @@ interface DashboardStatsRow {
   total_count: number;
   total_characters: number;
   total_recording_duration_ms: number;
-  enhanced_count: number;
+}
+
+interface TotalCostCeilingRow {
+  total_cost_ceiling: number;
+}
+
+interface DailyUsageTrendRow {
+  date: string;
+  count: number;
+  total_chars: number;
 }
 
 export const useHistoryStore = defineStore("history", () => {
@@ -227,34 +262,71 @@ export const useHistoryStore = defineStore("history", () => {
     totalTranscriptions: 0,
     totalCharacters: 0,
     totalRecordingDurationMs: 0,
-    averageSpeedCharsPerMin: 0,
     estimatedTimeSavedMs: 0,
-    enhancedCount: 0,
+    totalCostCeiling: 0,
   });
   const recentTranscriptionList = ref<TranscriptionRecord[]>([]);
+  const dailyUsageTrendList = ref<DailyUsageTrend[]>([]);
 
   async function fetchDashboardStats(): Promise<DashboardStats> {
     const db = getDatabase();
-    const rows = await db.select<DashboardStatsRow[]>(DASHBOARD_STATS_SQL);
-    const row = rows[0] ?? {
+    const [statsRows, costCeiling] = await Promise.all([
+      db.select<DashboardStatsRow[]>(DASHBOARD_STATS_SQL),
+      fetchTotalCostCeiling(),
+    ]);
+    const row = statsRows[0] ?? {
       total_count: 0,
       total_characters: 0,
       total_recording_duration_ms: 0,
-      enhanced_count: 0,
     };
-    const totalMinutes = row.total_recording_duration_ms / 60000;
 
     return {
       totalTranscriptions: row.total_count,
       totalCharacters: row.total_characters,
       totalRecordingDurationMs: row.total_recording_duration_ms,
-      averageSpeedCharsPerMin:
-        totalMinutes > 0 ? Math.round(row.total_characters / totalMinutes) : 0,
       estimatedTimeSavedMs: Math.round(
         (row.total_characters / ASSUMED_TYPING_SPEED_CHARS_PER_MIN) * 60000,
       ),
-      enhancedCount: row.enhanced_count,
+      totalCostCeiling: costCeiling,
     };
+  }
+
+  async function addApiUsage(record: ApiUsageRecord): Promise<void> {
+    const db = getDatabase();
+    await db.execute(INSERT_API_USAGE_SQL, [
+      record.id,
+      record.transcriptionId,
+      record.apiType,
+      record.model,
+      record.promptTokens,
+      record.completionTokens,
+      record.totalTokens,
+      record.promptTimeMs,
+      record.completionTimeMs,
+      record.totalTimeMs,
+      record.audioDurationMs,
+      record.estimatedCostCeiling,
+    ]);
+  }
+
+  async function fetchTotalCostCeiling(): Promise<number> {
+    const db = getDatabase();
+    const rows = await db.select<TotalCostCeilingRow[]>(TOTAL_COST_CEILING_SQL);
+    return rows[0]?.total_cost_ceiling ?? 0;
+  }
+
+  async function fetchDailyUsageTrend(days = 30): Promise<DailyUsageTrend[]> {
+    const db = getDatabase();
+    const cutoffTimestamp = Date.now() - days * 86_400_000;
+    const rows = await db.select<DailyUsageTrendRow[]>(DAILY_USAGE_TREND_SQL, [
+      cutoffTimestamp,
+      days,
+    ]);
+    return rows.map((row) => ({
+      date: row.date,
+      count: row.count,
+      totalChars: row.total_chars,
+    }));
   }
 
   async function fetchRecentTranscriptionList(
@@ -271,12 +343,16 @@ export const useHistoryStore = defineStore("history", () => {
     const results = await Promise.allSettled([
       fetchDashboardStats(),
       fetchRecentTranscriptionList(10),
+      fetchDailyUsageTrend(),
     ]);
     if (results[0].status === "fulfilled") {
       dashboardStats.value = results[0].value;
     }
     if (results[1].status === "fulfilled") {
       recentTranscriptionList.value = results[1].value;
+    }
+    if (results[2].status === "fulfilled") {
+      dailyUsageTrendList.value = results[2].value;
     }
   }
 
@@ -288,11 +364,13 @@ export const useHistoryStore = defineStore("history", () => {
     currentOffset,
     dashboardStats,
     recentTranscriptionList,
+    dailyUsageTrendList,
     fetchTranscriptionList,
     searchTranscriptionList,
     resetAndFetch,
     loadMore,
     addTranscription,
+    addApiUsage,
     fetchDashboardStats,
     fetchRecentTranscriptionList,
     refreshDashboard,
