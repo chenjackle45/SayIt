@@ -7,7 +7,10 @@ import {
 } from "../stores/useSettingsStore";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
-import type { TriggerKey } from "../types/settings";
+import {
+  type PresetTriggerKey,
+  isCustomTriggerKey,
+} from "../types/settings";
 import type { TriggerMode } from "../types";
 import {
   LLM_MODEL_LIST,
@@ -43,19 +46,19 @@ const settingsStore = useSettingsStore();
 // ── 快捷鍵設定 ──────────────────────────────────────────────
 const isMac = navigator.userAgent.includes("Mac");
 
-const MAC_TRIGGER_KEY_OPTIONS: { value: TriggerKey; label: string }[] = [
+const MAC_TRIGGER_KEY_OPTIONS: { value: PresetTriggerKey; label: string }[] = [
   { value: "fn", label: "Fn" },
-  { value: "option", label: "左 Option (\u2325)" },
-  { value: "rightOption", label: "右 Option (\u2325)" },
-  { value: "control", label: "左 Control (\u2303)" },
-  { value: "rightControl", label: "右 Control (\u2303)" },
-  { value: "command", label: "Command (\u2318)" },
-  { value: "shift", label: "Shift (\u21E7)" },
+  { value: "option", label: "左 Option (⌥)" },
+  { value: "rightOption", label: "右 Option (⌥)" },
+  { value: "control", label: "左 Control (⌃)" },
+  { value: "rightControl", label: "右 Control (⌃)" },
+  { value: "command", label: "Command (⌘)" },
+  { value: "shift", label: "Shift (⇧)" },
 ];
 
-const WINDOWS_TRIGGER_KEY_OPTIONS: { value: TriggerKey; label: string }[] = [
-  { value: "rightAlt", label: "\u53F3 Alt" },
-  { value: "leftAlt", label: "\u5DE6 Alt" },
+const WINDOWS_TRIGGER_KEY_OPTIONS: { value: PresetTriggerKey; label: string }[] = [
+  { value: "rightAlt", label: "右 Alt" },
+  { value: "leftAlt", label: "左 Alt" },
   { value: "control", label: "Control" },
   { value: "shift", label: "Shift" },
 ];
@@ -66,7 +69,129 @@ const triggerKeyOptions = isMac
 
 const hotkeyFeedback = useFeedbackMessage();
 
-async function handleTriggerKeyChange(newKey: TriggerKey) {
+// ── 兩層模式切換 ──────────────────────────────────────────
+const isCustomMode = ref(false);
+const isRecording = ref(false);
+const recordingWarning = ref("");
+const recordingHint = ref("");
+let recordingTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
+const RECORDING_TIMEOUT_MS = 10_000;
+
+const currentCustomKeyDisplay = computed(() => {
+  if (!settingsStore.customTriggerKeyDomCode) return "";
+  return settingsStore.getKeyDisplayName(settingsStore.customTriggerKeyDomCode);
+});
+
+const hasCustomKey = computed(() => settingsStore.customTriggerKey !== null);
+
+const currentPresetKey = computed(() => {
+  const key = settingsStore.hotkeyConfig?.triggerKey;
+  if (!key || isCustomTriggerKey(key)) return isMac ? "fn" : "rightAlt";
+  return key;
+});
+
+async function handleKeydownForRecording(event: KeyboardEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  // Escape cancels recording
+  if (event.code === "Escape") {
+    stopKeyRecording();
+    return;
+  }
+
+  const domCode = event.code;
+  const keycode = settingsStore.getPlatformKeycode(domCode);
+
+  if (keycode === null) {
+    hotkeyFeedback.show("error", settingsStore.getHotkeyUnsupportedKeyMessage());
+    stopKeyRecording();
+    return;
+  }
+
+  recordingWarning.value = "";
+  recordingHint.value = "";
+
+  const isPresetEquivalent = settingsStore.isPresetEquivalentKey(domCode);
+
+  // Check dangerous key (R17: skip danger warning if preset-equivalent)
+  if (!isPresetEquivalent) {
+    const dangerWarning = settingsStore.getDangerousKeyWarning(domCode);
+    if (dangerWarning) {
+      recordingWarning.value = dangerWarning;
+    }
+  }
+
+  // Check preset equivalent
+  if (isPresetEquivalent) {
+    recordingHint.value = settingsStore.getHotkeyPresetHint();
+  }
+
+  // Save the custom key (R15: await instead of fire-and-forget)
+  const currentMode = settingsStore.triggerMode;
+  stopKeyRecording();
+  try {
+    await settingsStore.saveCustomTriggerKey(keycode, domCode, currentMode);
+    hotkeyFeedback.show("success", `觸發鍵已設為 ${settingsStore.getKeyDisplayName(domCode)}`);
+  } catch (err) {
+    hotkeyFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+function startRecording() {
+  isRecording.value = true;
+  recordingWarning.value = "";
+  recordingHint.value = "";
+
+  // Dynamic keydown listener (Review F11)
+  document.addEventListener("keydown", handleKeydownForRecording, {
+    capture: true,
+    once: true,
+  });
+
+  // 10s timeout (Review F3)
+  recordingTimeoutId = setTimeout(() => {
+    if (isRecording.value) {
+      hotkeyFeedback.show("error", settingsStore.getHotkeyRecordingTimeoutMessage());
+      stopKeyRecording();
+    }
+  }, RECORDING_TIMEOUT_MS);
+}
+
+function stopKeyRecording() {
+  isRecording.value = false;
+  clearTimeout(recordingTimeoutId);
+  document.removeEventListener("keydown", handleKeydownForRecording, {
+    capture: true,
+  });
+}
+
+function switchToCustom() {
+  isCustomMode.value = true;
+  if (hasCustomKey.value) {
+    // Restore saved custom key as active
+    settingsStore
+      .switchToCustomMode(settingsStore.triggerMode)
+      .catch((err: unknown) => {
+        hotkeyFeedback.show("error", extractErrorMessage(err));
+      });
+  }
+}
+
+function switchToPreset() {
+  isCustomMode.value = false;
+  stopKeyRecording();
+  recordingWarning.value = "";
+  recordingHint.value = "";
+  settingsStore
+    .switchToPresetMode(currentPresetKey.value, settingsStore.triggerMode)
+    .catch((err: unknown) => {
+      hotkeyFeedback.show("error", extractErrorMessage(err));
+    });
+}
+
+async function handleTriggerKeyChange(newKey: PresetTriggerKey) {
   const currentMode = settingsStore.triggerMode;
   try {
     await settingsStore.saveHotkeyConfig(newKey, currentMode);
@@ -290,9 +415,16 @@ onMounted(async () => {
   thresholdEnabled.value = settingsStore.isEnhancementThresholdEnabled;
   thresholdCharCount.value = settingsStore.enhancementThresholdCharCount;
   await settingsStore.loadAutoStartStatus();
+
+  // Detect if current key is custom
+  const currentKey = settingsStore.hotkeyConfig?.triggerKey;
+  if (currentKey && isCustomTriggerKey(currentKey)) {
+    isCustomMode.value = true;
+  }
 });
 
 onBeforeUnmount(() => {
+  stopKeyRecording();
   hotkeyFeedback.clearTimer();
   apiKeyFeedback.clearTimer();
   promptFeedback.clearTimer();
@@ -312,12 +444,43 @@ onBeforeUnmount(() => {
         <CardTitle class="text-base">快捷鍵設定</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4 pt-5">
-        <!-- 觸發鍵 -->
+        <!-- 簡易 / 自訂 模式切換 -->
         <div class="flex items-center justify-between">
+          <Label>觸發鍵模式</Label>
+          <div class="flex rounded-lg border border-border overflow-hidden">
+            <button
+              type="button"
+              class="px-4 py-2 text-sm font-medium transition-colors"
+              :class="
+                !isCustomMode
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent'
+              "
+              @click="switchToPreset"
+            >
+              簡易
+            </button>
+            <button
+              type="button"
+              class="px-4 py-2 text-sm font-medium transition-colors"
+              :class="
+                isCustomMode
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent'
+              "
+              @click="switchToCustom"
+            >
+              自訂
+            </button>
+          </div>
+        </div>
+
+        <!-- 簡易模式：Select 下拉 -->
+        <div v-if="!isCustomMode" class="flex items-center justify-between">
           <Label for="trigger-key">觸發鍵</Label>
           <Select
-            :model-value="settingsStore.hotkeyConfig?.triggerKey"
-            @update:model-value="handleTriggerKeyChange($event as TriggerKey)"
+            :model-value="currentPresetKey"
+            @update:model-value="handleTriggerKeyChange($event as PresetTriggerKey)"
           >
             <SelectTrigger id="trigger-key" class="w-48">
               <SelectValue />
@@ -332,6 +495,40 @@ onBeforeUnmount(() => {
               </SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <!-- 自訂模式：錄製按鍵 -->
+        <div v-else class="space-y-3">
+          <div class="flex items-center justify-between">
+            <Label>自訂觸發鍵</Label>
+            <div class="flex items-center gap-3">
+              <span v-if="hasCustomKey" class="text-sm font-medium text-foreground">
+                {{ currentCustomKeyDisplay }}
+              </span>
+              <span v-else class="text-sm text-muted-foreground">未設定</span>
+              <Button
+                :variant="isRecording ? 'destructive' : 'outline'"
+                size="sm"
+                :class="{ 'animate-pulse': isRecording }"
+                @click="isRecording ? stopKeyRecording() : startRecording()"
+              >
+                {{ isRecording ? '請按下按鍵...' : '錄製' }}
+              </Button>
+            </div>
+          </div>
+          <p class="text-xs text-muted-foreground">
+            Fn、媒體鍵等系統鍵請使用簡易模式
+          </p>
+
+          <!-- 警告訊息（黃色） -->
+          <p v-if="recordingWarning" class="text-sm text-destructive">
+            {{ recordingWarning }}
+          </p>
+
+          <!-- 提示訊息（藍色） -->
+          <p v-if="recordingHint" class="text-sm text-muted-foreground">
+            {{ recordingHint }}
+          </p>
         </div>
 
         <!-- 觸發模式 -->

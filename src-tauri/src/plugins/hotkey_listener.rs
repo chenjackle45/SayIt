@@ -24,6 +24,8 @@ pub enum TriggerKey {
     Control,      // macOS: 59 (left), Windows: VK_LCONTROL (0xA2)
     RightControl, // macOS: 62
     Shift,        // macOS: 56, Windows: VK_LSHIFT (0xA0)
+    // User-defined key (keycode is platform-specific: macOS CGEvent keycode / Windows VK code)
+    Custom { keycode: u16 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -146,7 +148,9 @@ mod macos_keycodes {
     pub const CONTROL_L: u16 = 59;
     pub const CONTROL_R: u16 = 62;
     pub const COMMAND_L: u16 = 55;
+    pub const COMMAND_R: u16 = 54;
     pub const SHIFT_L: u16 = 56;
+    pub const SHIFT_R: u16 = 60;
 }
 
 #[cfg(target_os = "macos")]
@@ -219,6 +223,7 @@ fn matches_trigger_key_macos(keycode: u16, trigger_key: &TriggerKey) -> bool {
         TriggerKey::RightControl => keycode == macos_keycodes::CONTROL_R,
         TriggerKey::Command => keycode == macos_keycodes::COMMAND_L,
         TriggerKey::Shift => keycode == macos_keycodes::SHIFT_L,
+        TriggerKey::Custom { keycode: custom_kc } => keycode == *custom_kc,
         _ => false, // Windows-only keys
     }
 }
@@ -236,6 +241,26 @@ fn is_modifier_pressed(flags: CGEventFlags, trigger_key: &TriggerKey) -> Option<
         }
         TriggerKey::Command => Some(flags.contains(CGEventFlags::CGEventFlagCommand)),
         TriggerKey::Shift => Some(flags.contains(CGEventFlags::CGEventFlagShift)),
+        TriggerKey::Custom { keycode } => {
+            // If custom keycode is a known modifier, use flag-based detection
+            // for more reliable press/release than toggle-based
+            match *keycode {
+                macos_keycodes::OPTION_L | macos_keycodes::OPTION_R => {
+                    Some(flags.contains(CGEventFlags::CGEventFlagAlternate))
+                }
+                macos_keycodes::CONTROL_L | macos_keycodes::CONTROL_R => {
+                    Some(flags.contains(CGEventFlags::CGEventFlagControl))
+                }
+                macos_keycodes::COMMAND_L | macos_keycodes::COMMAND_R => {
+                    Some(flags.contains(CGEventFlags::CGEventFlagCommand))
+                }
+                macos_keycodes::SHIFT_L | macos_keycodes::SHIFT_R => {
+                    Some(flags.contains(CGEventFlags::CGEventFlagShift))
+                }
+                macos_keycodes::FN => Some(flags.contains(CGEventFlags::CGEventFlagSecondaryFn)),
+                _ => None, // Non-modifier custom key: use keycode-based toggle
+            }
+        }
         _ => None,
     }
 }
@@ -296,6 +321,26 @@ fn start_event_tap<R: Runtime>(app_handle: AppHandle<R>, state: HotkeyListenerSt
                                     &state,
                                 );
                             }
+                        } else if let TriggerKey::Custom { keycode: custom_kc } = &trigger {
+                            // Custom key as modifier in FlagsChanged
+                            if keycode == *custom_kc {
+                                // Prefer flag-based detection if this is a known modifier
+                                if let Some(pressed) = is_modifier_pressed(flags, &trigger) {
+                                    handle_key_event(
+                                        &app_handle,
+                                        pressed,
+                                        &state,
+                                    );
+                                } else {
+                                    // Unknown modifier: fallback to toggle-based
+                                    let was_pressed = state.is_pressed.load(Ordering::SeqCst);
+                                    handle_key_event(
+                                        &app_handle,
+                                        !was_pressed,
+                                        &state,
+                                    );
+                                }
+                            }
                         } else if matches_trigger_key_macos(keycode, &trigger) {
                             // Other modifier keys: flag-based press/release detection
                             if let Some(pressed) = is_modifier_pressed(flags, &trigger) {
@@ -308,23 +353,41 @@ fn start_event_tap<R: Runtime>(app_handle: AppHandle<R>, state: HotkeyListenerSt
                         }
                     }
                     CGEventType::KeyDown => {
-                        // Fallback for Fn key only (other modifiers don't fire KeyDown)
                         if trigger == TriggerKey::Fn && keycode == macos_keycodes::FN {
+                            // Fallback for Fn key
                             handle_key_event(
                                 &app_handle,
                                 true,
                                 &state,
                             );
+                        } else if let TriggerKey::Custom { keycode: custom_kc } = &trigger {
+                            // Custom non-modifier key: KeyDown fires pressed
+                            if keycode == *custom_kc {
+                                handle_key_event(
+                                    &app_handle,
+                                    true,
+                                    &state,
+                                );
+                            }
                         }
                     }
                     CGEventType::KeyUp => {
-                        // Fallback for Fn key only
                         if trigger == TriggerKey::Fn && keycode == macos_keycodes::FN {
+                            // Fallback for Fn key
                             handle_key_event(
                                 &app_handle,
                                 false,
                                 &state,
                             );
+                        } else if let TriggerKey::Custom { keycode: custom_kc } = &trigger {
+                            // Custom non-modifier key: KeyUp fires released
+                            if keycode == *custom_kc {
+                                handle_key_event(
+                                    &app_handle,
+                                    false,
+                                    &state,
+                                );
+                            }
                         }
                     }
                     _ => {}
@@ -379,6 +442,7 @@ mod windows_hook {
     // Windows VK codes
     const VK_LSHIFT: u32 = 0xA0;
     const VK_LCONTROL: u32 = 0xA2;
+    const VK_RCONTROL: u32 = 0xA3;
     const VK_LMENU: u32 = 0xA4;
     const VK_RMENU: u32 = 0xA5;
 
@@ -462,7 +526,9 @@ mod windows_hook {
                         TriggerKey::RightAlt => kbd.vkCode == VK_RMENU,
                         TriggerKey::LeftAlt => kbd.vkCode == VK_LMENU,
                         TriggerKey::Control => kbd.vkCode == VK_LCONTROL,
+                        TriggerKey::RightControl => kbd.vkCode == VK_RCONTROL,
                         TriggerKey::Shift => kbd.vkCode == VK_LSHIFT,
+                        TriggerKey::Custom { keycode } => kbd.vkCode == keycode as u32,
                         _ => false, // macOS-only keys
                     };
 
@@ -536,4 +602,64 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             Ok(())
         })
         .build()
+}
+
+// ========== Tests ==========
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_custom_trigger_key_serde_serialize() {
+        let key = TriggerKey::Custom { keycode: 96 };
+        let value = serde_json::to_value(&key).unwrap();
+        assert_eq!(value, json!({"custom": {"keycode": 96}}));
+    }
+
+    #[test]
+    fn test_custom_trigger_key_serde_deserialize() {
+        let json_val = json!({"custom": {"keycode": 96}});
+        let key: TriggerKey = serde_json::from_value(json_val).unwrap();
+        assert_eq!(key, TriggerKey::Custom { keycode: 96 });
+    }
+
+    #[test]
+    fn test_preset_trigger_key_serde_roundtrip() {
+        // Verify existing preset keys are not affected by the new Custom variant
+        let key = TriggerKey::Fn;
+        let serialized = serde_json::to_value(&key).unwrap();
+        assert_eq!(serialized, json!("fn"));
+        let deserialized: TriggerKey = serde_json::from_value(json!("fn")).unwrap();
+        assert_eq!(deserialized, TriggerKey::Fn);
+    }
+
+    #[test]
+    fn test_preset_trigger_key_backward_compat() {
+        // All preset keys must still deserialize from plain strings
+        let presets = vec![
+            ("\"fn\"", TriggerKey::Fn),
+            ("\"option\"", TriggerKey::Option),
+            ("\"rightOption\"", TriggerKey::RightOption),
+            ("\"command\"", TriggerKey::Command),
+            ("\"rightAlt\"", TriggerKey::RightAlt),
+            ("\"leftAlt\"", TriggerKey::LeftAlt),
+            ("\"control\"", TriggerKey::Control),
+            ("\"rightControl\"", TriggerKey::RightControl),
+            ("\"shift\"", TriggerKey::Shift),
+        ];
+        for (json_str, expected) in presets {
+            let deserialized: TriggerKey = serde_json::from_str(json_str).unwrap();
+            assert_eq!(deserialized, expected, "Failed for {}", json_str);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_matches_trigger_key_macos_custom() {
+        let key = TriggerKey::Custom { keycode: 96 }; // F5 on macOS
+        assert!(matches_trigger_key_macos(96, &key));
+        assert!(!matches_trigger_key_macos(97, &key));
+    }
 }

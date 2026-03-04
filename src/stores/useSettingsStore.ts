@@ -3,8 +3,25 @@ import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { load } from "@tauri-apps/plugin-store";
 import type { TriggerMode } from "../types";
-import type { HotkeyConfig, TriggerKey } from "../types/settings";
-import { extractErrorMessage } from "../lib/errorUtils";
+import {
+  type HotkeyConfig,
+  type TriggerKey,
+  type CustomTriggerKey,
+  isCustomTriggerKey,
+  isPresetTriggerKey,
+} from "../types/settings";
+import {
+  getKeyDisplayName,
+  getPlatformKeycode,
+  isPresetEquivalentKey,
+  getDangerousKeyWarning,
+} from "../lib/keycodeMap";
+import {
+  extractErrorMessage,
+  getHotkeyRecordingTimeoutMessage,
+  getHotkeyUnsupportedKeyMessage,
+  getHotkeyPresetHint,
+} from "../lib/errorUtils";
 import { DEFAULT_SYSTEM_PROMPT } from "../lib/enhancer";
 import { emitEvent, SETTINGS_UPDATED } from "../composables/useTauriEvents";
 import type { SettingsUpdatedPayload } from "../types/events";
@@ -27,6 +44,18 @@ function getDefaultTriggerKey(): TriggerKey {
   return isMac ? "fn" : "rightAlt";
 }
 
+const PRESET_KEY_DISPLAY_NAMES: Record<string, string> = {
+  fn: "Fn",
+  option: "Option (⌥)",
+  rightOption: "Right Option (⌥)",
+  command: "Command (⌘)",
+  rightAlt: "Right Alt",
+  leftAlt: "Left Alt",
+  control: "Control (⌃)",
+  rightControl: "Right Control",
+  shift: "Shift (⇧)",
+};
+
 export const useSettingsStore = defineStore("settings", () => {
   const hotkeyConfig = ref<HotkeyConfig | null>(null);
   const triggerMode = computed<TriggerMode>(
@@ -44,6 +73,8 @@ export const useSettingsStore = defineStore("settings", () => {
   );
   const selectedLlmModelId = ref<LlmModelId>(DEFAULT_LLM_MODEL_ID);
   const selectedWhisperModelId = ref<WhisperModelId>(DEFAULT_WHISPER_MODEL_ID);
+  const customTriggerKey = ref<CustomTriggerKey | null>(null);
+  const customTriggerKeyDomCode = ref<string>("");
   let isLoaded = false;
 
   function getApiKey(): string {
@@ -73,11 +104,23 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedMode = await store.get<TriggerMode>("hotkeyTriggerMode");
       const savedApiKey = await store.get<string>("groqApiKey");
 
+      // Backward-compatible key parsing: string → PresetTriggerKey, object → CustomTriggerKey
       const key = savedKey ?? getDefaultTriggerKey();
       const mode = savedMode ?? "hold";
 
       hotkeyConfig.value = { triggerKey: key, triggerMode: mode };
       apiKey.value = savedApiKey?.trim() ?? "";
+
+      // Load independently persisted custom key
+      const savedCustomKey =
+        await store.get<CustomTriggerKey>("customTriggerKey");
+      const savedCustomDomCode = await store.get<string>(
+        "customTriggerKeyDomCode",
+      );
+      if (savedCustomKey && isCustomTriggerKey(savedCustomKey)) {
+        customTriggerKey.value = savedCustomKey;
+        customTriggerKeyDomCode.value = savedCustomDomCode ?? "";
+      }
 
       const savedPrompt = await store.get<string>("aiPrompt");
       aiPrompt.value = savedPrompt?.trim() || DEFAULT_SYSTEM_PROMPT;
@@ -108,7 +151,7 @@ export const useSettingsStore = defineStore("settings", () => {
       await syncHotkeyConfigToRust(key, mode);
       isLoaded = true;
       console.log(
-        `[useSettingsStore] Settings loaded: key=${key}, mode=${mode}`,
+        `[useSettingsStore] Settings loaded: key=${JSON.stringify(key)}, mode=${mode}`,
       );
     } catch (err) {
       console.error(
@@ -146,7 +189,7 @@ export const useSettingsStore = defineStore("settings", () => {
       await emitEvent(SETTINGS_UPDATED, payload);
 
       console.log(
-        `[useSettingsStore] Hotkey config saved: key=${key}, mode=${mode}`,
+        `[useSettingsStore] Hotkey config saved: key=${JSON.stringify(key)}, mode=${mode}`,
       );
     } catch (err) {
       console.error(
@@ -155,6 +198,59 @@ export const useSettingsStore = defineStore("settings", () => {
       );
       throw err;
     }
+  }
+
+  async function saveCustomTriggerKey(
+    keycode: number,
+    domCode: string,
+    mode: TriggerMode,
+  ) {
+    const customKey: CustomTriggerKey = { custom: { keycode } };
+    try {
+      // Persist custom key independently (survives mode switching)
+      const store = await load(STORE_NAME);
+      await store.set("customTriggerKey", customKey);
+      await store.set("customTriggerKeyDomCode", domCode);
+      await store.save();
+
+      customTriggerKey.value = customKey;
+      customTriggerKeyDomCode.value = domCode;
+
+      // Reuse shared logic for active key + Rust sync + event broadcast
+      await saveHotkeyConfig(customKey, mode);
+
+      console.log(
+        `[useSettingsStore] Custom trigger key saved: keycode=${keycode}, domCode=${domCode}, mode=${mode}`,
+      );
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveCustomTriggerKey failed:",
+        extractErrorMessage(err),
+      );
+      throw err;
+    }
+  }
+
+  async function switchToPresetMode(presetKey: TriggerKey, mode: TriggerMode) {
+    // Only update active key; keep customTriggerKey intact
+    await saveHotkeyConfig(presetKey, mode);
+  }
+
+  async function switchToCustomMode(mode: TriggerMode) {
+    if (!customTriggerKey.value) return;
+    // Restore custom key as active key
+    await saveHotkeyConfig(customTriggerKey.value, mode);
+  }
+
+  function getTriggerKeyDisplayName(key: TriggerKey): string {
+    if (isPresetTriggerKey(key)) {
+      return PRESET_KEY_DISPLAY_NAMES[key] ?? key;
+    }
+    // For custom keys, use saved DOM code to look up display name
+    if (customTriggerKeyDomCode.value) {
+      return getKeyDisplayName(customTriggerKeyDomCode.value);
+    }
+    return `自訂鍵 (${key.custom.keycode})`;
   }
 
   async function saveApiKey(key: string) {
@@ -442,6 +538,20 @@ export const useSettingsStore = defineStore("settings", () => {
     refreshApiKey,
     loadSettings,
     saveHotkeyConfig,
+    saveCustomTriggerKey,
+    switchToPresetMode,
+    switchToCustomMode,
+    getTriggerKeyDisplayName,
+    customTriggerKey,
+    customTriggerKeyDomCode,
+    // Hotkey recording helpers (proxied from lib/ for views)
+    getPlatformKeycode,
+    getKeyDisplayName,
+    isPresetEquivalentKey,
+    getDangerousKeyWarning,
+    getHotkeyRecordingTimeoutMessage,
+    getHotkeyUnsupportedKeyMessage,
+    getHotkeyPresetHint,
     saveApiKey,
     deleteApiKey,
     saveEnhancementThreshold,
