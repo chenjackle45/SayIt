@@ -1,13 +1,10 @@
 // ── LLM 模型（文字整理用）────────────────────────────────
 
 export type LlmModelId =
-  | "llama-3.1-8b-instant"
   | "llama-3.3-70b-versatile"
   | "meta-llama/llama-4-scout-17b-16e-instruct"
   | "meta-llama/llama-4-maverick-17b-128e-instruct"
-  | "qwen/qwen3-32b"
-  | "openai/gpt-oss-120b"
-  | "openai/gpt-oss-20b";
+  | "qwen/qwen3-32b";
 
 export interface LlmModelConfig {
   id: LlmModelId;
@@ -35,14 +32,17 @@ export interface WhisperModelConfig {
 
 // ── 預設值 ────────────────────────────────────────────────
 
-export const DEFAULT_LLM_MODEL_ID: LlmModelId = "llama-3.3-70b-versatile";
+export const DEFAULT_LLM_MODEL_ID: LlmModelId = "qwen/qwen3-32b";
 export const DEFAULT_WHISPER_MODEL_ID: WhisperModelId = "whisper-large-v3";
 
 // ── 已下架模型 ID 映射（舊 → 新，用於自動遷移）──────────
 
 export const DECOMMISSIONED_MODEL_MAP: Record<string, LlmModelId> = {
   "qwen-qwq-32b": "qwen/qwen3-32b",
-  "gpt-oss-120b": "openai/gpt-oss-120b",
+  "gpt-oss-120b": "qwen/qwen3-32b",
+  "openai/gpt-oss-120b": "qwen/qwen3-32b",
+  "openai/gpt-oss-20b": "qwen/qwen3-32b",
+  "llama-3.1-8b-instant": "qwen/qwen3-32b",
   "llama-4-scout-17b-16e-instruct": "meta-llama/llama-4-scout-17b-16e-instruct",
   "llama-4-maverick-17b-128e-instruct":
     "meta-llama/llama-4-maverick-17b-128e-instruct",
@@ -59,26 +59,6 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
     outputCostPerMillion: 0.79,
     freeQuotaRpd: 1_000,
     freeQuotaTpd: 100_000,
-    isDefault: true,
-  },
-  {
-    id: "openai/gpt-oss-120b",
-    displayName: "GPT OSS 120B",
-    speedTps: 500,
-    inputCostPerMillion: 0.15,
-    outputCostPerMillion: 0.6,
-    freeQuotaRpd: 1_000,
-    freeQuotaTpd: 200_000,
-    isDefault: false,
-  },
-  {
-    id: "openai/gpt-oss-20b",
-    displayName: "GPT OSS 20B",
-    speedTps: 1_000,
-    inputCostPerMillion: 0.075,
-    outputCostPerMillion: 0.3,
-    freeQuotaRpd: 1_000,
-    freeQuotaTpd: 200_000,
     isDefault: false,
   },
   {
@@ -109,17 +89,7 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
     outputCostPerMillion: 0.59,
     freeQuotaRpd: 1_000,
     freeQuotaTpd: 500_000,
-    isDefault: false,
-  },
-  {
-    id: "llama-3.1-8b-instant",
-    displayName: "Llama 3.1 8B Instant",
-    speedTps: 560,
-    inputCostPerMillion: 0.05,
-    outputCostPerMillion: 0.08,
-    freeQuotaRpd: 14_400,
-    freeQuotaTpd: 500_000,
-    isDefault: false,
+    isDefault: true,
   },
 ];
 

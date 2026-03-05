@@ -56,20 +56,20 @@ describe("apiPricing.ts", () => {
     });
 
     it("[P0] 1000 tokens 應按 output 價格上限計算", () => {
-      // 1000 * 0.00000079 = 0.00079
+      // 1000 * 0.00000059 = 0.00059
       const cost = calculateChatCostCeiling(1000);
-      expect(cost).toBeCloseTo(0.00079, 6);
+      expect(cost).toBeCloseTo(0.00059, 6);
     });
 
-    it("[P0] 1M tokens 應回傳 $0.79", () => {
+    it("[P0] 1M tokens 應回傳 $0.59", () => {
       const cost = calculateChatCostCeiling(1_000_000);
-      expect(cost).toBeCloseTo(0.79, 4);
+      expect(cost).toBeCloseTo(0.59, 4);
     });
 
     it("[P1] 150 tokens 應正確計算", () => {
-      // 150 * 0.00000079 = 0.0001185
+      // 150 * 0.00000059 = 0.0000885
       const cost = calculateChatCostCeiling(150);
-      expect(cost).toBeCloseTo(0.0001185, 6);
+      expect(cost).toBeCloseTo(0.0000885, 6);
     });
   });
 });
