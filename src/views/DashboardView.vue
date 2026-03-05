@@ -173,7 +173,7 @@ onBeforeUnmount(() => {
           <TooltipTrigger as-child>
             <Card class="cursor-default">
               <CardHeader class="pb-2">
-                <CardDescription>今日免費額度</CardDescription>
+                <CardDescription>今日剩餘免費額度</CardDescription>
               </CardHeader>
               <CardContent>
                 <p class="text-2xl font-bold text-foreground">
@@ -193,7 +193,7 @@ onBeforeUnmount(() => {
             </Card>
           </TooltipTrigger>
           <TooltipContent class="w-72 p-3 bg-card text-card-foreground border border-border" side="bottom" :side-offset="6" hide-arrow>
-            <p class="text-xs font-medium mb-2">今日免費額度明細</p>
+            <p class="text-xs font-medium mb-2">今日剩餘免費額度明細</p>
             <div class="space-y-2">
               <div v-for="(dim, idx) in quotaDimensionList" :key="idx">
                 <div class="flex items-center justify-between text-xs">
