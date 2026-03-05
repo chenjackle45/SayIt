@@ -370,14 +370,22 @@ src/
 
 #### 產出格式
 
-- **macOS** — `.dmg`（含 `.app`），簽署用 `TAURI_SIGNING_PRIVATE_KEY` 環境變數
-- **Windows** — `.msi` 或 NSIS `.exe`
-- **自動更新** — `tauri-plugin-updater` + 自訂 endpoint
+- **macOS** — `.dmg`（含 `.app`），Apple Developer ID 簽名 + Notarization
+- **Windows** — NSIS `.exe` + `.msi`
+- **自動更新** — `tauri-plugin-updater` + GitHub Releases endpoint（啟動 5 秒後首次檢查，每 4 小時定時檢查 + Sidebar 手動檢查按鈕）
+
+#### CI/CD
+
+- **CI** — `.github/workflows/ci.yml`（push/PR to main → vue-tsc + Vitest）
+- **Release** — `.github/workflows/release.yml`（tag `v*` → 3 平台建構 + Apple 簽名）
+- **發版腳本** — `./scripts/release.sh X.Y.Z`
+- **GitHub Secrets** — 8 個（Tauri signing key + Apple 簽名 6 個）
 
 #### 環境變數
 
-- **`VITE_GROQ_API_KEY`** — 開發時 Groq API Key（前端可存取）
-- **`TAURI_SIGNING_PRIVATE_KEY`** — 建構簽署金鑰（僅 CI/CD）
+- **`TAURI_SIGNING_PRIVATE_KEY`** — Updater 簽署金鑰（CI/CD）
+- **`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`** — 私鑰密碼（CI/CD）
+- **`APPLE_CERTIFICATE` 等 6 個** — Apple Code Signing（CI/CD，見 CLAUDE.md）
 - **`.env` 不進 git** — `.gitignore` 排除
 
 ### Critical Don't-Miss Rules

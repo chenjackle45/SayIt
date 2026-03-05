@@ -269,27 +269,36 @@ CREATE TABLE IF NOT EXISTS schema_version (
 
 ### Infrastructure & Deployment
 
-**決策：自訂 Endpoint 自動更新（Phase 1 納入）**
+**決策：GitHub Releases 自動更新**
 
-- 使用 tauri-plugin-updater + 自訂 endpoint（靜態 JSON + 檔案託管）
-- 託管選項：Cloudflare R2 / AWS S3 / 公司內部伺服器
-- 不需要 public repo，不需要後端服務
-- 使用者體驗：App 啟動時背景檢查 → 自動下載 → 提示重啟 → 一鍵完成
+- 使用 tauri-plugin-updater + GitHub Releases endpoint
+- Updater endpoint: `https://github.com/chenjackle45/SayIt/releases/latest/download/latest.json`
+- Public repo: `chenjackle45/SayIt`
+- 使用者體驗：
+  - **定時檢查** — 啟動 5 秒後首次檢查，之後每 4 小時背景檢查
+  - **手動檢查** — Sidebar Footer 的「檢查更新」按鈕，結果以 inline feedback 顯示（2.5 秒自動消失）
+  - **更新流程** — 自動下載 → 提示重啟 → 一鍵完成
+- `checkForAppUpdate()` 回傳 `UpdateCheckResult`（`up-to-date` | `update-available` | `error`），供 UI 顯示結果
+
+**CI/CD Pipeline（已實作）：**
+- **CI**（`.github/workflows/ci.yml`）— push/PR to main 觸發 vue-tsc + Vitest
+- **Release**（`.github/workflows/release.yml`）— push tag `v*` 觸發 3 平台建構
+  - macOS ARM + Intel：Apple Code Signing + Notarization
+  - Windows x64：NSIS installer
 
 **發版流程：**
-1. `tauri signer generate` 產生金鑰對（一次性）
-2. `TAURI_SIGNING_PRIVATE_KEY=xxx cargo tauri build` 產出安裝包 + `.sig`
-3. 上傳安裝包到託管位置
-4. 更新 endpoint JSON（version、url、signature）
-5. 使用者的 App 自動偵測並提示更新
+1. `./scripts/release.sh X.Y.Z`（自動更新版本號、commit、tag、push）
+2. 等 GitHub Actions 完成（約 10-15 分鐘）
+3. 到 GitHub Releases 手動 Publish draft release
+4. 使用者的 App 自動偵測並提示更新
 
-**Code Signing：**
-- macOS：需 Apple Developer ID 避免 Gatekeeper 攔截（可延後，開發期用 ad-hoc）
-- Windows：SmartScreen 信任需 EV code signing certificate（可延後，初期使用者手動信任）
+**Code Signing（已實作）：**
+- macOS：Developer ID Application — `Tai-Cheng Chen (G9J8D2T6DV)`，含 Notarization
+- Windows：暫無 EV code signing certificate，初期使用者手動信任
 
 **安裝包格式：**
-- macOS：`.dmg`（含 `.app`）
-- Windows：`.msi` 或 NSIS `.exe`
+- macOS：`.dmg`（含 `.app`）+ `.app.tar.gz`（updater 用）
+- Windows：NSIS `.exe` + `.msi`
 
 ### Decision Impact Analysis
 

@@ -74,6 +74,13 @@
 | `settings:updated` | `SETTINGS_UPDATED` | SettingsStore | All Windows |
 | `vocabulary:changed` | `VOCABULARY_CHANGED` | VocabularyStore | All Windows |
 
+## 自動更新機制
+
+- **定時檢查** — `main-window.ts`：啟動 5 秒後首次檢查，之後每 4 小時（`setInterval`）
+- **手動檢查** — `MainApp.vue` Sidebar Footer「檢查更新」按鈕，結果用 `useFeedbackMessage` 顯示
+- **回傳型別** — `checkForAppUpdate()` → `Promise<UpdateCheckResult>`（`up-to-date` | `update-available` | `error`）
+- **已知限制** — `autoUpdater.ts` 中 `window.confirm` 在 Tauri WKWebView 會被靜默忽略，未來需改用 in-app UI
+
 ## 依賴方向規則
 
 ```
@@ -160,6 +167,50 @@
 | `pnpm test` | 跑 Vitest |
 | `pnpm test:coverage` | 覆蓋率報告 |
 | `npx vue-tsc --noEmit` | 型別檢查 |
+| `./scripts/release.sh X.Y.Z` | 發版（更新版本號 + tag + push） |
+
+## CI/CD Pipeline
+
+```
+ push/PR to main           push tag v*
+       │                        │
+       ▼                        ▼
+ ┌──────────┐         ┌─────────────────┐
+ │  ci.yml  │         │  release.yml    │
+ │ vue-tsc  │         │ 3 matrix jobs:  │
+ │ vitest   │         │  macOS ARM      │
+ └──────────┘         │  macOS Intel    │
+                      │  Windows x64    │
+                      │                 │
+                      │ + Apple Signing │
+                      │ + Notarization  │
+                      │ + Updater .sig  │
+                      └────────┬────────┘
+                               │
+                          Draft Release
+                         （手動 Publish）
+```
+
+### GitHub Secrets（8 個）
+
+| Secret | 用途 |
+|--------|------|
+| `TAURI_SIGNING_PRIVATE_KEY` | Updater 簽署私鑰 |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 私鑰密碼 |
+| `APPLE_CERTIFICATE` | Developer ID .p12 (Base64) |
+| `APPLE_CERTIFICATE_PASSWORD` | .p12 密碼 |
+| `APPLE_SIGNING_IDENTITY` | `Developer ID Application: Tai-Cheng Chen (G9J8D2T6DV)` |
+| `APPLE_ID` | Apple ID email |
+| `APPLE_PASSWORD` | App-Specific Password |
+| `APPLE_TEAM_ID` | `G9J8D2T6DV` |
+
+### 固定下載連結（官網用）
+
+| 平台 | URL |
+|------|-----|
+| macOS ARM | `https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-mac-arm64.dmg` |
+| macOS Intel | `https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-mac-x64.dmg` |
+| Windows | `https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-windows-x64.exe` |
 
 ## Subagent
 
