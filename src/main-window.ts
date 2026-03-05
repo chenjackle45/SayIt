@@ -41,14 +41,19 @@ async function bootstrap() {
     console.log("[main-window] API Key missing, redirected to settings");
   }
 
-  // 延遲 5 秒背景檢查更新，避免影響啟動體驗
-  setTimeout(async () => {
+  // 背景定時檢查更新：啟動 5 秒後首次檢查，之後每 4 小時檢查一次
+  const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+  const runUpdateCheck = async () => {
     try {
       const { checkForAppUpdate } = await import("./lib/autoUpdater");
       await checkForAppUpdate();
     } catch (err) {
       console.error("[main-window] Update check failed (silenced):", err);
     }
+  };
+  setTimeout(() => {
+    runUpdateCheck();
+    setInterval(runUpdateCheck, UPDATE_CHECK_INTERVAL_MS);
   }, 5000);
 
   console.log("[main-window] Dashboard initialized");

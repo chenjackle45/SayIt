@@ -24,16 +24,14 @@ describe("autoUpdater.ts", () => {
     vi.restoreAllMocks();
   });
 
-  it("[P0] 無更新時應靜默結束", async () => {
+  it("[P0] 無更新時應回傳 up-to-date", async () => {
     mockCheck.mockResolvedValue(null);
 
     const { checkForAppUpdate } = await import("../../src/lib/autoUpdater");
-    await checkForAppUpdate();
+    const result = await checkForAppUpdate();
 
+    expect(result).toEqual({ status: "up-to-date" });
     expect(mockCheck).toHaveBeenCalledOnce();
-    expect(console.log).toHaveBeenCalledWith(
-      "[autoUpdater] No update available",
-    );
   });
 
   it("[P0] 有更新且使用者同意應下載並重啟", async () => {
@@ -47,8 +45,9 @@ describe("autoUpdater.ts", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     const { checkForAppUpdate } = await import("../../src/lib/autoUpdater");
-    await checkForAppUpdate();
+    const result = await checkForAppUpdate();
 
+    expect(result).toEqual({ status: "update-available", version: "1.2.0" });
     expect(mockDownload).toHaveBeenCalledOnce();
     expect(mockInstall).toHaveBeenCalledOnce();
     expect(mockRelaunch).toHaveBeenCalledOnce();
@@ -72,19 +71,20 @@ describe("autoUpdater.ts", () => {
     expect(mockRelaunch).not.toHaveBeenCalled();
   });
 
-  it("[P0] check 失敗應靜默處理不拋錯", async () => {
+  it("[P0] check 失敗應回傳 error 結果且不拋錯", async () => {
     mockCheck.mockRejectedValue(new Error("Network error"));
 
     const { checkForAppUpdate } = await import("../../src/lib/autoUpdater");
-    await expect(checkForAppUpdate()).resolves.toBeUndefined();
+    const result = await checkForAppUpdate();
 
+    expect(result).toEqual({ status: "error", error: "Network error" });
     expect(console.error).toHaveBeenCalledWith(
-      "[autoUpdater] Update check failed (silenced):",
-      expect.any(Error),
+      "[autoUpdater] Update check failed:",
+      "Network error",
     );
   });
 
-  it("[P0] 下載失敗應靜默處理不拋錯", async () => {
+  it("[P0] 下載失敗應回傳 error 結果且不拋錯", async () => {
     const mockDownload = vi
       .fn()
       .mockRejectedValue(new Error("Download failed"));
@@ -95,11 +95,12 @@ describe("autoUpdater.ts", () => {
     });
 
     const { checkForAppUpdate } = await import("../../src/lib/autoUpdater");
-    await expect(checkForAppUpdate()).resolves.toBeUndefined();
+    const result = await checkForAppUpdate();
 
+    expect(result).toEqual({ status: "error", error: "Download failed" });
     expect(console.error).toHaveBeenCalledWith(
-      "[autoUpdater] Update check failed (silenced):",
-      expect.any(Error),
+      "[autoUpdater] Update check failed:",
+      "Download failed",
     );
   });
 });

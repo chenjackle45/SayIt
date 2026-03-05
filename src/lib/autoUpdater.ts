@@ -1,16 +1,23 @@
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
+export interface UpdateCheckResult {
+  status: "up-to-date" | "update-available" | "error";
+  version?: string;
+  error?: string;
+}
+
 /**
- * 背景檢查 App 更新，下載完成後提示使用者重啟。
- * 全程靜默錯誤處理，不影響 App 正常使用。
+ * 檢查 App 更新。
+ * - 背景呼叫時靜默處理錯誤
+ * - 手動呼叫時回傳結果供 UI 通知使用者
  */
-export async function checkForAppUpdate(): Promise<void> {
+export async function checkForAppUpdate(): Promise<UpdateCheckResult> {
   try {
     const update = await check();
     if (!update) {
       console.log("[autoUpdater] No update available");
-      return;
+      return { status: "up-to-date" };
     }
 
     console.log(`[autoUpdater] Update available: v${update.version}`);
@@ -26,8 +33,11 @@ export async function checkForAppUpdate(): Promise<void> {
       await update.install();
       await relaunch();
     }
+
+    return { status: "update-available", version: update.version };
   } catch (err) {
-    // 靜默失敗：endpoint 不可用、網路問題、簽名驗證失敗
-    console.error("[autoUpdater] Update check failed (silenced):", err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[autoUpdater] Update check failed:", message);
+    return { status: "error", error: message };
   }
 }

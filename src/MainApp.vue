@@ -10,6 +10,9 @@ import { computed, markRaw, onMounted, ref } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import AccessibilityGuide from "./components/AccessibilityGuide.vue";
 import SiteHeader from "./components/SiteHeader.vue";
+import { Button } from "@/components/ui/button";
+import { useFeedbackMessage } from "./composables/useFeedbackMessage";
+import type { UpdateCheckResult } from "./lib/autoUpdater";
 import {
   Sidebar,
   SidebarContent,
@@ -41,6 +44,35 @@ const currentPageTitle = computed(() => {
 });
 
 const showAccessibilityGuide = ref(false);
+const isCheckingUpdate = ref(false);
+const updateButtonLabel = ref("檢查更新");
+const updateFeedback = useFeedbackMessage();
+
+function showUpdateResult(result: UpdateCheckResult) {
+  if (result.status === "up-to-date") {
+    updateFeedback.show("success", "已是最新版本");
+  } else if (result.status === "error") {
+    updateFeedback.show("error", "檢查失敗，請確認網路連線");
+  }
+  // "update-available" 已由 autoUpdater 內部的 confirm dialog 處理
+}
+
+async function handleCheckUpdate() {
+  if (isCheckingUpdate.value) return;
+  isCheckingUpdate.value = true;
+  updateButtonLabel.value = "檢查中...";
+  try {
+    const { checkForAppUpdate } = await import("./lib/autoUpdater");
+    const result = await checkForAppUpdate();
+    showUpdateResult(result);
+  } catch (err) {
+    console.error("[main-window] Manual update check failed:", err);
+    updateFeedback.show("error", "檢查更新時發生錯誤");
+  } finally {
+    isCheckingUpdate.value = false;
+    updateButtonLabel.value = "檢查更新";
+  }
+}
 
 onMounted(async () => {
   const isMacOS = navigator.userAgent.includes("Macintosh");
@@ -95,7 +127,24 @@ onMounted(async () => {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter class="border-t border-sidebar-border px-4 py-2">
-        <span class="text-xs text-muted-foreground">v{{ appVersion }}</span>
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-muted-foreground">v{{ appVersion }}</span>
+          <Button
+            variant="link"
+            class="h-auto p-0 text-xs text-muted-foreground"
+            :disabled="isCheckingUpdate"
+            @click="handleCheckUpdate"
+          >
+            {{ updateButtonLabel }}
+          </Button>
+        </div>
+        <p
+          v-if="updateFeedback.message.value"
+          class="mt-1 text-xs"
+          :class="updateFeedback.type.value === 'success' ? 'text-primary' : 'text-destructive'"
+        >
+          {{ updateFeedback.message.value }}
+        </p>
       </SidebarFooter>
     </Sidebar>
 
