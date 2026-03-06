@@ -120,10 +120,11 @@ jobs:
           fi
 
           npx @sentry/cli releases new "$SENTRY_RELEASE" || true
-          npx @sentry/cli releases files "$SENTRY_RELEASE" upload-sourcemaps dist/assets \
+          npx @sentry/cli sourcemaps upload dist/assets \
+            --release "$SENTRY_RELEASE" \
             --url-prefix "~/assets" \
-            --rewrite \
-            --validate
+            --validate \
+            --wait
           npx @sentry/cli releases finalize "$SENTRY_RELEASE" || true
 
       - name: Upload stable-name asset (macOS)
