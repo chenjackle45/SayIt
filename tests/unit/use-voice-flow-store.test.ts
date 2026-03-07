@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
-import { API_KEY_MISSING_ERROR } from "@/lib/errorUtils";
+// "errors.apiKeyMissing" removed — now uses i18n key
 import { HOTKEY_ERROR_CODES } from "@/types/events";
 
 const {
@@ -111,8 +111,30 @@ vi.mock("@tauri-apps/api/window", () => ({
   },
 }));
 
-vi.mock("../../src/lib/enhancer", () => ({
-  enhanceText: mockEnhanceText,
+vi.mock("../../src/lib/enhancer", () => {
+  class EnhancerApiError extends Error {
+    constructor(
+      public statusCode: number,
+      statusText: string,
+      public body: string,
+    ) {
+      super(`Enhancement API error: ${statusCode} ${statusText}`);
+      this.name = "EnhancerApiError";
+    }
+  }
+  return {
+    enhanceText: mockEnhanceText,
+    EnhancerApiError,
+  };
+});
+
+vi.mock("../../src/i18n", () => ({
+  default: {
+    global: {
+      locale: { value: "zh-TW" },
+      t: (key: string) => key,
+    },
+  },
 }));
 
 vi.mock("../../src/lib/apiPricing", () => ({
@@ -147,6 +169,7 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
     get isMuteOnRecordingEnabled() {
       return mockSettingsState.isMuteOnRecordingEnabled;
     },
+    getWhisperLanguageCode: () => "zh",
   }),
 }));
 
@@ -286,11 +309,11 @@ describe("useVoiceFlowStore", () => {
     vi.useFakeTimers();
     const store = useVoiceFlowStore();
 
-    store.transitionTo("recording", "錄音中...");
+    store.transitionTo("recording", "voiceFlow.recording");
     expect(store.status).toBe("recording");
-    expect(store.message).toBe("錄音中...");
+    expect(store.message).toBe("voiceFlow.recording");
 
-    store.transitionTo("success", "已貼上 ✓");
+    store.transitionTo("success", "voiceFlow.pasteSuccess");
     expect(store.status).toBe("success");
     vi.advanceTimersByTime(1000);
     await Promise.resolve();
@@ -324,7 +347,7 @@ describe("useVoiceFlowStore", () => {
     expect(store.status).toBe("recording");
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "recording",
-      message: "錄音中...",
+      message: "voiceFlow.recording",
     });
   });
 
@@ -349,12 +372,13 @@ describe("useVoiceFlowStore", () => {
       apiKey: "test-api-key-123",
       vocabularyTermList: null,
       modelId: "whisper-large-v3",
+      language: "zh",
     });
     expect(store.status).toBe("success");
-    expect(store.message).toBe("已貼上 ✓");
+    expect(store.message).toBe("voiceFlow.pasteSuccess");
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "success",
-      message: "已貼上 ✓",
+      message: "voiceFlow.pasteSuccess",
     });
   });
 
@@ -378,7 +402,7 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("error");
     });
 
-    expect(store.message).toBe("錄音時間太短");
+    expect(store.message).toBe("voiceFlow.recordingTooShort");
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "transcribe_audio",
       expect.anything(),
@@ -401,14 +425,14 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("error");
     });
 
-    expect(store.message).toBe(API_KEY_MISSING_ERROR);
+    expect(store.message).toBe("errors.apiKeyMissing");
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "transcribe_audio",
       expect.anything(),
     );
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "error",
-      message: API_KEY_MISSING_ERROR,
+      message: "errors.apiKeyMissing",
     });
   });
 
@@ -436,7 +460,7 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("error");
     });
 
-    expect(store.message).toBe("未偵測到語音");
+    expect(store.message).toBe("voiceFlow.noSpeechDetected");
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "paste_text",
       expect.anything(),
@@ -467,7 +491,7 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("error");
     });
 
-    expect(store.message).toBe("未偵測到語音");
+    expect(store.message).toBe("voiceFlow.noSpeechDetected");
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "paste_text",
       expect.anything(),
@@ -498,7 +522,7 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("error");
     });
 
-    expect(store.message).toBe("未偵測到語音");
+    expect(store.message).toBe("voiceFlow.noSpeechDetected");
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "paste_text",
       expect.anything(),
@@ -529,7 +553,7 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("error");
     });
 
-    expect(store.message).toBe("未偵測到語音");
+    expect(store.message).toBe("voiceFlow.noSpeechDetected");
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "paste_text",
       expect.anything(),
@@ -585,10 +609,10 @@ describe("useVoiceFlowStore", () => {
       expect(store.status).toBe("error");
     });
 
-    expect(store.message).toBe("轉錄服務暫時無法使用");
+    expect(store.message).toBe("errors.transcription.serviceUnavailable");
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "error",
-      message: "轉錄服務暫時無法使用",
+      message: "errors.transcription.serviceUnavailable",
     });
   });
 
@@ -657,10 +681,10 @@ describe("useVoiceFlowStore", () => {
     });
 
     expect(store.status).toBe("error");
-    expect(store.message).toBe("快捷鍵發生錯誤");
+    expect(store.message).toBe("errors.hotkey.default");
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "error",
-      message: "快捷鍵發生錯誤",
+      message: "errors.hotkey.default",
     });
   });
 
@@ -679,14 +703,14 @@ describe("useVoiceFlowStore", () => {
     expect(mockWebviewWindowGetByLabel).toHaveBeenCalledWith("main-window");
     expect(mockMainWindowShow).toHaveBeenCalledTimes(1);
     expect(store.status).toBe("error");
-    expect(store.message).toBe("需要輔助使用權限");
+    expect(store.message).toBe("errors.hotkey.accessibilityPermission");
   });
 
   it("[P1] success auto-hide 應廣播 idle 事件", async () => {
     vi.useFakeTimers();
     const store = useVoiceFlowStore();
 
-    store.transitionTo("success", "已貼上 ✓");
+    store.transitionTo("success", "voiceFlow.pasteSuccess");
     mockEmit.mockClear();
 
     vi.advanceTimersByTime(1000);
@@ -706,7 +730,7 @@ describe("useVoiceFlowStore", () => {
     const store = useVoiceFlowStore();
     await store.initialize();
 
-    store.transitionTo("success", "已貼上 ✓");
+    store.transitionTo("success", "voiceFlow.pasteSuccess");
     store.cleanup();
     vi.advanceTimersByTime(1000);
 
@@ -761,15 +785,15 @@ describe("useVoiceFlowStore", () => {
         }),
       );
       expect(store.status).toBe("success");
-      expect(store.message).toBe("已貼上 ✓");
+      expect(store.message).toBe("voiceFlow.pasteSuccess");
 
       expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
         status: "enhancing",
-        message: "整理中...",
+        message: "voiceFlow.enhancing",
       });
       expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
         status: "success",
-        message: "已貼上 ✓",
+        message: "voiceFlow.pasteSuccess",
       });
     });
 
@@ -801,7 +825,7 @@ describe("useVoiceFlowStore", () => {
 
       expect(mockEnhanceText).not.toHaveBeenCalled();
       expect(store.status).toBe("success");
-      expect(store.message).toBe("已貼上 ✓");
+      expect(store.message).toBe("voiceFlow.pasteSuccess");
 
       const enhancingCalls = mockEmit.mock.calls.filter(
         (call: unknown[]) =>
@@ -840,7 +864,7 @@ describe("useVoiceFlowStore", () => {
       });
 
       expect(store.status).toBe("success");
-      expect(store.message).toBe("已貼上（未整理）");
+      expect(store.message).toBe("voiceFlow.pasteSuccessUnenhanced");
     });
 
     it("[P0] AI 整理 API 錯誤應 fallback 貼原始文字並顯示「已貼上（未整理）」", async () => {
@@ -872,10 +896,10 @@ describe("useVoiceFlowStore", () => {
       });
 
       expect(store.status).toBe("success");
-      expect(store.message).toBe("已貼上（未整理）");
+      expect(store.message).toBe("voiceFlow.pasteSuccessUnenhanced");
       expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
         status: "success",
-        message: "已貼上（未整理）",
+        message: "voiceFlow.pasteSuccessUnenhanced",
       });
     });
 
@@ -1135,6 +1159,7 @@ describe("useVoiceFlowStore", () => {
         apiKey: "test-api-key-123",
         vocabularyTermList: ["TypeScript", "Tauri"],
         modelId: "whisper-large-v3",
+        language: "zh",
       });
     });
 
@@ -1161,6 +1186,7 @@ describe("useVoiceFlowStore", () => {
         apiKey: "test-api-key-123",
         vocabularyTermList: null,
         modelId: "whisper-large-v3",
+        language: "zh",
       });
     });
 
@@ -1203,6 +1229,7 @@ describe("useVoiceFlowStore", () => {
         apiKey: "test-api-key-123",
         vocabularyTermList: ["Pinia", "Vitest"],
         modelId: "whisper-large-v3",
+        language: "zh",
       });
 
       // enhancer 也收到詞彙

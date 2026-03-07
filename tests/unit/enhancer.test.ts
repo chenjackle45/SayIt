@@ -5,6 +5,23 @@ vi.mock("@tauri-apps/plugin-http", () => ({
   fetch: mockFetch,
 }));
 
+vi.mock("../../src/i18n", () => ({
+  default: {
+    global: {
+      locale: { value: "zh-TW" },
+      t: (key: string) => key,
+    },
+  },
+}));
+
+vi.mock("../../src/i18n/prompts", () => ({
+  getDefaultPromptForLocale: () => "mock-default-prompt",
+}));
+
+vi.mock("../../src/i18n/languageConfig", () => ({
+  FALLBACK_LOCALE: "zh-TW",
+}));
+
 const TEST_API_KEY = "test-api-key-123";
 
 function createSuccessResponse(
@@ -135,14 +152,14 @@ describe("enhancer.ts", () => {
     it("[P0] 空 API Key 應拋出錯誤", async () => {
       const { enhanceText } = await import("../../src/lib/enhancer");
       await expect(enhanceText("測試文字", "")).rejects.toThrow(
-        "API Key 未設定",
+        "API Key not configured",
       );
     });
 
     it("[P0] 純空白 API Key 應拋出錯誤", async () => {
       const { enhanceText } = await import("../../src/lib/enhancer");
       await expect(enhanceText("測試文字", "   ")).rejects.toThrow(
-        "API Key 未設定",
+        "API Key not configured",
       );
     });
   });
@@ -176,28 +193,46 @@ describe("enhancer.ts", () => {
   });
 
   describe("HTTP 錯誤處理", () => {
-    it("[P0] HTTP 非 200 應拋出包含狀態碼的錯誤", async () => {
+    it("[P0] HTTP 非 200 應拋出 EnhancerApiError", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 401,
+        statusText: "Unauthorized",
+        text: vi.fn().mockResolvedValue("error body"),
       });
 
-      const { enhanceText } = await import("../../src/lib/enhancer");
-      await expect(
-        enhanceText("測試文字測試文字測試", TEST_API_KEY),
-      ).rejects.toThrow("AI 整理失敗：401");
+      const { enhanceText, EnhancerApiError } = await import(
+        "../../src/lib/enhancer"
+      );
+      const error = await enhanceText(
+        "測試文字測試文字測試",
+        TEST_API_KEY,
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(EnhancerApiError);
+      expect((error as InstanceType<typeof EnhancerApiError>).statusCode).toBe(
+        401,
+      );
     });
 
-    it("[P0] HTTP 500 應拋出包含狀態碼的錯誤", async () => {
+    it("[P0] HTTP 500 應拋出 EnhancerApiError", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
+        statusText: "Internal Server Error",
+        text: vi.fn().mockResolvedValue("server error"),
       });
 
-      const { enhanceText } = await import("../../src/lib/enhancer");
-      await expect(
-        enhanceText("測試文字測試文字測試", TEST_API_KEY),
-      ).rejects.toThrow("AI 整理失敗：500");
+      const { enhanceText, EnhancerApiError } = await import(
+        "../../src/lib/enhancer"
+      );
+      const error = await enhanceText(
+        "測試文字測試文字測試",
+        TEST_API_KEY,
+      ).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(EnhancerApiError);
+      expect((error as InstanceType<typeof EnhancerApiError>).statusCode).toBe(
+        500,
+      );
     });
 
     it("[P0] 網路錯誤應自然拋出", async () => {
@@ -224,17 +259,17 @@ describe("enhancer.ts", () => {
       expect(body.messages[0].content).toBe("你是一個英文助手");
     });
 
-    it("[P0] 不傳 options 應使用 DEFAULT_SYSTEM_PROMPT", async () => {
+    it("[P0] 不傳 options 應使用 getDefaultSystemPrompt", async () => {
       mockFetch.mockResolvedValue(createSuccessResponse("整理後文字"));
 
-      const { enhanceText, DEFAULT_SYSTEM_PROMPT } = await import(
+      const { enhanceText, getDefaultSystemPrompt } = await import(
         "../../src/lib/enhancer"
       );
       await enhanceText("測試輸入文字", TEST_API_KEY);
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs[1].body);
-      expect(body.messages[0].content).toBe(DEFAULT_SYSTEM_PROMPT);
+      expect(body.messages[0].content).toBe(getDefaultSystemPrompt());
     });
 
     it("[P0] vocabularyTermList 應注入 <vocabulary> 標籤", async () => {
@@ -373,9 +408,43 @@ describe("enhancer.ts", () => {
 
       vi.advanceTimersByTime(5000);
 
-      await expect(promise).rejects.toThrow("AI 整理逾時");
+      await expect(promise).rejects.toThrow("Enhancement timeout");
 
       vi.useRealTimers();
+    });
+  });
+
+  describe("getDefaultSystemPrompt 多語言", () => {
+    it("[P0] 應透過 getDefaultPromptForLocale 回傳當前 locale 的預設 prompt", async () => {
+      const { getDefaultSystemPrompt } = await import("../../src/lib/enhancer");
+      const result = getDefaultSystemPrompt();
+
+      expect(result).toBe("mock-default-prompt");
+    });
+  });
+
+  describe("EnhancerApiError 結構化錯誤", () => {
+    it("[P0] 應具備正確的 statusCode、name 與 body 屬性", async () => {
+      const { EnhancerApiError } = await import("../../src/lib/enhancer");
+      const error = new EnhancerApiError(
+        429,
+        "Too Many Requests",
+        "rate limited",
+      );
+
+      expect(error.statusCode).toBe(429);
+      expect(error.name).toBe("EnhancerApiError");
+      expect(error.body).toBe("rate limited");
+      expect(error.message).toBe(
+        "Enhancement API error: 429 Too Many Requests",
+      );
+    });
+
+    it("[P0] 應為 Error 的 instance", async () => {
+      const { EnhancerApiError } = await import("../../src/lib/enhancer");
+      const error = new EnhancerApiError(503, "Service Unavailable", "");
+
+      expect(error).toBeInstanceOf(Error);
     });
   });
 });

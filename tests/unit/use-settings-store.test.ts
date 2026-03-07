@@ -299,7 +299,7 @@ describe("useSettingsStore", () => {
       await store.saveAiPrompt("自訂內容");
       await store.resetAiPrompt();
 
-      // 應恢復為 DEFAULT_SYSTEM_PROMPT（非空）
+      // 應恢復為當前語言的預設 prompt（非空）
       expect(store.getAiPrompt()).not.toBe("自訂內容");
       expect(store.getAiPrompt().length).toBeGreaterThan(0);
       expect(mockStoreSet).toHaveBeenCalledWith(
@@ -439,6 +439,62 @@ describe("useSettingsStore", () => {
       expect(store.selectedLlmModelId).toBe("llama-3.3-70b-versatile");
       expect(store.selectedWhisperModelId).toBe("whisper-large-v3-turbo");
       expect(store.isMuteOnRecordingEnabled).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // saveLocale
+  // ==========================================================================
+
+  describe("saveLocale", () => {
+    it("[P0] saveLocale('en') should persist to store", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+
+      await store.saveLocale("en");
+
+      expect(mockStoreSet).toHaveBeenCalledWith("selectedLocale", "en");
+      expect(mockStoreSave).toHaveBeenCalled();
+    });
+
+    it("[P0] saveLocale should emit SETTINGS_UPDATED event", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+
+      await store.saveLocale("ja");
+
+      expect(mockEmit).toHaveBeenCalledWith("settings:updated", {
+        key: "locale",
+        value: "ja",
+      });
+    });
+  });
+
+  // ==========================================================================
+  // loadSettings locale
+  // ==========================================================================
+
+  describe("loadSettings locale", () => {
+    it("[P0] should load saved locale from store", async () => {
+      mockStoreData.set("selectedLocale", "en");
+
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+
+      await store.loadSettings();
+
+      // When a saved locale exists, loadSettings should NOT re-set it
+      // (the "first launch" path calls store.set("selectedLocale", detected))
+      const selectedLocaleSetCallList = mockStoreSet.mock.calls.filter(
+        ([key]: [string]) => key === "selectedLocale",
+      );
+      expect(selectedLocaleSetCallList).toHaveLength(0);
     });
   });
 });
