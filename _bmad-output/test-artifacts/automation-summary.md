@@ -38,6 +38,14 @@ inputDocuments:
   - _bmad/tea/testarch/knowledge/playwright-cli.md
 ---
 
+> **⚠️ Migration Note (2026-03-08):** Rust Native Audio Pipeline 遷移後，以下變更影響本文件的準確性：
+> - `src/lib/recorder.ts` 和 `src/lib/transcriber.ts` 已刪除，錄音與轉錄邏輯遷移至 Rust（`audio_recorder.rs`, `transcription.rs`）
+> - `tests/unit/recorder.test.ts` 和 `tests/unit/transcriber.test.ts` 已刪除
+> - `useVoiceFlow.ts` → `useVoiceFlowStore.ts`（Pinia store），測試檔 `use-voice-flow-store.test.ts` 已全面重構為 `mockInvoke` command dispatch 模式
+> - `useHudState.ts` 已不存在（狀態管理移入 store + composable）
+> - 新增 Rust 測試：`audio_recorder.rs`（9 tests）、`transcription.rs`（4 tests）
+> - 目前測試總數：238（Vitest）+ Rust inline tests
+
 # Automation Summary — SayIt
 
 ## Step 1: Preflight & Context Loading

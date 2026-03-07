@@ -1,10 +1,10 @@
 ---
 project_name: 'sayit'
 user_name: 'Jackle'
-date: '2026-03-06'
-sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules']
+date: '2026-03-08'
+sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules', 'sentry_telemetry']
 status: 'complete'
-rule_count: 112
+rule_count: 120
 optimized_for_llm: true
 ---
 
@@ -33,6 +33,8 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | Node | 24 | .nvmrc 鎖定 | — |
 | Test (Unit) | Vitest | ^4.0.18 | jsdom 環境 |
 | Test (E2E) | Playwright | ^1.58.2 | — |
+| Telemetry (Frontend) | @sentry/vue | ^10.42.0 | 僅生產環境啟用，雙視窗分別初始化 |
+| Telemetry (Backend) | sentry (Rust) | 0.46 | 環境變數驅動，Guard 模式 |
 
 ### Frontend Dependencies
 
@@ -70,9 +72,11 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | 套件 | 平台 | 用途 |
 |------|------|------|
 | `core-graphics` 0.24 + `core-foundation` 0.10 + `objc` 0.2 | macOS | 視窗控制、CGEventTap |
-| `core-audio-types` + `coreaudio-sys` | macOS | 系統音量控制（錄音靜音） |
+| 原生 CoreAudio FFI（`extern "C"`，無 crate wrapper） | macOS | 系統音量控制（AudioObjectGetPropertyData/SetPropertyData） |
 | `windows` 0.61 | Windows | Win32 API、鍵盤 Hook、IAudioEndpointVolume（系統音量） |
 | `arboard` 3 | 跨平台 | 剪貼簿存取 |
+| `cpal` 0.15 + `hound` 3.5 + `rustfft` 6 | 跨平台 | 音訊錄製、WAV 編碼、FFT 波形分析 |
+| `reqwest` 0.12 (multipart, json) | 跨平台 | Groq Whisper API（Rust 直接呼叫） |
 
 ### External APIs
 
@@ -80,6 +84,34 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Groq LLM API — `https://api.groq.com/openai/v1/chat/completions`（預設模型：`llama-3.3-70b-versatile`，支援 7 個模型切換，temperature: 0.3，timeout: 5s）
 - **模型註冊** — `src/lib/modelRegistry.ts` 集中管理所有可用模型、價格、免費配額，支援模型下架自動遷移（`DECOMMISSIONED_MODEL_MAP`）
 - CSP 白名單：`connect-src 'self' https://api.groq.com`
+
+### Sentry/Telemetry 整合
+
+#### 架構概覽
+
+- **前端** — `@sentry/vue` ^10.42.0，集中在 `src/lib/sentry.ts`，兩個視窗分別初始化
+- **後端** — `sentry` 0.46（Rust crate），在 `lib.rs` 的 `run()` 中初始化
+- **僅生產環境** — 兩端都只在 production 環境且 DSN 存在時啟用，開發模式不發送
+
+#### 前端初始化（lib/sentry.ts）
+
+- **`initSentryForHud(app)`** — HUD 視窗輕量初始化（無 tracing integration），`main.ts` 呼叫
+- **`initSentryForDashboard(app, router)`** — Dashboard 視窗完整初始化（含 `browserTracingIntegration`），`main-window.ts` 呼叫
+- **`captureError(error, context?)`** — 統一錯誤上報入口，帶可選 context 物件
+- **視窗標籤** — `tags: { window: "hud" | "dashboard" }` 區分錯誤來源
+
+#### Rust 初始化（lib.rs）
+
+- **Guard 模式** — `let _sentry_guard = sentry::init(...)` 綁定在 `run()` 局部變數，app 結束才釋放
+- **`send_default_pii: false`** — 不發送個人識別資訊
+- **DSN 過濾** — 忽略空字串和 `__` 開頭的 CI 佔位符
+
+#### Sentry 規則
+
+- **錯誤上報** — 關鍵流程失敗（錄音、轉錄、AI 整理、DB 初始化、bootstrap）必須呼叫 `captureError(error, { context })`
+- **上報層級** — 只從 store actions 或啟動腳本（`main.ts`, `main-window.ts`）呼叫，`lib/` 層只拋錯不上報
+- **Release 格式** — `sayit@<version>`，由 CI/CD 環境變數自動設定
+- **Sourcemap 上傳** — 僅 `release.yml` 的 macOS ARM64 job 執行（避免重複），使用 `@sentry/cli`
 
 ## Critical Implementation Rules
 
@@ -104,7 +136,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **平台隔離** — `#[cfg(target_os = "macos")]` / `#[cfg(target_os = "windows")]` 隔離，不可在同一函式中混合
 - **unsafe 標記** — macOS `objc::msg_send!` 呼叫必須在 `unsafe {}` 區塊內
 - **原子操作** — 跨執行緒共享狀態使用 `AtomicBool` + `Ordering::SeqCst`
-- **Plugin 模式** — 每個功能模組是獨立的 `TauriPlugin<R>`，在 `plugins/mod.rs` 中 `pub mod` 匯出（目前：`clipboard_paste`, `hotkey_listener`, `keyboard_monitor`, `audio_control`）
+- **Plugin 模式** — 每個功能模組是獨立的 `TauriPlugin<R>`，在 `plugins/mod.rs` 中 `pub mod` 匯出（目前：`clipboard_paste`, `hotkey_listener`, `keyboard_monitor`, `audio_control`, `audio_recorder`, `transcription`）
 - **Serde JSON 序列化** — Rust → 前端的 payload struct 使用 `#[serde(rename_all = "camelCase")]` 確保前端收到 camelCase JSON
 - **Crate 命名** — `name = "sayit_lib"`，`crate-type = ["staticlib", "cdylib", "rlib"]`
 - **Release profile** — `panic = "abort"`, `lto = true`, `opt-level = "s"`（檔案大小最佳化）
@@ -158,6 +190,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | `hotkey:toggled` | `HOTKEY_TOGGLED` | Rust → HUD | `HotkeyEventPayload` |
 | `hotkey:error` | `HOTKEY_ERROR` | Rust → HUD | `HotkeyErrorPayload` |
 | `quality-monitor:result` | `QUALITY_MONITOR_RESULT` | Rust → HUD | `QualityMonitorResultPayload` |
+| `audio:waveform` | `AUDIO_WAVEFORM` | Rust → HUD | `WaveformPayload { levels: [f32; 6] }` |
 
 #### Tailwind CSS v4
 
@@ -220,12 +253,10 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 | 測試檔案 | 測試對象 |
 |----------|---------|
-| `transcriber.test.ts` | Groq Whisper API 呼叫邏輯 |
 | `enhancer.test.ts` | Groq LLM AI 整理邏輯 |
-| `recorder.test.ts` | MediaRecorder 錄音邏輯 |
 | `error-utils.test.ts` | 錯誤訊息本地化 |
 | `auto-updater.test.ts` | 自動更新流程（UpdateCheckResult） |
-| `use-voice-flow-store.test.ts` | 錄音→轉錄→AI 整理流程狀態 |
+| `use-voice-flow-store.test.ts` | 錄音→轉錄→AI 整理流程狀態（mock Tauri invoke） |
 | `use-history-store.test.ts` | 歷史記錄 CRUD + 統計查詢 |
 | `use-settings-store.test.ts` | 設定讀寫（hotkey, API Key, prompt） |
 | `use-settings-store-autostart.test.ts` | 開機自啟動邏輯 |
@@ -263,12 +294,12 @@ _This file contains critical rules and patterns that AI agents must follow when 
 |------|------|------|
 | Vue 元件檔案 | PascalCase | `NotchHud.vue`, `DashboardView.vue` |
 | Composable 檔案 | camelCase + use 前綴 | `useTauriEvents.ts`, `useFeedbackMessage.ts` |
-| Service/Lib 檔案 | camelCase | `recorder.ts`, `transcriber.ts`, `errorUtils.ts`, `formatUtils.ts` |
+| Service/Lib 檔案 | camelCase | `enhancer.ts`, `errorUtils.ts`, `formatUtils.ts`, `apiPricing.ts` |
 | Pinia Store 檔案 | camelCase + use 前綴 | `useSettingsStore.ts`, `useVoiceFlowStore.ts` |
-| Rust 模組檔案 | snake_case | `clipboard_paste.rs`, `hotkey_listener.rs`, `keyboard_monitor.rs` |
+| Rust 模組檔案 | snake_case | `clipboard_paste.rs`, `hotkey_listener.rs`, `keyboard_monitor.rs`, `audio_recorder.rs`, `transcription.rs` |
 | 資料夾 | kebab-case | `src-tauri/`, `components/` |
 | TS 變數/函式 | camelCase | `startRecording()`, `enhancedText` |
-| TS 型別/介面 | PascalCase + 後綴 | `TranscriptionRecord`, `HotkeyConfig`, `AudioAnalyserHandle` |
+| TS 型別/介面 | PascalCase + 後綴 | `TranscriptionRecord`, `HotkeyConfig`, `WaveformPayload`, `StopRecordingResult` |
 | TS 布林變數 | is/has/can/should 前綴 | `isRecording`, `wasEnhanced`, `hasApiKey` |
 | TS 常數 | UPPER_SNAKE_CASE | `DEFAULT_SYSTEM_PROMPT`, `ENHANCEMENT_TIMEOUT_MS` |
 | Rust 函式/變數 | snake_case | `paste_text()`, `listen_hotkey()` |
@@ -283,19 +314,21 @@ _This file contains critical rules and patterns that AI agents must follow when 
 ```
 src/
 ├── components/           # 共用 UI 元件
-│   ├── NotchHud.vue     # HUD 狀態顯示
+│   ├── NotchHud.vue     # HUD 6 態狀態顯示（自訂動畫引擎）
+│   ├── AccessibilityGuide.vue # macOS 輔助使用權限引導
+│   ├── AppSidebar.vue   # Dashboard 側邊欄（shadcn Sidebar）
 │   ├── DashboardUsageChart.vue # API 用量趨勢圖表（unovis）
+│   ├── Nav*.vue / SiteHeader.vue # 導覽元件群（shadcn blocks）
 │   └── ui/              # shadcn-vue CLI 生成元件（不手動修改）
 ├── composables/          # Vue composables（跨元件邏輯）
 │   ├── useTauriEvents.ts    # Tauri Event 常量 + 封裝
 │   ├── useFeedbackMessage.ts # 臨時回饋訊息模式
-│   └── useAudioWaveform.ts  # 音訊視覺化
+│   └── useAudioWaveform.ts  # 音訊波形視覺化（Tauri Event push 模式）
 ├── lib/                  # Service 層（純邏輯，無 Vue 依賴）
-│   ├── recorder.ts          # MediaRecorder 麥克風錄音
-│   ├── transcriber.ts       # Groq Whisper API
 │   ├── enhancer.ts          # Groq LLM AI 整理
 │   ├── database.ts          # SQLite 初始化 + migration
 │   ├── autoUpdater.ts       # tauri-plugin-updater 封裝（回傳 UpdateCheckResult）
+│   ├── sentry.ts            # Sentry 初始化 + captureError（雙視窗策略）
 │   ├── modelRegistry.ts     # LLM/Whisper 模型註冊、價格、下架遷移
 │   ├── keycodeMap.ts        # DOM event.code → 平台原生 keycode 映射
 │   ├── errorUtils.ts        # 錯誤訊息本地化（繁體中文）
@@ -318,7 +351,7 @@ src/
 │   ├── vocabulary.ts        # VocabularyEntry
 │   ├── settings.ts          # TriggerKey (含右側修飾鍵: rightOption, rightControl), HotkeyConfig, SettingsDto
 │   ├── events.ts            # 所有 Tauri Event payload 型別
-│   └── audio.ts             # AudioAnalyserHandle, AudioAnalyserConfig
+│   └── audio.ts             # WaveformPayload, StopRecordingResult, TranscriptionResult
 ├── App.vue              # HUD Window 入口
 ├── MainApp.vue          # Main Window 入口
 ├── router.ts            # Vue Router hash mode 設定
@@ -394,11 +427,25 @@ src/
 
 #### 環境變數
 
-- **`TAURI_SIGNING_PRIVATE_KEY`** — Updater 簽署金鑰（CI/CD）
-- **`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`** — 私鑰密碼（CI/CD）
-- **`APPLE_CERTIFICATE` 等 6 個** — Apple Code Signing（CI/CD，見 CLAUDE.md）
-- **`SENTRY_DSN` / `VITE_SENTRY_DSN`** — 正式版 Sentry DSN（CI/CD）
-- **`SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT`** — Sentry sourcemap upload 與 release 管理（CI/CD）
+**建構/簽署（CI/CD only）：**
+- **`TAURI_SIGNING_PRIVATE_KEY`** / **`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`** — Updater 簽署
+- **`APPLE_CERTIFICATE` 等 6 個** — Apple Code Signing（見 CLAUDE.md）
+
+**Sentry（CI/CD 注入，生產環境用）：**
+
+| 端 | 變數名 | 用途 | Fallback |
+|----|--------|------|----------|
+| Frontend | `VITE_SENTRY_DSN` | Frontend DSN | 無（不啟用） |
+| Frontend | `VITE_SENTRY_ENVIRONMENT` | 環境標籤 | `import.meta.env.MODE` |
+| Frontend | `VITE_SENTRY_RELEASE` | Release 版本 | `sayit@${__APP_VERSION__}` |
+| Frontend | `VITE_SENTRY_TRACES_SAMPLE_RATE` | 追蹤採樣率 | `0`（不開啟） |
+| Frontend | `VITE_SENTRY_SOURCEMAPS_ENABLED` | Sourcemap 生成 | `false` |
+| Rust | `SENTRY_DSN` | Rust 端 DSN | 無（不啟用） |
+| Rust | `SENTRY_ENVIRONMENT` | 環境標籤 | `production` / `development` |
+| Rust | `SENTRY_RELEASE` | Release 版本 | `sayit@CARGO_PKG_VERSION` |
+| CI/CD | `SENTRY_AUTH_TOKEN` | Sourcemap upload 認證 | — |
+| CI/CD | `SENTRY_ORG` / `SENTRY_PROJECT` | Sentry 組織/專案 | — |
+
 - **`.env` 不進 git** — `.gitignore` 排除
 
 ### Critical Don't-Miss Rules
@@ -483,4 +530,4 @@ src/
 - Review periodically for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-06
+Last Updated: 2026-03-08 (v2 — Sentry 整合、Rust 音訊管線遷移)

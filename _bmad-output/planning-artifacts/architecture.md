@@ -67,8 +67,8 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | `fn_key_listener.rs` | CGEventTap（僅 macOS） | 擴展重寫 → OS-native 雙平台（macOS CGEventTap + Windows SetWindowsHookExW） |
 | `clipboard_paste.rs` | arboard + AX API menu press（macOS）+ SendInput（Windows） | 保留，擴展貼上後監控 |
 | `lib.rs` | 單視窗設定 + System Tray | 擴展支援雙視窗 |
-| `recorder.ts` | MediaRecorder 錄音 | 保留 |
-| `transcriber.ts` | Groq Whisper API | 保留，新增詞彙注入 |
+| `recorder.ts` | MediaRecorder 錄音 | **DELETED** — 遷移至 `audio_recorder.rs`（Rust cpal） |
+| `transcriber.ts` | Groq Whisper API | **DELETED** — 遷移至 `transcription.rs`（Rust reqwest） |
 | `useVoiceFlow.ts` | 錄音→轉錄流程 | 擴展 AI 整理步驟 |
 | `NotchHud.vue` | 3 態 HUD | 擴展為 6 態 |
 | `App.vue` | 單視窗（HUD only） | HUD 視窗保留，Main Window 新增 |
@@ -126,6 +126,10 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | `tauri-plugin-autostart` | 2.5.1 | 開機自啟動 | — |
 | `tauri-plugin-updater` | ~2.2.0 | 自動更新 | — |
 | `tauri-plugin-store` | ~2.x | API Key 本地儲存（明文 JSON） | — |
+| `cpal` | 0.15 | 跨平台音訊錄製 | — |
+| `hound` | 3.5 | WAV 編碼 | — |
+| `rustfft` | 6 | FFT 波形分析 | — |
+| `reqwest` | 0.12 | Groq Whisper API | `multipart`, `json` |
 
 **JavaScript (pnpm) — 新增：**
 
@@ -234,11 +238,11 @@ CREATE TABLE IF NOT EXISTS schema_version (
 
 ### API & Communication Patterns
 
-**決策：前端 WebView 直接呼叫 Groq API**
+**決策：Groq API 呼叫分層 — Whisper 走 Rust、LLM 走前端**
 
-- 維持 POC 現有模式，transcriber.ts 直接呼叫 Groq Whisper API
-- 新增 enhancer.ts 直接呼叫 Groq LLM API
-- CSP 限制 `connect-src` 至 `self` + `https://api.groq.com`
+- Groq Whisper API 已遷移至 Rust 側（`transcription.rs` via `reqwest`），音訊錄製到轉錄全程在 Rust 完成，避免跨語言傳遞音訊 blob
+- Groq LLM API 維持前端呼叫（`enhancer.ts` via `@tauri-apps/plugin-http`），因文字處理邏輯與前端狀態緊耦合
+- CSP 仍限制 `connect-src` 至 `self` + `https://api.groq.com`（LLM 呼叫仍從前端發出）
 - API Key 在本地 App 環境中，不存在瀏覽器公開暴露風險
 
 **錯誤處理模式：**
@@ -381,10 +385,10 @@ src/
 │   ├── useHudState.ts   # HUD 狀態管理（現有）
 │   └── useVoiceFlow.ts  # 錄音/轉錄流程（現有，擴展）
 ├── lib/                  # Service 層（純邏輯，不依賴 Vue）
-│   ├── recorder.ts      # 麥克風錄音（現有）
-│   ├── transcriber.ts   # Groq Whisper API（現有，擴展）
 │   ├── enhancer.ts      # Groq LLM AI 整理（新增）
 │   └── database.ts      # SQLite 初始化 + migration（新增）
+│   # recorder.ts — DELETED，遷移至 audio_recorder.rs（Rust cpal）
+│   # transcriber.ts — DELETED，遷移至 transcription.rs（Rust reqwest）
 ├── stores/               # Pinia stores（新增目錄）
 │   ├── useSettingsStore.ts
 │   ├── useHistoryStore.ts
@@ -409,7 +413,9 @@ src-tauri/src/
 │   ├── mod.rs
 │   ├── hotkey_listener.rs   # OS-native 跨平台熱鍵（擴展重寫）
 │   ├── clipboard_paste.rs   # 剪貼簿操作（現有，擴展）
-│   └── keyboard_monitor.rs  # 貼上後鍵盤監控（新增）
+│   ├── keyboard_monitor.rs  # 貼上後鍵盤監控（新增）
+│   ├── audio_recorder.rs    # cpal 音訊錄製 + WAV 編碼 + FFT 波形 [新增]
+│   └── transcription.rs     # Groq Whisper API via reqwest [新增]
 ├── lib.rs                   # App 設定（現有，擴展雙視窗）
 └── main.rs
 ```
@@ -446,6 +452,7 @@ src-tauri/src/
 | `transcription:completed` | → Main Window | `{ id, rawText, processedText, ... }` | 新記錄通知 |
 | `settings:updated` | → All Windows | `{ key, value }` | 設定變更同步 |
 | `vocabulary:changed` | → All Windows | `{ action, term }` | 詞彙變更同步 |
+| `audio:waveform` | Rust → HUD | `{ levels: [f32; 6] }` | 波形頻率資料推送 |
 
 **Pinia Store Action 命名：**
 - CRUD：`addXxx()`, `removeXxx()`, `updateXxx()`, `fetchXxxList()`
@@ -498,8 +505,8 @@ async function processTranscription() {
 
 | FR Category | FR 範圍 | 架構元件 | 目錄位置 |
 |-------------|---------|---------|---------|
-| 語音觸發與錄音 | FR1-5 | hotkey_listener.rs, useVoiceFlow.ts, recorder.ts, useVoiceFlowStore.ts | plugins/, composables/, lib/, stores/ |
-| 語音轉文字 | FR6-7 | transcriber.ts, useVoiceFlow.ts | lib/, composables/ |
+| 語音觸發與錄音 | FR1-5 | hotkey_listener.rs, audio_recorder.rs, useVoiceFlow.ts, useVoiceFlowStore.ts | plugins/, composables/, stores/ |
+| 語音轉文字 | FR6-7 | transcription.rs, useVoiceFlow.ts | plugins/, composables/ |
 | AI 文字整理 | FR8-12 | enhancer.ts, useVoiceFlowStore.ts, useSettingsStore.ts | lib/, stores/ |
 | 文字輸出 | FR13-15 | clipboard_paste.rs, keyboard_monitor.rs | plugins/ |
 | 自訂詞彙字典 | FR16-19 | useVocabularyStore.ts, DictionaryView.vue | stores/, views/ |
@@ -536,11 +543,11 @@ sayit/
 │   │   └── useTauriEvents.ts          # Tauri Event 訂閱/發送封裝 [新增]
 │   │
 │   ├── lib/                            # Service 層（純邏輯，無 Vue 依賴）
-│   │   ├── recorder.ts                # MediaRecorder 麥克風錄音 [現有]
-│   │   ├── transcriber.ts             # Groq Whisper API 呼叫 [現有，擴展詞彙注入]
 │   │   ├── enhancer.ts                # Groq LLM AI 文字整理 [新增]
 │   │   ├── database.ts                # SQLite 初始化 + schema migration [新增]
 │   │   └── updater.ts                 # tauri-plugin-updater 封裝 [新增]
+│   │   # recorder.ts — DELETED，遷移至 audio_recorder.rs（Rust cpal）
+│   │   # transcriber.ts — DELETED，遷移至 transcription.rs（Rust reqwest）
 │   │
 │   ├── stores/                         # Pinia stores [新增目錄]
 │   │   ├── useSettingsStore.ts        # 快捷鍵 / API Key / AI Prompt
@@ -574,7 +581,9 @@ sayit/
 │   │   │   ├── mod.rs                 # Plugin 統一匯出 [現有，擴展]
 │   │   │   ├── hotkey_listener.rs     # OS-native 跨平台全域熱鍵 [擴展重寫]
 │   │   │   ├── clipboard_paste.rs     # arboard + AX API menu press（macOS）+ SendInput（Windows） [現有，擴展]
-│   │   │   └── keyboard_monitor.rs    # 貼上後鍵盤監控 [新增]
+│   │   │   ├── keyboard_monitor.rs    # 貼上後鍵盤監控 [新增]
+│   │   │   ├── audio_recorder.rs      # cpal 音訊錄製 + WAV 編碼 + FFT 波形 [新增]
+│   │   │   └── transcription.rs       # Groq Whisper API via reqwest [新增]
 │   │   ├── lib.rs                     # App 配置 + 雙視窗 + Tray [現有，擴展]
 │   │   └── main.rs                    # Rust 入口 [現有]
 │   │
@@ -630,7 +639,8 @@ sayit/
 |------|------|------|
 | WebView → Rust | `invoke()` Tauri Command | `invoke('paste_text', { text })` |
 | Rust → WebView | `emit()` / `emitTo()` | 熱鍵按下事件、鍵盤監控結果 |
-| WebView → Groq | 直接 HTTPS（不經 Rust） | `transcriber.ts`, `enhancer.ts` |
+| Rust → Groq | Rust reqwest（Whisper API） | `transcription.rs`（音訊錄製到轉錄全程 Rust） |
+| WebView → Groq | 直接 HTTPS（LLM API，不經 Rust） | `enhancer.ts` |
 
 **Data Boundaries：**
 
@@ -654,10 +664,10 @@ User presses hotkey (Fn/右Alt)
 hotkey_listener.rs ──→ Tauri Event: hotkey:pressed
     │
     ↓
-useVoiceFlow.ts ──→ recorder.ts (start MediaRecorder)
+useVoiceFlow.ts ──→ invoke('start_recording') → audio_recorder.rs (cpal)
     │                     │
-    │                     ↓ audio blob
-    │               transcriber.ts (Groq Whisper API + 詞彙注入)
+    │                     ↓ (WAV 保存於 Rust state，不跨語言傳遞)
+    │               invoke('transcribe_audio') → transcription.rs (Rust reqwest → Groq Whisper)
     │                     │
     │                     ↓ raw text
     │               enhancer.ts (Groq LLM, skip if < 10 chars)
@@ -679,7 +689,7 @@ useHistoryStore (save to SQLite) ──→ Main Window Dashboard refresh
 
 | 外部服務 | 整合模組 | 協定 | 失敗策略 |
 |----------|----------|------|----------|
-| Groq Whisper API | `transcriber.ts` | HTTPS POST multipart/form-data | HUD 顯示錯誤訊息，使用者可重試 |
+| Groq Whisper API | `transcription.rs` | Rust reqwest multipart | HUD 顯示錯誤訊息，使用者可重試 |
 | Groq LLM API | `enhancer.ts` | HTTPS POST JSON | 5 秒 timeout → 跳過 AI，貼上原始文字 |
 | 自動更新 Endpoint | `updater.ts` | HTTPS GET JSON | 靜默失敗，下次啟動再試 |
 
@@ -735,7 +745,8 @@ pnpm tauri build  # 1. Vite 打包前端 → dist/
 - Tauri v2.10.x 與所有 Tauri plugins（sql 2.3.1, autostart 2.5.1, updater ~2.2.0, store ~2.x）版本相容
 - Vue 3.5.29 + Pinia 3.x + Vue Router 5.0.3 生態相容
 - arboard 3.6.1 為獨立 Rust crate，無衝突（enigo 已移除，rdev 改用 OS-native API 取代）
-- 前端直接呼叫 Groq API 的決策與 CSP 白名單一致
+- Groq API 分層呼叫：Whisper 走 Rust（reqwest）、LLM 走前端（plugin-http），CSP 白名單仍需保留 `https://api.groq.com`
+- cpal 0.15 + hound 3.5 + rustfft 6 + reqwest 0.12 為獨立 Rust crate，與現有依賴無衝突
 - tauri-plugin-store 本地儲存與 SQLite 資料層分離，職責清晰
 
 **Pattern Consistency：**
@@ -755,8 +766,8 @@ pnpm tauri build  # 1. Vite 打包前端 → dist/
 
 | FR | 需求 | 架構支援 |
 |----|------|---------|
-| FR1-5 | 語音觸發與錄音 | hotkey_listener.rs (OS-native) + recorder.ts + useVoiceFlow.ts |
-| FR6-7 | 語音轉文字 | transcriber.ts (Groq Whisper API + 詞彙 prompt 注入) |
+| FR1-5 | 語音觸發與錄音 | hotkey_listener.rs (OS-native) + audio_recorder.rs (cpal) + useVoiceFlow.ts |
+| FR6-7 | 語音轉文字 | transcription.rs (Rust reqwest → Groq Whisper API + 詞彙 prompt 注入) |
 | FR8-12 | AI 文字整理 | enhancer.ts (Groq LLM) + useSettingsStore (prompt) + 詞彙/剪貼簿上下文注入 |
 | FR13-15 | 文字輸出 | clipboard_paste.rs (arboard + AX API menu press / SendInput) + keyboard_monitor.rs |
 | FR16-19 | 自訂詞彙字典 | useVocabularyStore + DictionaryView.vue + SQLite vocabulary table |
