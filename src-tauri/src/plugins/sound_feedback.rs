@@ -69,18 +69,18 @@ mod windows_sound {
     static STOP_SOUND: &[u8] = include_bytes!("../../resources/sounds/stop.wav");
 
     pub fn play_start_sound() {
-        let result =
+        let ok =
             unsafe { PlaySoundA(PCSTR(START_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
-        if let Err(e) = result {
-            eprintln!("[sound-feedback] PlaySoundA(start) failed: {}", e);
+        if !ok.as_bool() {
+            eprintln!("[sound-feedback] PlaySoundA(start) failed");
         }
     }
 
     pub fn play_stop_sound() {
-        let result =
+        let ok =
             unsafe { PlaySoundA(PCSTR(STOP_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
-        if let Err(e) = result {
-            eprintln!("[sound-feedback] PlaySoundA(stop) failed: {}", e);
+        if !ok.as_bool() {
+            eprintln!("[sound-feedback] PlaySoundA(stop) failed");
         }
     }
 }
