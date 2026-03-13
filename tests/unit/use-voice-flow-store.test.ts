@@ -85,6 +85,7 @@ const {
       selectedWhisperModelId: "whisper-large-v3",
       isMuteOnRecordingEnabled: false,
       isSmartDictionaryEnabled: false,
+      whisperLanguageCode: "zh" as string | null,
     },
     mockVocabularyState: {
       termList: [] as Array<{
@@ -188,7 +189,7 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
     get isSmartDictionaryEnabled() {
       return mockSettingsState.isSmartDictionaryEnabled;
     },
-    getWhisperLanguageCode: () => "zh",
+    getWhisperLanguageCode: () => mockSettingsState.whisperLanguageCode,
   }),
 }));
 
@@ -290,6 +291,7 @@ describe("useVoiceFlowStore", () => {
     mockSettingsState.selectedWhisperModelId = "whisper-large-v3";
     mockSettingsState.isMuteOnRecordingEnabled = false;
     mockSettingsState.isSmartDictionaryEnabled = false;
+    mockSettingsState.whisperLanguageCode = "zh";
     mockVocabularyState.termList = [];
     mockVocabularyState.getTopTermListByWeight
       .mockClear()
@@ -495,7 +497,7 @@ describe("useVoiceFlowStore", () => {
     );
   });
 
-  it("[P0] 高 noSpeechProbability 時應觸發「未偵測到語音」", async () => {
+  it("[P0] 高 noSpeechProbability 但有文字時應正常貼上（不攔截幻聽）", async () => {
     mockInvoke.mockImplementation(
       createMockInvokeHandler({
         transcribeResult: {
@@ -516,17 +518,13 @@ describe("useVoiceFlowStore", () => {
 
     triggerHotkeyEvent("hotkey:released");
     await vi.waitFor(() => {
-      expect(store.status).toBe("error");
+      expect(mockInvoke).toHaveBeenCalledWith("paste_text", expect.anything());
     });
 
-    expect(store.message).toBe("voiceFlow.noSpeechDetected");
-    expect(mockInvoke).not.toHaveBeenCalledWith(
-      "paste_text",
-      expect.anything(),
-    );
+    expect(store.status).toBe("success");
   });
 
-  it("[P0] 已知幻覺短語「谢谢大家」應觸發「未偵測到語音」", async () => {
+  it("[P0] 已知幻覺短語有文字時應正常貼上（讓使用者自行判斷）", async () => {
     mockInvoke.mockImplementation(
       createMockInvokeHandler({
         transcribeResult: {
@@ -547,48 +545,13 @@ describe("useVoiceFlowStore", () => {
 
     triggerHotkeyEvent("hotkey:released");
     await vi.waitFor(() => {
-      expect(store.status).toBe("error");
+      expect(mockInvoke).toHaveBeenCalledWith("paste_text", expect.anything());
     });
 
-    expect(store.message).toBe("voiceFlow.noSpeechDetected");
-    expect(mockInvoke).not.toHaveBeenCalledWith(
-      "paste_text",
-      expect.anything(),
-    );
+    expect(store.status).toBe("success");
   });
 
-  it("[P0] 含幻覺子字串的長句應觸發「未偵測到語音」", async () => {
-    mockInvoke.mockImplementation(
-      createMockInvokeHandler({
-        transcribeResult: {
-          rawText: "請點贊、訂閱、轉發、打賞，支持《明鏡》和《點點》欄目。",
-          transcriptionDurationMs: 280,
-          noSpeechProbability: 0.5,
-        },
-      }),
-    );
-
-    const store = useVoiceFlowStore();
-    await store.initialize();
-
-    triggerHotkeyEvent("hotkey:pressed");
-    await vi.waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("start_recording");
-    });
-
-    triggerHotkeyEvent("hotkey:released");
-    await vi.waitFor(() => {
-      expect(store.status).toBe("error");
-    });
-
-    expect(store.message).toBe("voiceFlow.noSpeechDetected");
-    expect(mockInvoke).not.toHaveBeenCalledWith(
-      "paste_text",
-      expect.anything(),
-    );
-  });
-
-  it("[P0] 正常語音 + 低 noSpeechProbability 應正常貼上", async () => {
+  it("[P0] 正常語音應正常貼上", async () => {
     mockInvoke.mockImplementation(
       createMockInvokeHandler({
         transcribeResult: {
@@ -615,6 +578,37 @@ describe("useVoiceFlowStore", () => {
     });
 
     expect(store.status).toBe("success");
+  });
+
+  it("[P1] 純空白字串應視為空轉錄，觸發「未偵測到語音」", async () => {
+    mockInvoke.mockImplementation(
+      createMockInvokeHandler({
+        transcribeResult: {
+          rawText: "   ",
+          transcriptionDurationMs: 280,
+          noSpeechProbability: 0.8,
+        },
+      }),
+    );
+
+    const store = useVoiceFlowStore();
+    await store.initialize();
+
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("start_recording");
+    });
+
+    triggerHotkeyEvent("hotkey:released");
+    await vi.waitFor(() => {
+      expect(store.status).toBe("error");
+    });
+
+    expect(store.message).toBe("voiceFlow.noSpeechDetected");
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "paste_text",
+      expect.anything(),
+    );
   });
 
   it("[P0] 轉錄失敗時應回報中文錯誤訊息", async () => {

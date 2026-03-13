@@ -52,76 +52,18 @@ import { useSettingsStore } from "./useSettingsStore";
 
 const SUCCESS_DISPLAY_DURATION_MS = 1000;
 const ERROR_DISPLAY_DURATION_MS = 3000;
-const NO_SPEECH_PROBABILITY_THRESHOLD = 0.9;
 const START_SOUND_DURATION_MS = 400;
 
-const WHISPER_HALLUCINATION_PHRASES = new Set([
-  "谢谢大家",
-  "謝謝大家",
-  "感谢收看",
-  "感謝收看",
-  "Thanks for watching",
-  "Thank you for watching",
-  "Subtitles by",
-]);
-
-const WHISPER_HALLUCINATION_SUBSTRINGS = [
-  "字幕由",
-  "请不吝点赞",
-  "請不吝點贊",
-  "请订阅",
-  "請訂閱",
-  "点赞、订阅",
-  "點贊、訂閱",
-  "支持《明鏡》",
-  "支持《點點》",
-  "支持《点点》",
-  "MING PAO",
-  "Ming Pao",
-];
-
-// CJK Unified Ideographs range
-const CJK_REGEX = /[\u4e00-\u9fff]/;
-
 /**
- * Whisper 靜音幻覺常出現重複片段（如 "MING PAO Canada MING PAO Toronto"）。
- * 將文字切成 token，偵測任何 token 是否重複出現。
+ * 判斷轉錄結果是否為空（無內容可貼上）。
+ *
+ * 設計決策：只攔截「完全沒有文字」的情況。
+ * Whisper 幻聽（如「谢谢大家」、重複片語）不攔截，直接貼上讓使用者自行判斷。
+ * 理由：攔截 + 顯示「未偵測到語音」會讓使用者以為麥克風或系統有問題；
+ * 直接貼上則讓使用者看到是模型的輸出品質問題，可自行 Cmd+Z 重來。
  */
-function hasRepeatedTokens(text: string): boolean {
-  const tokens = text
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((t) => t.length >= 3);
-  if (tokens.length < 3) return false;
-  const seen = new Set<string>();
-  for (const token of tokens) {
-    if (seen.has(token)) return true;
-    seen.add(token);
-  }
-  return false;
-}
-
-function isSilenceOrHallucination(
-  rawText: string,
-  noSpeechProbability: number,
-): boolean {
-  if (!rawText) return true;
-  if (noSpeechProbability >= NO_SPEECH_PROBABILITY_THRESHOLD) return true;
-  if (WHISPER_HALLUCINATION_PHRASES.has(rawText)) return true;
-  if (WHISPER_HALLUCINATION_SUBSTRINGS.some((sub) => rawText.includes(sub)))
-    return true;
-  const settingsStore = useSettingsStore();
-  const whisperLang = settingsStore.getWhisperLanguageCode();
-  // CJK-specific check: zh mode, no CJK chars, repeated tokens → hallucination
-  if (
-    whisperLang === "zh" &&
-    !CJK_REGEX.test(rawText) &&
-    hasRepeatedTokens(rawText)
-  )
-    return true;
-  // Language-agnostic fallback: any mode (including auto), repeated tokens → likely hallucination
-  if (whisperLang === null && hasRepeatedTokens(rawText)) return true;
-  return false;
+function isEmptyTranscription(rawText: string): boolean {
+  return !rawText || !rawText.trim();
 }
 function t(key: string, params?: Record<string, unknown>): string {
   return i18n.global.t(key, params ?? {});
@@ -903,12 +845,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
       writeInfoLog(`轉錄原文: "${result.rawText}"`);
 
-      if (
-        isSilenceOrHallucination(result.rawText, result.noSpeechProbability)
-      ) {
+      if (isEmptyTranscription(result.rawText)) {
         failRecordingFlow(
           t("voiceFlow.noSpeechDetected"),
-          `useVoiceFlowStore: silence detected (noSpeechProb=${result.noSpeechProbability.toFixed(3)}, text="${result.rawText}")`,
+          `useVoiceFlowStore: empty transcription (noSpeechProb=${result.noSpeechProbability.toFixed(3)})`,
         );
         return;
       }
