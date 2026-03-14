@@ -40,12 +40,14 @@ import {
   DEFAULT_LLM_MODEL_ID,
   DEFAULT_VOCABULARY_ANALYSIS_MODEL_ID,
   DEFAULT_WHISPER_MODEL_ID,
+  DEFAULT_TRANSCRIPTION_PROVIDER,
   getEffectiveLlmModelId,
   getEffectiveVocabularyAnalysisModelId,
   getEffectiveWhisperModelId,
   type LlmModelId,
   type VocabularyAnalysisModelId,
   type WhisperModelId,
+  type TranscriptionProvider,
 } from "../lib/modelRegistry";
 
 const STORE_NAME = "settings.json";
@@ -92,6 +94,10 @@ export const useSettingsStore = defineStore("settings", () => {
     DEFAULT_VOCABULARY_ANALYSIS_MODEL_ID,
   );
   const selectedWhisperModelId = ref<WhisperModelId>(DEFAULT_WHISPER_MODEL_ID);
+  const transcriptionProvider = ref<TranscriptionProvider>(DEFAULT_TRANSCRIPTION_PROVIDER);
+  const localModelPath = ref<string>("");
+  const isLocalModelLoaded = ref(false);
+  const isLocalModelLoading = ref(false);
   const customTriggerKey = ref<CustomTriggerKey | null>(null);
   const isMuteOnRecordingEnabled = ref<boolean>(DEFAULT_MUTE_ON_RECORDING);
   const isSmartDictionaryEnabled = ref<boolean>(
@@ -216,6 +222,22 @@ export const useSettingsStore = defineStore("settings", () => {
       selectedWhisperModelId.value = getEffectiveWhisperModelId(
         savedWhisperModelId ?? null,
       );
+
+      const savedProvider = await store.get<TranscriptionProvider>("transcriptionProvider");
+      transcriptionProvider.value = savedProvider ?? DEFAULT_TRANSCRIPTION_PROVIDER;
+
+      const savedLocalModelPath = await store.get<string>("localModelPath");
+      localModelPath.value = savedLocalModelPath ?? "";
+
+      // Check local model status on startup
+      if (transcriptionProvider.value === "local" && localModelPath.value) {
+        try {
+          const status = await invoke<{ isLoaded: boolean; modelPath: string | null }>("get_local_model_status");
+          isLocalModelLoaded.value = status.isLoaded;
+        } catch {
+          isLocalModelLoaded.value = false;
+        }
+      }
 
       const savedMuteOnRecording = await store.get<boolean>("muteOnRecording");
       isMuteOnRecordingEnabled.value =
@@ -557,6 +579,68 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveTranscriptionProvider(provider: TranscriptionProvider) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("transcriptionProvider", provider);
+      await store.save();
+      transcriptionProvider.value = provider;
+
+      const payload: SettingsUpdatedPayload = {
+        key: "transcriptionProvider",
+        value: provider,
+      };
+      await emitEvent(SETTINGS_UPDATED, payload);
+      console.log(`[useSettingsStore] Transcription provider saved: ${provider}`);
+    } catch (err) {
+      console.error("[useSettingsStore] saveTranscriptionProvider failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function saveLocalModelPath(path: string) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("localModelPath", path);
+      await store.save();
+      localModelPath.value = path;
+
+      const payload: SettingsUpdatedPayload = {
+        key: "localModelPath",
+        value: path,
+      };
+      await emitEvent(SETTINGS_UPDATED, payload);
+      console.log(`[useSettingsStore] Local model path saved: ${path}`);
+    } catch (err) {
+      console.error("[useSettingsStore] saveLocalModelPath failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function loadLocalModel(path: string) {
+    isLocalModelLoading.value = true;
+    try {
+      await invoke("load_local_model", { modelPath: path });
+      isLocalModelLoaded.value = true;
+      await saveLocalModelPath(path);
+    } catch (err) {
+      isLocalModelLoaded.value = false;
+      throw err;
+    } finally {
+      isLocalModelLoading.value = false;
+    }
+  }
+
+  async function unloadLocalModel() {
+    try {
+      await invoke("unload_local_model");
+      isLocalModelLoaded.value = false;
+    } catch (err) {
+      console.error("[useSettingsStore] unloadLocalModel failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
   async function loadAutoStartStatus() {
     try {
       const { isEnabled } = await import("@tauri-apps/plugin-autostart");
@@ -794,6 +878,13 @@ export const useSettingsStore = defineStore("settings", () => {
       selectedWhisperModelId.value = getEffectiveWhisperModelId(
         savedWhisperModelId ?? null,
       );
+
+      const savedProvider = await store.get<TranscriptionProvider>("transcriptionProvider");
+      transcriptionProvider.value = savedProvider ?? DEFAULT_TRANSCRIPTION_PROVIDER;
+
+      const savedLocalModelPath = await store.get<string>("localModelPath");
+      localModelPath.value = savedLocalModelPath ?? "";
+
       isMuteOnRecordingEnabled.value =
         savedMuteOnRecording ?? DEFAULT_MUTE_ON_RECORDING;
       isSmartDictionaryEnabled.value =
@@ -841,6 +932,10 @@ export const useSettingsStore = defineStore("settings", () => {
     selectedLlmModelId,
     selectedVocabularyAnalysisModelId,
     selectedWhisperModelId,
+    transcriptionProvider,
+    localModelPath,
+    isLocalModelLoaded,
+    isLocalModelLoading,
     getApiKey,
     getAiPrompt,
     saveAiPrompt,
@@ -868,6 +963,10 @@ export const useSettingsStore = defineStore("settings", () => {
     saveLlmModel,
     saveVocabularyAnalysisModel,
     saveWhisperModel,
+    saveTranscriptionProvider,
+    saveLocalModelPath,
+    loadLocalModel,
+    unloadLocalModel,
     isMuteOnRecordingEnabled,
     saveMuteOnRecording,
     isSmartDictionaryEnabled,

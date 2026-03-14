@@ -109,6 +109,23 @@
       "transcriptionLanguageUpdated": "转录语言已更新",
       "autoDetect": "自动检测"
     },
+    "transcription": {
+      "providerLabel": "转录引擎",
+      "cloud": "云端（Groq API）",
+      "local": "本地（Whisper）",
+      "cloudDescription": "使用 Groq 云端 API 进行语音转录，需要 API Key。",
+      "localDescription": "使用本地 Whisper 模型进行语音转录，不需要网络连接。",
+      "modelPathLabel": "模型文件路径",
+      "modelPathPlaceholder": "/path/to/whisper-model.bin",
+      "modelPathHint": "支持 GGML 格式的 Whisper 模型文件（.bin）。可从 Hugging Face 下载。",
+      "loadModel": "加载模型",
+      "unloadModel": "卸载模型",
+      "loading": "加载中...",
+      "modelLoaded": "已加载",
+      "modelLoadSuccess": "本地模型加载成功",
+      "modelUnloaded": "本地模型已卸载",
+      "providerUpdated": "转录引擎已更新"
+    },
     "smartDictionary": {
       "title": "智能字典学习",
       "description": "转录粘贴后自动检测修正，通过 AI 分析学习新词汇",
@@ -213,6 +230,7 @@
     "apiKeyNotSet": "API Key 未设置",
     "enhancementTimeout": "AI 整理超时",
     "apiKeyMissing": "请设置 API Key",
+    "localModelNotLoaded": "本地模型尚未加载，请先在设置中加载模型",
     "mic": {
       "default": "麦克风初始化失败",
       "permission": "需要麦克风权限才能录音",

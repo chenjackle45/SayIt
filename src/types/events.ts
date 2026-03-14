@@ -26,6 +26,8 @@ export type SettingsKey =
   | "llmModel"
   | "vocabularyAnalysisModel"
   | "whisperModel"
+  | "transcriptionProvider"
+  | "localModelPath"
   | "muteOnRecording"
   | "smartDictionaryEnabled"
   | "locale"

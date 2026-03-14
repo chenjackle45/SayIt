@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   useSettingsStore,
@@ -23,6 +23,7 @@ import {
   type LlmModelId,
   type VocabularyAnalysisModelId,
   type WhisperModelId,
+  type TranscriptionProvider,
 } from "../lib/modelRegistry";
 import {
   LANGUAGE_OPTIONS,
@@ -58,6 +59,7 @@ import {
   Github,
   Globe,
   Instagram,
+  Loader2,
 } from "lucide-vue-next";
 
 const settingsStore = useSettingsStore();
@@ -373,6 +375,43 @@ async function handleSaveThresholdCharCount() {
   }
 }
 
+// ── 轉錄引擎 ──────────────────────────────────────────────
+const localModelPathInput = ref(settingsStore.localModelPath || "");
+const transcriptionProviderFeedback = useFeedbackMessage();
+
+async function handleProviderChange(value: string) {
+  try {
+    await settingsStore.saveTranscriptionProvider(value as TranscriptionProvider);
+    transcriptionProviderFeedback.show("success", t("settings.transcription.providerUpdated"));
+  } catch (err) {
+    transcriptionProviderFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleLoadModel() {
+  try {
+    await settingsStore.loadLocalModel(localModelPathInput.value);
+    transcriptionProviderFeedback.show("success", t("settings.transcription.modelLoadSuccess"));
+  } catch (err) {
+    transcriptionProviderFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleUnloadModel() {
+  try {
+    await settingsStore.unloadLocalModel();
+    transcriptionProviderFeedback.show("success", t("settings.transcription.modelUnloaded"));
+  } catch (err) {
+    transcriptionProviderFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+watch(() => settingsStore.localModelPath, (newPath) => {
+  if (newPath && !localModelPathInput.value) {
+    localModelPathInput.value = newPath;
+  }
+});
+
 // ── 模型選擇 ──────────────────────────────────────────────
 const modelFeedback = useFeedbackMessage();
 
@@ -520,6 +559,7 @@ onBeforeUnmount(() => {
   apiKeyFeedback.clearTimer();
   promptFeedback.clearTimer();
   enhancementThresholdFeedback.clearTimer();
+  transcriptionProviderFeedback.clearTimer();
   modelFeedback.clearTimer();
   muteOnRecordingFeedback.clearTimer();
   localeFeedback.clearTimer();
@@ -816,6 +856,91 @@ onBeforeUnmount(() => {
             {{ isConfirmingDeleteApiKey ? $t('settings.apiKey.confirmDelete') : $t('settings.apiKey.delete') }}
           </Button>
         </div>
+      </CardContent>
+    </Card>
+
+    <!-- 轉錄引擎 -->
+    <Card>
+      <CardHeader class="border-b border-border">
+        <CardTitle class="text-base">{{ $t("settings.transcription.providerLabel") }}</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="space-y-2">
+          <Label for="transcription-provider">{{ $t("settings.transcription.providerLabel") }}</Label>
+          <Select
+            :model-value="settingsStore.transcriptionProvider"
+            @update:model-value="handleProviderChange($event as string)"
+          >
+            <SelectTrigger id="transcription-provider" class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cloud">{{ $t("settings.transcription.cloud") }}</SelectItem>
+              <SelectItem value="local">{{ $t("settings.transcription.local") }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <p class="text-xs text-muted-foreground">
+            {{ settingsStore.transcriptionProvider === "local"
+              ? $t("settings.transcription.localDescription")
+              : $t("settings.transcription.cloudDescription") }}
+          </p>
+        </div>
+
+        <!-- Local model config -->
+        <div v-if="settingsStore.transcriptionProvider === 'local'" class="space-y-3">
+          <div class="space-y-2">
+            <Label for="local-model-path">{{ $t("settings.transcription.modelPathLabel") }}</Label>
+            <div class="flex gap-2">
+              <Input
+                id="local-model-path"
+                v-model="localModelPathInput"
+                :placeholder="$t('settings.transcription.modelPathPlaceholder')"
+                class="flex-1"
+              />
+            </div>
+            <p class="text-xs text-muted-foreground">
+              {{ $t("settings.transcription.modelPathHint") }}
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <Button
+              v-if="!settingsStore.isLocalModelLoaded"
+              :disabled="!localModelPathInput || settingsStore.isLocalModelLoading"
+              @click="handleLoadModel"
+            >
+              <Loader2 v-if="settingsStore.isLocalModelLoading" class="mr-2 h-4 w-4 animate-spin" />
+              {{ settingsStore.isLocalModelLoading
+                ? $t("settings.transcription.loading")
+                : $t("settings.transcription.loadModel") }}
+            </Button>
+            <Button
+              v-else
+              variant="outline"
+              @click="handleUnloadModel"
+            >
+              {{ $t("settings.transcription.unloadModel") }}
+            </Button>
+
+            <Badge v-if="settingsStore.isLocalModelLoaded" variant="secondary">
+              {{ $t("settings.transcription.modelLoaded") }}
+            </Badge>
+          </div>
+        </div>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="transcriptionProviderFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              transcriptionProviderFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            {{ transcriptionProviderFeedback.message.value }}
+          </p>
+        </transition>
       </CardContent>
     </Card>
 

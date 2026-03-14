@@ -109,6 +109,23 @@
       "transcriptionLanguageUpdated": "文字起こし言語が更新されました",
       "autoDetect": "自動検出"
     },
+    "transcription": {
+      "providerLabel": "文字起こしエンジン",
+      "cloud": "クラウド（Groq API）",
+      "local": "ローカル（Whisper）",
+      "cloudDescription": "Groq クラウド API を使用して音声を文字起こしします。API Key が必要です。",
+      "localDescription": "ローカルの Whisper モデルを使用して音声を文字起こしします。インターネット不要。",
+      "modelPathLabel": "モデルファイルパス",
+      "modelPathPlaceholder": "/path/to/whisper-model.bin",
+      "modelPathHint": "GGML 形式の Whisper モデルファイル（.bin）に対応。Hugging Face からダウンロードできます。",
+      "loadModel": "モデルを読み込む",
+      "unloadModel": "モデルをアンロード",
+      "loading": "読み込み中...",
+      "modelLoaded": "読み込み済み",
+      "modelLoadSuccess": "ローカルモデルの読み込みに成功しました",
+      "modelUnloaded": "ローカルモデルをアンロードしました",
+      "providerUpdated": "文字起こしエンジンが更新されました"
+    },
     "smartDictionary": {
       "title": "スマート辞書学習",
       "description": "貼り付け後に修正を自動検出し、AI 分析で新語を学習",
@@ -213,6 +230,7 @@
     "apiKeyNotSet": "API Key が未設定です",
     "enhancementTimeout": "AI 整理がタイムアウトしました",
     "apiKeyMissing": "API Key を設定してください",
+    "localModelNotLoaded": "ローカルモデルが読み込まれていません。設定でモデルを読み込んでください",
     "mic": {
       "default": "マイクの初期化に失敗しました",
       "permission": "録音にはマイクの権限が必要です",

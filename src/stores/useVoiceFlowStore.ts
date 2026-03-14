@@ -729,11 +729,13 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         );
     }
 
+    const isLocalProvider = settingsStore.transcriptionProvider === "local";
+
     fireAndForget({
       id: crypto.randomUUID(),
       transcriptionId: record.id,
       apiType: "whisper",
-      model: settingsStore.selectedWhisperModelId,
+      model: isLocalProvider ? "local" : settingsStore.selectedWhisperModelId,
       promptTokens: null,
       completionTokens: null,
       totalTokens: null,
@@ -741,10 +743,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       completionTimeMs: null,
       totalTimeMs: null,
       audioDurationMs: roundedAudioMs,
-      estimatedCostCeiling: calculateWhisperCostCeiling(
-        roundedAudioMs,
-        settingsStore.selectedWhisperModelId,
-      ),
+      estimatedCostCeiling: isLocalProvider
+        ? 0
+        : calculateWhisperCostCeiling(
+            roundedAudioMs,
+            settingsStore.selectedWhisperModelId,
+          ),
     });
 
     if (chatUsage) {
@@ -817,31 +821,55 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
       transitionTo("transcribing", t("voiceFlow.transcribing"));
       const settingsStore = useSettingsStore();
-      let apiKey = settingsStore.getApiKey();
 
-      if (!apiKey) {
-        await settingsStore.refreshApiKey();
-        apiKey = settingsStore.getApiKey();
+      let result: TranscriptionResult;
+
+      if (settingsStore.transcriptionProvider === "local") {
+        // Local whisper transcription
+        if (!settingsStore.isLocalModelLoaded) {
+          failRecordingFlow(
+            t("errors.localModelNotLoaded"),
+            "useVoiceFlowStore: local model not loaded",
+          );
+          return;
+        }
+
+        const vocabularyStore = useVocabularyStore();
+        const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
+        const hasVocabulary = whisperTermList.length > 0;
+
+        result = await invoke<TranscriptionResult>("transcribe_audio_local", {
+          language: settingsStore.getWhisperLanguageCode(),
+          vocabularyTermList: hasVocabulary ? whisperTermList : null,
+        });
+      } else {
+        // Cloud (Groq) transcription
+        let apiKey = settingsStore.getApiKey();
+
+        if (!apiKey) {
+          await settingsStore.refreshApiKey();
+          apiKey = settingsStore.getApiKey();
+        }
+
+        if (!apiKey) {
+          failRecordingFlow(
+            t("errors.apiKeyMissing"),
+            "useVoiceFlowStore: missing API key while transcribing",
+          );
+          return;
+        }
+
+        const vocabularyStore = useVocabularyStore();
+        const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
+        const hasVocabulary = whisperTermList.length > 0;
+
+        result = await invoke<TranscriptionResult>("transcribe_audio", {
+          apiKey,
+          vocabularyTermList: hasVocabulary ? whisperTermList : null,
+          modelId: settingsStore.selectedWhisperModelId,
+          language: settingsStore.getWhisperLanguageCode(),
+        });
       }
-
-      if (!apiKey) {
-        failRecordingFlow(
-          t("errors.apiKeyMissing"),
-          "useVoiceFlowStore: missing API key while transcribing",
-        );
-        return;
-      }
-
-      const vocabularyStore = useVocabularyStore();
-      const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
-      const hasVocabulary = whisperTermList.length > 0;
-
-      const result = await invoke<TranscriptionResult>("transcribe_audio", {
-        apiKey,
-        vocabularyTermList: hasVocabulary ? whisperTermList : null,
-        modelId: settingsStore.selectedWhisperModelId,
-        language: settingsStore.getWhisperLanguageCode(),
-      });
 
       writeInfoLog(`轉錄原文: "${result.rawText}"`);
 
@@ -861,9 +889,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         const enhancementStartTime = performance.now();
 
         try {
+          const vocabularyStoreForEnhancement = useVocabularyStore();
           const enhancementTermList =
-            await vocabularyStore.getTopTermListByWeight(50);
-          const enhanceResult = await enhanceText(result.rawText, apiKey, {
+            await vocabularyStoreForEnhancement.getTopTermListByWeight(50);
+          const enhancementApiKey = settingsStore.getApiKey();
+          const enhanceResult = await enhanceText(result.rawText, enhancementApiKey, {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
               enhancementTermList.length > 0 ? enhancementTermList : undefined,

@@ -109,6 +109,23 @@
       "transcriptionLanguageUpdated": "Transcription language updated",
       "autoDetect": "Auto Detect"
     },
+    "transcription": {
+      "providerLabel": "Transcription Engine",
+      "cloud": "Cloud (Groq API)",
+      "local": "Local (Whisper)",
+      "cloudDescription": "Uses Groq cloud API for speech transcription. Requires an API Key.",
+      "localDescription": "Uses a local Whisper model for speech transcription. No internet required.",
+      "modelPathLabel": "Model File Path",
+      "modelPathPlaceholder": "/path/to/whisper-model.bin",
+      "modelPathHint": "Supports GGML format Whisper model files (.bin). Download from Hugging Face.",
+      "loadModel": "Load Model",
+      "unloadModel": "Unload Model",
+      "loading": "Loading...",
+      "modelLoaded": "Loaded",
+      "modelLoadSuccess": "Local model loaded successfully",
+      "modelUnloaded": "Local model unloaded",
+      "providerUpdated": "Transcription engine updated"
+    },
     "smartDictionary": {
       "title": "Smart Dictionary Learning",
       "description": "Auto-detect corrections after paste and learn new terms via AI analysis",
@@ -213,6 +230,7 @@
     "apiKeyNotSet": "API Key not set",
     "enhancementTimeout": "AI enhancement timed out",
     "apiKeyMissing": "Please set your API Key",
+    "localModelNotLoaded": "Local model not loaded. Please load a model in Settings first.",
     "mic": {
       "default": "Microphone initialization failed",
       "permission": "Microphone permission is required to record",
