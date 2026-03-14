@@ -593,8 +593,8 @@ So that 沒講話或很短停頓時不會有亂碼被貼入編輯器。
 **And** `en` 載入英文幻覺詞（「Thank you for watching」「Subscribe」等）
 **And** `auto` 載入所有語言的幻覺詞庫
 
-**Given** 設定頁面
-**When** 使用者開啟幻覺詞庫區塊
+**Given** 幻覺詞庫頁面（HallucinationView.vue）
+**When** 使用者從側邊欄開啟幻覺詞庫頁面
 **Then** 顯示所有幻覺詞（內建 + 自動學習 + 手動新增）
 **And** 使用者可手動新增/刪除幻覺詞
 
