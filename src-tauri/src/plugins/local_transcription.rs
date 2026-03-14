@@ -18,8 +18,11 @@ struct WhisperEngine {
     context: WhisperContext,
 }
 
-// Safety: WhisperContext is internally thread-safe for read operations.
-// We wrap the entire engine in a Mutex to ensure exclusive access during inference.
+// Safety: WhisperContext contains raw pointers to the C whisper.cpp state, so the
+// compiler does not auto-derive Send/Sync. However, we wrap the engine in a
+// Mutex<Option<WhisperEngine>> which guarantees exclusive access — only one thread
+// can hold the lock during model loading or inference. No concurrent access to the
+// underlying C state is possible through our API.
 unsafe impl Send for WhisperEngine {}
 unsafe impl Sync for WhisperEngine {}
 
@@ -302,6 +305,10 @@ pub fn transcribe_audio_local(
         .map_err(|e| LocalTranscriptionError::TranscriptionFailed(e.to_string()))?;
 
     let mut full_text = String::new();
+    // Note: whisper-rs does not expose per-segment no_speech_prob in its public API.
+    // We default to 0.0 (assume speech present) and only set to 1.0 when no segments
+    // are produced at all. The frontend's empty-transcription check relies on rawText
+    // emptiness, so this does not affect correctness.
     let mut max_no_speech_prob: f64 = 0.0;
 
     for i in 0..num_segments {
@@ -311,7 +318,6 @@ pub fn transcribe_audio_local(
         full_text.push_str(&text);
     }
 
-    // If no segments, treat as full silence
     if num_segments == 0 {
         max_no_speech_prob = 1.0;
     }

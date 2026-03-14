@@ -229,13 +229,24 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedLocalModelPath = await store.get<string>("localModelPath");
       localModelPath.value = savedLocalModelPath ?? "";
 
-      // Check local model status on startup
+      // Auto-load local model on startup if provider is "local" and a path is saved
       if (transcriptionProvider.value === "local" && localModelPath.value) {
         try {
           const status = await invoke<{ isLoaded: boolean; modelPath: string | null }>("get_local_model_status");
-          isLocalModelLoaded.value = status.isLoaded;
-        } catch {
+          if (status.isLoaded) {
+            isLocalModelLoaded.value = true;
+          } else {
+            // Model not loaded (e.g. after app restart) — auto-load it
+            isLocalModelLoading.value = true;
+            await invoke("load_local_model", { modelPath: localModelPath.value });
+            isLocalModelLoaded.value = true;
+            isLocalModelLoading.value = false;
+            console.log("[useSettingsStore] Auto-loaded local model on startup");
+          }
+        } catch (err) {
           isLocalModelLoaded.value = false;
+          isLocalModelLoading.value = false;
+          console.warn("[useSettingsStore] Failed to auto-load local model:", extractErrorMessage(err));
         }
       }
 
