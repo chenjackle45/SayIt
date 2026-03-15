@@ -881,10 +881,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         return;
       }
 
-      if (
-        !settingsStore.isEnhancementThresholdEnabled ||
-        result.rawText.length >= settingsStore.enhancementThresholdCharCount
-      ) {
+      const shouldEnhance =
+        settingsStore.isCloudEnhancementEnabled &&
+        (!settingsStore.isEnhancementThresholdEnabled ||
+          result.rawText.length >= settingsStore.enhancementThresholdCharCount);
+
+      if (shouldEnhance) {
         transitionTo("enhancing", t("voiceFlow.enhancing"));
         const enhancementStartTime = performance.now();
 

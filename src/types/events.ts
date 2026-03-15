@@ -28,6 +28,7 @@ export type SettingsKey =
   | "whisperModel"
   | "transcriptionProvider"
   | "localModelPath"
+  | "cloudEnhancementEnabled"
   | "muteOnRecording"
   | "smartDictionaryEnabled"
   | "locale"

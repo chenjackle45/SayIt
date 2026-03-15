@@ -124,7 +124,15 @@
       "modelLoaded": "読み込み済み",
       "modelLoadSuccess": "ローカルモデルの読み込みに成功しました",
       "modelUnloaded": "ローカルモデルをアンロードしました",
-      "providerUpdated": "文字起こしエンジンが更新されました"
+      "providerUpdated": "文字起こしエンジンが更新されました",
+      "cloudEnhancementLabel": "クラウドテキスト整形",
+      "cloudEnhancementDescription": "Groq LLMを使用して話し言葉を自動的に整った書き言葉に変換します。無効にすると、生の文字起こしがそのまま貼り付けられます。",
+      "cloudEnhancementUpdated": "クラウドテキスト整形設定が更新されました",
+      "selectModel": "モデルを選択",
+      "downloadAndLoad": "ダウンロードして読み込む",
+      "downloading": "ダウンロード中...",
+      "deleteModel": "削除",
+      "modelDeleted": "モデルが削除されました"
     },
     "smartDictionary": {
       "title": "スマート辞書学習",

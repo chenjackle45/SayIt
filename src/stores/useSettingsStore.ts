@@ -98,6 +98,17 @@ export const useSettingsStore = defineStore("settings", () => {
   const localModelPath = ref<string>("");
   const isLocalModelLoaded = ref(false);
   const isLocalModelLoading = ref(false);
+  const isCloudEnhancementEnabled = ref(true);
+  const availableLocalModels = ref<Array<{
+    id: string;
+    displayName: string;
+    sizeMb: number;
+    url: string;
+    description: string;
+  }>>([]);
+  const selectedLocalModelId = ref<string>("");
+  const downloadProgress = ref<number>(0);
+  const isDownloading = ref(false);
   const customTriggerKey = ref<CustomTriggerKey | null>(null);
   const isMuteOnRecordingEnabled = ref<boolean>(DEFAULT_MUTE_ON_RECORDING);
   const isSmartDictionaryEnabled = ref<boolean>(
@@ -229,24 +240,18 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedLocalModelPath = await store.get<string>("localModelPath");
       localModelPath.value = savedLocalModelPath ?? "";
 
-      // Auto-load local model on startup if provider is "local" and a path is saved
-      if (transcriptionProvider.value === "local" && localModelPath.value) {
+      const savedCloudEnhancement = await store.get<boolean>("cloudEnhancementEnabled");
+      isCloudEnhancementEnabled.value = savedCloudEnhancement ?? true;
+
+      const savedSelectedModelId = await store.get<string>("selectedLocalModelId");
+      selectedLocalModelId.value = savedSelectedModelId ?? "";
+
+      // Auto-load saved model on startup
+      if (transcriptionProvider.value === "local" && selectedLocalModelId.value) {
         try {
-          const status = await invoke<{ isLoaded: boolean; modelPath: string | null }>("get_local_model_status");
-          if (status.isLoaded) {
-            isLocalModelLoaded.value = true;
-          } else {
-            // Model not loaded (e.g. after app restart) — auto-load it
-            isLocalModelLoading.value = true;
-            await invoke("load_local_model", { modelPath: localModelPath.value });
-            isLocalModelLoaded.value = true;
-            isLocalModelLoading.value = false;
-            console.log("[useSettingsStore] Auto-loaded local model on startup");
-          }
+          await checkAndLoadSavedModel();
         } catch (err) {
-          isLocalModelLoaded.value = false;
-          isLocalModelLoading.value = false;
-          console.warn("[useSettingsStore] Failed to auto-load local model:", extractErrorMessage(err));
+          console.warn("[useSettingsStore] Failed to auto-load model:", extractErrorMessage(err));
         }
       }
 
@@ -628,6 +633,25 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveCloudEnhancementEnabled(enabled: boolean) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("cloudEnhancementEnabled", enabled);
+      await store.save();
+      isCloudEnhancementEnabled.value = enabled;
+
+      const payload: SettingsUpdatedPayload = {
+        key: "cloudEnhancementEnabled",
+        value: enabled,
+      };
+      await emitEvent(SETTINGS_UPDATED, payload);
+      console.log(`[useSettingsStore] cloudEnhancementEnabled saved: ${enabled}`);
+    } catch (err) {
+      console.error("[useSettingsStore] saveCloudEnhancementEnabled failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
   async function loadLocalModel(path: string) {
     isLocalModelLoading.value = true;
     try {
@@ -648,6 +672,76 @@ export const useSettingsStore = defineStore("settings", () => {
       isLocalModelLoaded.value = false;
     } catch (err) {
       console.error("[useSettingsStore] unloadLocalModel failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function fetchAvailableModels() {
+    try {
+      availableLocalModels.value = await invoke("list_available_models");
+    } catch (err) {
+      console.error("[useSettingsStore] fetchAvailableModels failed:", extractErrorMessage(err));
+    }
+  }
+
+  async function downloadAndLoadModel(modelId: string) {
+    isDownloading.value = true;
+    downloadProgress.value = 0;
+    try {
+      const modelPath = await invoke<string>("download_local_model", { modelId });
+      await invoke("load_local_model", { modelPath });
+      isLocalModelLoaded.value = true;
+      selectedLocalModelId.value = modelId;
+
+      // Save selections
+      const store = await load(STORE_NAME);
+      await store.set("localModelPath", modelPath);
+      await store.set("selectedLocalModelId", modelId);
+      await store.save();
+      localModelPath.value = modelPath;
+    } catch (err) {
+      isLocalModelLoaded.value = false;
+      throw err;
+    } finally {
+      isDownloading.value = false;
+      downloadProgress.value = 0;
+    }
+  }
+
+  async function checkAndLoadSavedModel() {
+    if (!selectedLocalModelId.value) return;
+    try {
+      const existingPath = await invoke<string | null>("check_downloaded_model", { modelId: selectedLocalModelId.value });
+      if (existingPath) {
+        const status = await invoke<{ isLoaded: boolean }>("get_local_model_status");
+        if (!status.isLoaded) {
+          await invoke("load_local_model", { modelPath: existingPath });
+        }
+        isLocalModelLoaded.value = true;
+        localModelPath.value = existingPath;
+      }
+    } catch (err) {
+      isLocalModelLoaded.value = false;
+      console.warn("[useSettingsStore] checkAndLoadSavedModel failed:", extractErrorMessage(err));
+    }
+  }
+
+  async function deleteModel(modelId: string) {
+    try {
+      // Unload if this is the currently loaded model
+      if (selectedLocalModelId.value === modelId && isLocalModelLoaded.value) {
+        await invoke("unload_local_model");
+        isLocalModelLoaded.value = false;
+      }
+      await invoke("delete_local_model", { modelId });
+      selectedLocalModelId.value = "";
+      localModelPath.value = "";
+      const store = await load(STORE_NAME);
+      await store.set("selectedLocalModelId", "");
+      await store.set("localModelPath", "");
+      await store.save();
+    } catch (err) {
+      console.error("[useSettingsStore] deleteModel failed:", extractErrorMessage(err));
       throw err;
     }
   }
@@ -896,6 +990,24 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedLocalModelPath = await store.get<string>("localModelPath");
       localModelPath.value = savedLocalModelPath ?? "";
 
+      const savedSelectedModelId = await store.get<string>("selectedLocalModelId");
+      selectedLocalModelId.value = savedSelectedModelId ?? "";
+
+      const savedCloudEnhancement = await store.get<boolean>("cloudEnhancementEnabled");
+      isCloudEnhancementEnabled.value = savedCloudEnhancement ?? true;
+
+      // Sync local model loaded status from Rust backend
+      if (transcriptionProvider.value === "local" && selectedLocalModelId.value) {
+        try {
+          const status = await invoke<{ isLoaded: boolean }>("get_local_model_status");
+          isLocalModelLoaded.value = status.isLoaded;
+        } catch {
+          isLocalModelLoaded.value = false;
+        }
+      } else {
+        isLocalModelLoaded.value = false;
+      }
+
       isMuteOnRecordingEnabled.value =
         savedMuteOnRecording ?? DEFAULT_MUTE_ON_RECORDING;
       isSmartDictionaryEnabled.value =
@@ -947,6 +1059,8 @@ export const useSettingsStore = defineStore("settings", () => {
     localModelPath,
     isLocalModelLoaded,
     isLocalModelLoading,
+    isCloudEnhancementEnabled,
+    saveCloudEnhancementEnabled,
     getApiKey,
     getAiPrompt,
     saveAiPrompt,
@@ -978,6 +1092,14 @@ export const useSettingsStore = defineStore("settings", () => {
     saveLocalModelPath,
     loadLocalModel,
     unloadLocalModel,
+    availableLocalModels,
+    selectedLocalModelId,
+    downloadProgress,
+    isDownloading,
+    fetchAvailableModels,
+    downloadAndLoadModel,
+    checkAndLoadSavedModel,
+    deleteModel,
     isMuteOnRecordingEnabled,
     saveMuteOnRecording,
     isSmartDictionaryEnabled,

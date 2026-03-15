@@ -432,6 +432,11 @@ pub fn run() {
             plugins::local_transcription::unload_local_model,
             plugins::local_transcription::get_local_model_status,
             plugins::local_transcription::transcribe_audio_local,
+            plugins::local_transcription::list_available_models,
+            plugins::local_transcription::download_local_model,
+            plugins::local_transcription::check_downloaded_model,
+            plugins::local_transcription::delete_local_model,
+            plugins::local_transcription::get_models_dir,
             plugins::sound_feedback::play_start_sound,
             plugins::sound_feedback::play_stop_sound,
             plugins::sound_feedback::play_learned_sound

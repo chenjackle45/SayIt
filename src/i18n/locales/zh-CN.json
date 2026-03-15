@@ -124,7 +124,15 @@
       "modelLoaded": "已加载",
       "modelLoadSuccess": "本地模型加载成功",
       "modelUnloaded": "本地模型已卸载",
-      "providerUpdated": "转录引擎已更新"
+      "providerUpdated": "转录引擎已更新",
+      "cloudEnhancementLabel": "云端文字整理",
+      "cloudEnhancementDescription": "使用 Groq LLM 将口语自动转为通顺的书面语。关闭后直接粘贴原始转录文字。",
+      "cloudEnhancementUpdated": "云端文字整理设置已更新",
+      "selectModel": "选择模型",
+      "downloadAndLoad": "下载并加载",
+      "downloading": "下载中...",
+      "deleteModel": "删除",
+      "modelDeleted": "模型已删除"
     },
     "smartDictionary": {
       "title": "智能字典学习",

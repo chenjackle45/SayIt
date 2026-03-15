@@ -124,7 +124,15 @@
       "modelLoaded": "Loaded",
       "modelLoadSuccess": "Local model loaded successfully",
       "modelUnloaded": "Local model unloaded",
-      "providerUpdated": "Transcription engine updated"
+      "providerUpdated": "Transcription engine updated",
+      "cloudEnhancementLabel": "Cloud Text Enhancement",
+      "cloudEnhancementDescription": "Uses Groq LLM to automatically convert spoken language into polished written text. When disabled, raw transcription is pasted directly.",
+      "cloudEnhancementUpdated": "Cloud text enhancement setting updated",
+      "selectModel": "Select Model",
+      "downloadAndLoad": "Download & Load",
+      "downloading": "Downloading...",
+      "deleteModel": "Delete",
+      "modelDeleted": "Model deleted"
     },
     "smartDictionary": {
       "title": "Smart Dictionary Learning",

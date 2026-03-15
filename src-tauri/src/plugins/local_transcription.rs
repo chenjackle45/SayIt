@@ -2,7 +2,7 @@ use std::io::Cursor;
 use std::sync::Mutex;
 use std::time::Instant;
 
-use tauri::{command, State};
+use tauri::{command, AppHandle, Emitter, Manager, State};
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 use super::audio_recorder::AudioRecorderState;
@@ -147,6 +147,55 @@ fn resample(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
     }
 
     output
+}
+
+// ========== Available Models ==========
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalModelInfo {
+    pub id: String,
+    pub display_name: String,
+    pub size_mb: u64,
+    pub url: String,
+    pub description: String,
+}
+
+pub fn get_available_models() -> Vec<LocalModelInfo> {
+    vec![
+        LocalModelInfo {
+            id: "breeze-asr-25-q4k".to_string(),
+            display_name: "Breeze ASR 25 (Q4_K)".to_string(),
+            size_mb: 889,
+            url: "https://huggingface.co/alan314159/Breeze-ASR-25-whispercpp/resolve/main/ggml-model-q4_k.bin".to_string(),
+            description: "中英混合優化，品質與大小平衡".to_string(),
+        },
+        LocalModelInfo {
+            id: "breeze-asr-25-q5k".to_string(),
+            display_name: "Breeze ASR 25 (Q5_K)".to_string(),
+            size_mb: 1080,
+            url: "https://huggingface.co/alan314159/Breeze-ASR-25-whispercpp/resolve/main/ggml-model-q5_k.bin".to_string(),
+            description: "中英混合優化，品質較高".to_string(),
+        },
+        LocalModelInfo {
+            id: "breeze-asr-25-q8".to_string(),
+            display_name: "Breeze ASR 25 (Q8_0)".to_string(),
+            size_mb: 1660,
+            url: "https://huggingface.co/alan314159/Breeze-ASR-25-whispercpp/resolve/main/ggml-model-q8_0.bin".to_string(),
+            description: "中英混合優化，最高品質".to_string(),
+        },
+    ]
+}
+
+// ========== Download Progress ==========
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadProgressPayload {
+    pub model_id: String,
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub progress_percent: f64,
 }
 
 // ========== Commands ==========
@@ -335,6 +384,164 @@ pub fn transcribe_audio_local(
         transcription_duration_ms,
         no_speech_probability: max_no_speech_prob,
     })
+}
+
+// ========== Model Management Commands ==========
+
+#[command]
+pub fn list_available_models() -> Vec<LocalModelInfo> {
+    get_available_models()
+}
+
+#[command]
+pub fn get_models_dir(app: AppHandle) -> Result<String, LocalTranscriptionError> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Cannot resolve app data dir: {}", e)))?;
+    let models_dir = app_data_dir.join("models");
+    std::fs::create_dir_all(&models_dir)
+        .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Cannot create models dir: {}", e)))?;
+    Ok(models_dir.to_string_lossy().to_string())
+}
+
+#[command]
+pub fn check_downloaded_model(app: AppHandle, model_id: String) -> Result<Option<String>, LocalTranscriptionError> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Cannot resolve app data dir: {}", e)))?;
+    let models_dir = app_data_dir.join("models");
+    let model_path = models_dir.join(format!("{}.bin", model_id));
+    if model_path.exists() {
+        Ok(Some(model_path.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
+#[command]
+pub async fn download_local_model(
+    app: AppHandle,
+    model_id: String,
+) -> Result<String, LocalTranscriptionError> {
+    let models = get_available_models();
+    let model_info = models
+        .iter()
+        .find(|m| m.id == model_id)
+        .ok_or_else(|| LocalTranscriptionError::ModelLoadFailed(format!("Unknown model: {}", model_id)))?;
+
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Cannot resolve app data dir: {}", e)))?;
+    let models_dir = app_data_dir.join("models");
+    std::fs::create_dir_all(&models_dir)
+        .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Cannot create models dir: {}", e)))?;
+
+    let dest_path = models_dir.join(format!("{}.bin", model_id));
+
+    // If already downloaded, return path directly
+    if dest_path.exists() {
+        let metadata = std::fs::metadata(&dest_path)
+            .map_err(|e| LocalTranscriptionError::ModelLoadFailed(e.to_string()))?;
+        // Check if file size is reasonable (at least 50MB)
+        if metadata.len() > 50_000_000 {
+            println!("[local-transcription] Model already exists: {}", dest_path.display());
+            return Ok(dest_path.to_string_lossy().to_string());
+        }
+        // File too small, probably corrupted — re-download
+        let _ = std::fs::remove_file(&dest_path);
+    }
+
+    let url = model_info.url.clone();
+    let model_id_clone = model_id.clone();
+
+    println!("[local-transcription] Downloading model {} from {}", model_id, url);
+
+    // Download with progress reporting
+    let client = reqwest::Client::new();
+    let mut response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Download request failed: {}", e)))?;
+
+    if !response.status().is_success() {
+        return Err(LocalTranscriptionError::ModelLoadFailed(
+            format!("Download failed with status: {}", response.status()),
+        ));
+    }
+
+    let total_bytes = response.content_length().unwrap_or(model_info.size_mb * 1_000_000);
+
+    // Write to a temp file first, then rename (atomic-ish)
+    let temp_path = models_dir.join(format!("{}.bin.tmp", model_id));
+    let mut file = std::fs::File::create(&temp_path)
+        .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Cannot create file: {}", e)))?;
+
+    // Download in chunks
+    let mut downloaded: u64 = 0;
+    let mut last_emit_percent: f64 = -1.0;
+
+    loop {
+        let chunk = response
+            .chunk()
+            .await
+            .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Download error: {}", e)))?;
+
+        match chunk {
+            Some(bytes) => {
+                use std::io::Write;
+                file.write_all(&bytes)
+                    .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Write error: {}", e)))?;
+
+                downloaded += bytes.len() as u64;
+                let percent = (downloaded as f64 / total_bytes as f64 * 100.0).min(100.0);
+
+                if percent - last_emit_percent >= 1.0 {
+                    last_emit_percent = percent;
+                    let _ = app.emit("local-model:download-progress", DownloadProgressPayload {
+                        model_id: model_id_clone.clone(),
+                        downloaded_bytes: downloaded,
+                        total_bytes,
+                        progress_percent: percent,
+                    });
+                }
+            }
+            None => break,
+        }
+    }
+
+    drop(file);
+
+    // Rename temp → final
+    std::fs::rename(&temp_path, &dest_path)
+        .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Cannot rename file: {}", e)))?;
+
+    println!(
+        "[local-transcription] Download complete: {} ({} bytes)",
+        dest_path.display(),
+        downloaded
+    );
+
+    Ok(dest_path.to_string_lossy().to_string())
+}
+
+#[command]
+pub fn delete_local_model(app: AppHandle, model_id: String) -> Result<(), LocalTranscriptionError> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Cannot resolve app data dir: {}", e)))?;
+    let models_dir = app_data_dir.join("models");
+    let model_path = models_dir.join(format!("{}.bin", model_id));
+    if model_path.exists() {
+        std::fs::remove_file(&model_path)
+            .map_err(|e| LocalTranscriptionError::ModelLoadFailed(format!("Cannot delete model: {}", e)))?;
+        println!("[local-transcription] Model deleted: {}", model_path.display());
+    }
+    Ok(())
 }
 
 // ========== Tests ==========

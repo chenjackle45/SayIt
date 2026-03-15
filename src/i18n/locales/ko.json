@@ -124,7 +124,15 @@
       "modelLoaded": "로드됨",
       "modelLoadSuccess": "로컬 모델이 성공적으로 로드되었습니다",
       "modelUnloaded": "로컬 모델이 언로드되었습니다",
-      "providerUpdated": "전사 엔진이 업데이트되었습니다"
+      "providerUpdated": "전사 엔진이 업데이트되었습니다",
+      "cloudEnhancementLabel": "클라우드 텍스트 정리",
+      "cloudEnhancementDescription": "Groq LLM을 사용하여 구어를 자동으로 매끄러운 문어로 변환합니다. 비활성화하면 원본 전사 텍스트가 바로 붙여넣기됩니다.",
+      "cloudEnhancementUpdated": "클라우드 텍스트 정리 설정이 업데이트되었습니다",
+      "selectModel": "모델 선택",
+      "downloadAndLoad": "다운로드 및 로드",
+      "downloading": "다운로드 중...",
+      "deleteModel": "삭제",
+      "modelDeleted": "모델이 삭제되었습니다"
     },
     "smartDictionary": {
       "title": "스마트 사전 학습",
