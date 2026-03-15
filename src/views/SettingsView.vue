@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import {
   useSettingsStore,
@@ -23,6 +23,7 @@ import {
   type LlmModelId,
   type VocabularyAnalysisModelId,
   type WhisperModelId,
+  type TranscriptionProvider,
 } from "../lib/modelRegistry";
 import {
   LANGUAGE_OPTIONS,
@@ -30,6 +31,7 @@ import {
   type SupportedLocale,
   type TranscriptionLocale,
 } from "../i18n/languageConfig";
+import { listenToEvent } from "../composables/useTauriEvents";
 
 import {
   Card,
@@ -58,6 +60,7 @@ import {
   Github,
   Globe,
   Instagram,
+  Loader2,
 } from "lucide-vue-next";
 
 const settingsStore = useSettingsStore();
@@ -373,6 +376,56 @@ async function handleSaveThresholdCharCount() {
   }
 }
 
+// ── 轉錄引擎 ──────────────────────────────────────────────
+const transcriptionProviderFeedback = useFeedbackMessage();
+const downloadingModelId = ref("");
+
+async function handleProviderChange(value: string) {
+  try {
+    await settingsStore.saveTranscriptionProvider(value as TranscriptionProvider);
+    transcriptionProviderFeedback.show("success", t("settings.transcription.providerUpdated"));
+  } catch (err) {
+    transcriptionProviderFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleDownloadAndLoad(modelId: string) {
+  downloadingModelId.value = modelId;
+  try {
+    await settingsStore.downloadAndLoadModel(modelId);
+    transcriptionProviderFeedback.show("success", t("settings.transcription.modelLoadSuccess"));
+  } catch (err) {
+    transcriptionProviderFeedback.show("error", extractErrorMessage(err));
+  } finally {
+    downloadingModelId.value = "";
+  }
+}
+
+async function handleDeleteModel(modelId: string) {
+  try {
+    await settingsStore.deleteModel(modelId);
+    transcriptionProviderFeedback.show("success", t("settings.transcription.modelDeleted"));
+  } catch (err) {
+    transcriptionProviderFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleCloudEnhancementChange(enabled: boolean) {
+  try {
+    await settingsStore.saveCloudEnhancementEnabled(enabled);
+    transcriptionProviderFeedback.show("success", t("settings.transcription.cloudEnhancementUpdated"));
+  } catch (err) {
+    transcriptionProviderFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+// Fetch available models when provider changes to local
+watch(() => settingsStore.transcriptionProvider, async (provider) => {
+  if (provider === "local" && settingsStore.availableLocalModels.length === 0) {
+    await settingsStore.fetchAvailableModels();
+  }
+}, { immediate: true });
+
 // ── 模型選擇 ──────────────────────────────────────────────
 const modelFeedback = useFeedbackMessage();
 
@@ -498,6 +551,8 @@ async function handleToggleAutoStart() {
   }
 }
 
+let unlistenProgress: (() => void) | null = null;
+
 onMounted(async () => {
   promptInput.value = settingsStore.getAiPrompt();
   if (settingsStore.hasApiKey) {
@@ -512,14 +567,24 @@ onMounted(async () => {
   if (currentKey && isCustomTriggerKey(currentKey)) {
     isCustomMode.value = true;
   }
+
+  // Listen for download progress events from Rust backend
+  unlistenProgress = await listenToEvent<{ modelId: string; downloadedBytes: number; totalBytes: number; progressPercent: number }>(
+    "local-model:download-progress",
+    (event) => {
+      settingsStore.downloadProgress = event.payload.progressPercent;
+    },
+  );
 });
 
 onBeforeUnmount(() => {
+  unlistenProgress?.();
   stopKeyRecording();
   hotkeyFeedback.clearTimer();
   apiKeyFeedback.clearTimer();
   promptFeedback.clearTimer();
   enhancementThresholdFeedback.clearTimer();
+  transcriptionProviderFeedback.clearTimer();
   modelFeedback.clearTimer();
   muteOnRecordingFeedback.clearTimer();
   localeFeedback.clearTimer();
@@ -816,6 +881,121 @@ onBeforeUnmount(() => {
             {{ isConfirmingDeleteApiKey ? $t('settings.apiKey.confirmDelete') : $t('settings.apiKey.delete') }}
           </Button>
         </div>
+      </CardContent>
+    </Card>
+
+    <!-- 轉錄引擎 -->
+    <Card>
+      <CardHeader class="border-b border-border">
+        <CardTitle class="text-base">{{ $t("settings.transcription.providerLabel") }}</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-4">
+        <div class="space-y-2">
+          <Label for="transcription-provider">{{ $t("settings.transcription.providerLabel") }}</Label>
+          <Select
+            :model-value="settingsStore.transcriptionProvider"
+            @update:model-value="handleProviderChange($event as string)"
+          >
+            <SelectTrigger id="transcription-provider" class="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cloud">{{ $t("settings.transcription.cloud") }}</SelectItem>
+              <SelectItem value="local">{{ $t("settings.transcription.local") }}</SelectItem>
+            </SelectContent>
+          </Select>
+          <p class="text-xs text-muted-foreground">
+            {{ settingsStore.transcriptionProvider === "local"
+              ? $t("settings.transcription.localDescription")
+              : $t("settings.transcription.cloudDescription") }}
+          </p>
+        </div>
+
+        <!-- Local model config -->
+        <div v-if="settingsStore.transcriptionProvider === 'local'" class="space-y-3">
+          <div class="space-y-2">
+            <Label>{{ $t("settings.transcription.selectModel") }}</Label>
+            <div class="space-y-2">
+              <div
+                v-for="model in settingsStore.availableLocalModels"
+                :key="model.id"
+                class="flex items-center justify-between rounded-md border border-border p-3"
+              >
+                <div class="space-y-0.5">
+                  <p class="text-sm font-medium">{{ model.displayName }}</p>
+                  <p class="text-xs text-muted-foreground">
+                    {{ model.description }} · {{ model.sizeMb }} MB
+                  </p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <Badge v-if="settingsStore.selectedLocalModelId === model.id && settingsStore.isLocalModelLoaded" variant="secondary">
+                    {{ $t("settings.transcription.modelLoaded") }}
+                  </Badge>
+                  <Button
+                    v-if="settingsStore.selectedLocalModelId !== model.id || !settingsStore.isLocalModelLoaded"
+                    size="sm"
+                    :disabled="settingsStore.isDownloading || settingsStore.isLocalModelLoading"
+                    @click="handleDownloadAndLoad(model.id)"
+                  >
+                    <Loader2 v-if="(settingsStore.isDownloading || settingsStore.isLocalModelLoading) && downloadingModelId === model.id" class="mr-1 h-3 w-3 animate-spin" />
+                    {{ $t("settings.transcription.downloadAndLoad") }}
+                  </Button>
+                  <Button
+                    v-if="settingsStore.selectedLocalModelId === model.id && settingsStore.isLocalModelLoaded"
+                    size="sm"
+                    variant="outline"
+                    @click="handleDeleteModel(model.id)"
+                  >
+                    {{ $t("settings.transcription.deleteModel") }}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Download progress -->
+          <div v-if="settingsStore.isDownloading" class="space-y-1">
+            <div class="flex justify-between text-xs text-muted-foreground">
+              <span>{{ $t("settings.transcription.downloading") }}</span>
+              <span>{{ Math.round(settingsStore.downloadProgress) }}%</span>
+            </div>
+            <div class="h-2 w-full overflow-hidden rounded-full bg-secondary">
+              <div
+                class="h-full rounded-full bg-primary transition-all duration-300"
+                :style="{ width: settingsStore.downloadProgress + '%' }"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 雲端文字整理開關 -->
+        <div class="flex items-center justify-between">
+          <div class="space-y-0.5">
+            <Label for="cloud-enhancement">{{ $t("settings.transcription.cloudEnhancementLabel") }}</Label>
+            <p class="text-xs text-muted-foreground">
+              {{ $t("settings.transcription.cloudEnhancementDescription") }}
+            </p>
+          </div>
+          <Switch
+            id="cloud-enhancement"
+            :model-value="settingsStore.isCloudEnhancementEnabled"
+            @update:model-value="handleCloudEnhancementChange"
+          />
+        </div>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="transcriptionProviderFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              transcriptionProviderFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            {{ transcriptionProviderFeedback.message.value }}
+          </p>
+        </transition>
       </CardContent>
     </Card>
 

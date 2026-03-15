@@ -1,5 +1,5 @@
 import type { TriggerMode } from "./index";
-import type { LlmModelId, WhisperModelId } from "../lib/modelRegistry";
+import type { LlmModelId, WhisperModelId, TranscriptionProvider } from "../lib/modelRegistry";
 
 export type PresetTriggerKey =
   | "fn"
@@ -39,4 +39,5 @@ export interface SettingsDto {
   enhancementThresholdCharCount: number;
   llmModelId: LlmModelId;
   whisperModelId: WhisperModelId;
+  transcriptionProvider: TranscriptionProvider;
 }

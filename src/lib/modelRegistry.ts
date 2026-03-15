@@ -44,6 +44,10 @@ export interface WhisperModelConfig {
   isDefault: boolean;
 }
 
+// ── Transcription Provider ─────────────────────────────────
+export type TranscriptionProvider = "cloud" | "local";
+export const DEFAULT_TRANSCRIPTION_PROVIDER: TranscriptionProvider = "cloud";
+
 // ── 預設值 ────────────────────────────────────────────────
 
 export const DEFAULT_LLM_MODEL_ID: LlmModelId = "qwen/qwen3-32b";

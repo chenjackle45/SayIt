@@ -428,6 +428,15 @@ pub fn run() {
             plugins::audio_recorder::start_recording,
             plugins::audio_recorder::stop_recording,
             plugins::transcription::transcribe_audio,
+            plugins::local_transcription::load_local_model,
+            plugins::local_transcription::unload_local_model,
+            plugins::local_transcription::get_local_model_status,
+            plugins::local_transcription::transcribe_audio_local,
+            plugins::local_transcription::list_available_models,
+            plugins::local_transcription::download_local_model,
+            plugins::local_transcription::check_downloaded_model,
+            plugins::local_transcription::delete_local_model,
+            plugins::local_transcription::get_models_dir,
             plugins::sound_feedback::play_start_sound,
             plugins::sound_feedback::play_stop_sound,
             plugins::sound_feedback::play_learned_sound
@@ -441,6 +450,8 @@ pub fn run() {
             app.manage(plugins::audio_recorder::AudioRecorderState::new());
             // 初始化 transcription 狀態（共用 HTTP client）
             app.manage(plugins::transcription::TranscriptionState::new());
+            // 初始化 local transcription 狀態（whisper.cpp engine）
+            app.manage(plugins::local_transcription::LocalTranscriptionState::new());
 
             let open_dashboard_item =
                 MenuItem::with_id(app, "open-dashboard", "開啟 Dashboard", true, None::<&str>)?;
