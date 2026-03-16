@@ -1,7 +1,7 @@
 {
   "name": "sayit",
   "private": true,
-  "version": "0.8.3",
+  "version": "0.8.4",
   "type": "module",
   "packageManager": "pnpm@10.28.2",
   "scripts": {
