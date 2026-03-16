@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedoc/resources/main/tauri-conf-v2.json",
   "productName": "SayIt",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "identifier": "com.sayit.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
