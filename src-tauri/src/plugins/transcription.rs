@@ -164,11 +164,14 @@ async fn send_transcription_request(
         .map_err(|e| TranscriptionError::ParseError(e.to_string()))?;
 
     let raw_text = json.text.trim().to_string();
+    // Use MIN: if any segment detects speech (low NSP), trust it — real speech
+    // always produces at least one low-NSP segment, while pure noise/hallucination
+    // keeps all segments high.
     let no_speech_probability = json
         .segments
         .iter()
         .map(|s| s.no_speech_prob)
-        .fold(0.0_f64, f64::max);
+        .fold(1.0_f64, f64::min);
     // If no segments, treat as full silence
     let no_speech_probability = if json.segments.is_empty() {
         1.0
