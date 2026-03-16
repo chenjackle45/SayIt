@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import MainApp from "./MainApp.vue";
 import router from "./router";
-import { initializeDatabase } from "./lib/database";
+import { initializeDatabase, setDatabaseInitError } from "./lib/database";
 import { extractErrorMessage } from "./lib/errorUtils";
 import { initSentryForDashboard, captureError } from "./lib/sentry";
 import { useSettingsStore } from "./stores/useSettingsStore";
@@ -45,6 +45,7 @@ async function bootstrap() {
     const message = extractErrorMessage(err);
     console.error("[main-window] Database init failed:", message);
     captureError(err, { source: "database-init" });
+    setDatabaseInitError(message);
     await invoke("debug_log", {
       level: "error",
       message: `Database init failed: ${message}`,

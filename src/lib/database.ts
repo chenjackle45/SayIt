@@ -1,6 +1,45 @@
 import Database from "@tauri-apps/plugin-sql";
 
 let db: Database | null = null;
+let databaseInitError: string | null = null;
+
+export function getDatabaseInitError(): string | null {
+  return databaseInitError;
+}
+
+export function setDatabaseInitError(error: string): void {
+  databaseInitError = error;
+}
+
+async function hasColumn(
+  connection: Database,
+  tableName: string,
+  columnName: string,
+): Promise<boolean> {
+  const columns = await connection.select<{ name: string }[]>(
+    `PRAGMA table_info(${tableName})`,
+  );
+  return columns.some((col) => col.name === columnName);
+}
+
+/** 冪等 ADD COLUMN：欄位已存在時跳過，避免 crash 後重試時 duplicate column 錯誤 */
+async function addColumnIfNotExists(
+  connection: Database,
+  tableName: string,
+  columnDefinition: string,
+): Promise<void> {
+  const columnName = columnDefinition.split(/\s+/)[0];
+  if (!columnName) {
+    throw new Error(
+      `[database] Invalid columnDefinition: "${columnDefinition}"`,
+    );
+  }
+  if (!(await hasColumn(connection, tableName, columnName))) {
+    await connection.execute(
+      `ALTER TABLE ${tableName} ADD COLUMN ${columnDefinition};`,
+    );
+  }
+}
 
 export async function initializeDatabase(): Promise<Database> {
   if (db) return db;
@@ -104,11 +143,15 @@ export async function initializeDatabase(): Promise<Database> {
     await connection.execute("BEGIN TRANSACTION;");
     try {
       // vocabulary 表新增 weight + source 欄位
-      await connection.execute(
-        "ALTER TABLE vocabulary ADD COLUMN weight INTEGER NOT NULL DEFAULT 1;",
+      await addColumnIfNotExists(
+        connection,
+        "vocabulary",
+        "weight INTEGER NOT NULL DEFAULT 1",
       );
-      await connection.execute(
-        "ALTER TABLE vocabulary ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';",
+      await addColumnIfNotExists(
+        connection,
+        "vocabulary",
+        "source TEXT NOT NULL DEFAULT 'manual'",
       );
       await connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_vocabulary_weight ON vocabulary(weight DESC);",
@@ -116,6 +159,8 @@ export async function initializeDatabase(): Promise<Database> {
 
       // api_usage 表重建（擴展 CHECK constraint 加入 'vocabulary_analysis'）
       // SQLite 不支援 ALTER CONSTRAINT，必須重建
+      // 清除上次失敗可能殘留的暫存表
+      await connection.execute("DROP TABLE IF EXISTS api_usage_new;");
       await connection.execute(`
         CREATE TABLE api_usage_new (
           id TEXT PRIMARY KEY,
@@ -170,11 +215,15 @@ export async function initializeDatabase(): Promise<Database> {
   if (v4CurrentVersion < 4) {
     await connection.execute("BEGIN TRANSACTION;");
     try {
-      await connection.execute(
-        "ALTER TABLE transcriptions ADD COLUMN audio_file_path TEXT;",
+      await addColumnIfNotExists(
+        connection,
+        "transcriptions",
+        "audio_file_path TEXT",
       );
-      await connection.execute(
-        "ALTER TABLE transcriptions ADD COLUMN status TEXT NOT NULL DEFAULT 'success';",
+      await addColumnIfNotExists(
+        connection,
+        "transcriptions",
+        "status TEXT NOT NULL DEFAULT 'success'",
       );
       await connection.execute(
         "CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);",

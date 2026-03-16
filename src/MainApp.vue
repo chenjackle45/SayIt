@@ -30,6 +30,7 @@ import { useSettingsStore } from "./stores/useSettingsStore";
 import { useVocabularyStore } from "./stores/useVocabularyStore";
 import { useHallucinationStore } from "./stores/useHallucinationStore";
 import { captureError } from "./lib/sentry";
+import { getDatabaseInitError } from "./lib/database";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import type { UpdateCheckResult } from "./lib/autoUpdater";
 import {
@@ -64,6 +65,8 @@ const currentPageTitle = computed(() => {
   return item?.label ?? "SayIt";
 });
 
+// 必須在 app.mount() 後讀取 — setDatabaseInitError 在 bootstrap catch 中已設定
+const databaseError = ref(getDatabaseInitError());
 const showAccessibilityGuide = ref(false);
 
 // ── 更新相關狀態 ──
@@ -320,6 +323,13 @@ onUnmounted(() => {
 
     <SidebarInset class="overflow-hidden">
       <SiteHeader :title="currentPageTitle" />
+      <div
+        v-if="databaseError"
+        class="border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+      >
+        <p class="font-medium">{{ $t("errors.databaseInitFailed") }}</p>
+        <p class="mt-1 text-xs text-destructive/80">{{ databaseError }}</p>
+      </div>
       <div class="flex-1 overflow-y-auto">
         <RouterView />
       </div>

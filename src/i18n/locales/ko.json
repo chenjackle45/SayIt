@@ -242,6 +242,7 @@
     "cancelled": "취소됨"
   },
   "errors": {
+    "databaseInitFailed": "데이터베이스 초기화에 실패했습니다. 기록을 일시적으로 사용할 수 없습니다. 앱을 다시 시작해 주세요.",
     "apiKeyEmpty": "API Key는 비워둘 수 없습니다",
     "promptEmpty": "Prompt는 비워둘 수 없습니다",
     "apiKeyNotSet": "API Key가 설정되지 않았습니다",

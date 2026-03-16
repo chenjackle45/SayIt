@@ -36,6 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { captureError } from "../lib/sentry";
 
 const { t } = useI18n();
 const historyStore = useHistoryStore();
@@ -96,7 +97,11 @@ function navigateToHistory() {
 }
 
 onMounted(async () => {
-  await historyStore.refreshDashboard();
+  try {
+    await historyStore.refreshDashboard();
+  } catch (err) {
+    captureError(err, { source: "dashboard-view-mount" });
+  }
 
   unlistenTranscriptionCompleted = await listenToEvent(
     TRANSCRIPTION_COMPLETED,

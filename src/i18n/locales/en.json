@@ -242,6 +242,7 @@
     "cancelled": "Cancelled"
   },
   "errors": {
+    "databaseInitFailed": "Database initialization failed. History is temporarily unavailable. Please restart the app.",
     "apiKeyEmpty": "API Key cannot be empty",
     "promptEmpty": "Prompt cannot be empty",
     "apiKeyNotSet": "API Key not set",

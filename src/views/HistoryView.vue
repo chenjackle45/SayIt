@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, ChevronDown, Copy, Check, Trash2, Play, Pause } from "lucide-vue-next";
+import { captureError } from "../lib/sentry";
 
 const historyStore = useHistoryStore();
 
@@ -116,7 +117,12 @@ function handlePlayRecording(record: TranscriptionRecord) {
 }
 
 onMounted(async () => {
-  await historyStore.resetAndFetch();
+  try {
+    await historyStore.resetAndFetch();
+  } catch (err) {
+    // DB 初始化失敗時 graceful degradation，MainApp Banner 已通知使用者
+    captureError(err, { source: "history-view-mount" });
+  }
 
   unlistenTranscriptionCompleted = await listenToEvent(
     TRANSCRIPTION_COMPLETED,

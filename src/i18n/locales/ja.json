@@ -242,6 +242,7 @@
     "cancelled": "キャンセル"
   },
   "errors": {
+    "databaseInitFailed": "データベースの初期化に失敗しました。履歴が一時的に使用できません。アプリを再起動してください。",
     "apiKeyEmpty": "API Key は空にできません",
     "promptEmpty": "Prompt は空にできません",
     "apiKeyNotSet": "API Key が未設定です",

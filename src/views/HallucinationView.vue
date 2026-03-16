@@ -6,6 +6,7 @@ import { extractErrorMessage } from "../lib/errorUtils";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
 import { useI18n } from "vue-i18n";
 import { Plus, Trash2, Info, Bot, Hand } from "lucide-vue-next";
+import { captureError } from "../lib/sentry";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,8 +91,9 @@ function formatDate(dateString: string): string {
 onMounted(async () => {
   try {
     await hallucinationStore.fetchTermList();
-  } catch {
+  } catch (err) {
     feedback.show("error", t("dictionary.loadFailed"));
+    captureError(err, { source: "hallucination-view-mount" });
   }
 });
 

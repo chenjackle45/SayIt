@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { captureError } from "../lib/sentry";
 
 const vocabularyStore = useVocabularyStore();
 const { t, locale } = useI18n();
@@ -89,8 +90,9 @@ function formatDate(dateString: string): string {
 onMounted(async () => {
   try {
     await vocabularyStore.fetchTermList();
-  } catch {
+  } catch (err) {
     feedback.show("error", t("dictionary.loadFailed"));
+    captureError(err, { source: "dictionary-view-mount" });
   }
 });
 
