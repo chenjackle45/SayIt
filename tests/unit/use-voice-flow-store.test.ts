@@ -1561,7 +1561,7 @@ describe("useVoiceFlowStore", () => {
       expect(record.processedText).toBe("整理後的書面語文字");
       expect(record.wasEnhanced).toBe(true);
       expect(record.enhancementDurationMs).toBeGreaterThanOrEqual(0);
-      expect(record.charCount).toBe("整理後的書面語文字".length);
+      expect(record.charCount).toBe(longText.length);
       expect(record.triggerMode).toBe("hold");
       expect(record.wasModified).toBeNull();
       expect(record.id).toBeTruthy();

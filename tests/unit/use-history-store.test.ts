@@ -482,7 +482,7 @@ describe("useHistoryStore", () => {
     });
 
     it("[P0] 應正確計算節省時間和整合每日額度用量", async () => {
-      // 節省時間 = 600 / 40 * 60000 = 900000ms
+      // 節省時間 = 600 / 40 * 60000 - 120000 = 780000ms
       mockDbSelect.mockResolvedValueOnce([
         {
           total_count: 10,
@@ -516,7 +516,7 @@ describe("useHistoryStore", () => {
       expect(stats.totalTranscriptions).toBe(10);
       expect(stats.totalCharacters).toBe(600);
       expect(stats.totalRecordingDurationMs).toBe(120000);
-      expect(stats.estimatedTimeSavedMs).toBe(900000);
+      expect(stats.estimatedTimeSavedMs).toBe(780000);
       expect(stats.dailyQuotaUsage).toEqual({
         whisperRequestCount: 5,
         whisperBilledAudioMs: 50000,

@@ -344,8 +344,11 @@ export const useHistoryStore = defineStore("history", () => {
       totalTranscriptions: row.total_count,
       totalCharacters: row.total_characters,
       totalRecordingDurationMs: row.total_recording_duration_ms,
-      estimatedTimeSavedMs: Math.round(
-        (row.total_characters / ASSUMED_TYPING_SPEED_CHARS_PER_MIN) * 60000,
+      estimatedTimeSavedMs: Math.max(
+        0,
+        Math.round(
+          (row.total_characters / ASSUMED_TYPING_SPEED_CHARS_PER_MIN) * 60000,
+        ) - row.total_recording_duration_ms,
       ),
       dailyQuotaUsage,
     };

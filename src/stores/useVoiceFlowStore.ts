@@ -300,7 +300,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         params.enhancementDurationMs !== null
           ? Math.round(params.enhancementDurationMs)
           : null,
-      charCount: (params.processedText ?? params.rawText).length,
+      charCount: params.rawText.length,
       triggerMode: settingsStore.triggerMode,
       wasEnhanced: params.wasEnhanced,
       wasModified: null,
@@ -1410,7 +1410,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
               ),
               enhancementDurationMs: Math.round(enhancementDurationMs),
               wasEnhanced: true,
-              charCount: enhanceResult.text.length,
+              charCount: result.rawText.length,
             })
             .then(() => {
               saveApiUsageRecordList(record, enhanceResult.usage);

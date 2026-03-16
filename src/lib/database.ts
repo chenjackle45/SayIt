@@ -278,6 +278,34 @@ export async function initializeDatabase(): Promise<Database> {
     console.log("[database] Migration v4 → v5: hallucination_terms table");
   }
 
+  // --- Migration v5 → v6: recalculate char_count from raw_text ---
+  const v6VersionRows = await connection.select<{ version: number }[]>(
+    "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1",
+  );
+  const v6CurrentVersion = v6VersionRows[0]?.version ?? 1;
+
+  if (v6CurrentVersion < 6) {
+    await connection.execute("BEGIN TRANSACTION;");
+    try {
+      await connection.execute(`
+        UPDATE transcriptions
+        SET char_count = LENGTH(raw_text)
+        WHERE processed_text IS NOT NULL
+          AND char_count != LENGTH(raw_text);
+      `);
+      await connection.execute(
+        "INSERT OR REPLACE INTO schema_version (version) VALUES (6);",
+      );
+      await connection.execute("COMMIT;");
+    } catch (migrationError) {
+      await connection.execute("ROLLBACK;");
+      throw migrationError;
+    }
+    console.log(
+      "[database] Migration v5 → v6: recalculate char_count from raw_text",
+    );
+  }
+
   // 只有全部 schema 建立成功才設定 singleton
   db = connection;
   console.log("[database] SQLite initialized with WAL mode");
