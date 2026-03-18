@@ -330,11 +330,11 @@
     },
     "upgradeNotice": {
       "title": "SayIt Update Summary",
-      "item1": "1. Microphone selection: choose your input device in settings",
-      "item2": "2. Improved soft speech detection: peak energy escape hatch reduces false positives",
-      "item3": "3. More stable AI enhancement: lower randomness, auto-retry on anomalous results",
-      "item4": "4. AI enhancement preserves tone: questions are no longer rewritten as statements",
-      "item5": "5. Better microphone errors: precise messages for device not found, busy, etc.",
+      "item1": "1. Security fix: microphone stays active after stopping recording on macOS when a specific device is selected — now fixed",
+      "item2": "2. Microphone selection: choose your input device in settings",
+      "item3": "3. Improved soft speech detection: peak energy escape hatch reduces false positives",
+      "item4": "4. More stable AI enhancement: lower randomness, auto-retry on anomalous results",
+      "item5": "5. AI enhancement preserves tone: questions are no longer rewritten as statements",
       "dismiss": "Got it"
     }
   }

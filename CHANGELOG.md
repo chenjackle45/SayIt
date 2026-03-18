@@ -2,6 +2,12 @@
 
 SayIt 版本更新紀錄。
 
+## [0.8.9] - 2026-03-19
+
+### Fixed
+
+- 修正 macOS 上選擇特定麥克風後停止錄音，麥克風指示燈（橘色圓點）不消失的安全問題：cpal 0.15.3 CoreAudio backend 對非預設裝置建立 disconnect listener 造成 Arc 循環引用，AudioUnit 永不釋放。修正方式為優先使用 default_input_device() 避免循環引用，並在停止時顯式呼叫 stream.pause() 作為兜底防禦
+
 ## [0.8.8] - 2026-03-18
 
 ### Added

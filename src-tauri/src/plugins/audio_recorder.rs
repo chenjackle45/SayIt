@@ -278,23 +278,45 @@ fn run_recording_thread(
     device_name: String,
 ) {
     // ── Get input device ──
+    // WORKAROUND: cpal 0.15.3 macOS CoreAudio backend 的 Arc 循環引用問題。
+    // input_devices() 回傳的 Device (is_default=false) 會觸發 add_disconnect_listener
+    // (coreaudio/macos/mod.rs:449-471)，clone Stream 造成 Arc cycle，
+    // 導致 drop(stream) 無法釋放 AudioUnit，macOS 麥克風指示燈不消失。
+    // 優先使用 default_input_device() (is_default=true) 來避免此問題。
     let host = cpal::default_host();
     let device = if device_name.is_empty() {
         // 空字串 = 使用系統預設
         host.default_input_device()
     } else {
-        // 依名稱查找，找不到時 fallback 到系統預設
-        let found = host
-            .input_devices()
-            .ok()
-            .and_then(|mut devices| devices.find(|d| d.name().map_or(false, |n| n == device_name)));
-        if found.is_none() {
+        // 優先檢查系統預設裝置是否就是使用者選的裝置
+        let default_device = host.default_input_device();
+        let default_matches = default_device
+            .as_ref()
+            .and_then(|d| d.name().ok())
+            .map_or(false, |n| n == device_name);
+
+        if default_matches {
             println!(
-                "[audio-recorder] Device '{}' not found, falling back to default",
+                "[audio-recorder] Device '{}' matches system default, using default_input_device",
                 device_name
             );
+            default_device
+        } else {
+            // 非預設裝置，需透過 input_devices() 查找
+            let found = host
+                .input_devices()
+                .ok()
+                .and_then(|mut devices| {
+                    devices.find(|d| d.name().map_or(false, |n| n == device_name))
+                });
+            if found.is_none() {
+                println!(
+                    "[audio-recorder] Device '{}' not found, falling back to default",
+                    device_name
+                );
+            }
+            found.or(default_device)
         }
-        found.or_else(|| host.default_input_device())
     };
     let device = match device {
         Some(d) => d,
@@ -345,7 +367,14 @@ fn run_recording_thread(
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
 
-    // Stream dropped here → microphone released
+    // 顯式 pause：呼叫 AudioOutputUnitStop 停止麥克風捕獲。
+    // 兜底防禦 cpal macOS disconnect listener 的 Arc 循環引用——
+    // 即使 Arc cycle 導致 drop 無法觸發 AudioUnit 清理，pause 也能確保麥克風停止。
+    // 已知限制：非預設裝置仍會因 Arc cycle 洩漏 ~1-2 KB/次（StreamInner + listener）。
+    if let Err(e) = stream.pause() {
+        // ⚠️ 安全相關：pause 失敗意味著麥克風可能仍在捕獲，且 drop 也無法停止
+        eprintln!("[audio-recorder] SECURITY: Failed to pause stream, mic may remain active: {:?}", e);
+    }
     drop(stream);
     println!("[audio-recorder] Recording stopped, stream released");
 }
