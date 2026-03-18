@@ -89,6 +89,9 @@
               "x": 8,
               "y": 156
             },
+            "NgAuk/WCEn2": {
+              "y": 10
+            },
             "vTYBG": {
               "x": 8,
               "y": 198
@@ -1191,6 +1194,9 @@
               "x": 8,
               "y": 156
             },
+            "NgAuk/WCEn2": {
+              "y": 10
+            },
             "vTYBG": {
               "x": 8,
               "y": 198
@@ -2187,6 +2193,9 @@
               "x": 8,
               "y": 156
             },
+            "NgAuk/WCEn2": {
+              "y": 10
+            },
             "vTYBG": {
               "x": 8,
               "y": 198
@@ -3136,6 +3145,9 @@
             "NgAuk": {
               "x": 8,
               "y": 156
+            },
+            "NgAuk/WCEn2": {
+              "y": 10
             },
             "vTYBG": {
               "x": 8,
@@ -8187,7 +8199,8 @@
             },
             "DUIwo": {
               "height": "fit_content",
-              "y": 222.5
+              "y": 222.5,
+              "width": "fill_container"
             },
             "PrHTg": {
               "x": 8,
@@ -8245,7 +8258,8 @@
             },
             "NgAuk/WCEn2": {
               "fill": "$--foreground",
-              "fontWeight": "600"
+              "fontWeight": "600",
+              "y": 10
             },
             "vTYBG": {
               "x": 8,
@@ -8260,6 +8274,20 @@
               "content": "設定",
               "x": 40,
               "y": 10
+            },
+            "XkoLu": {
+              "width": "fill_container",
+              "height": "fit_content",
+              "y": 639
+            },
+            "gLiYM": {
+              "width": "fill_container",
+              "height": "fit_content",
+              "x": 16,
+              "y": 12
+            },
+            "NML06": {
+              "x": 143
             }
           }
         },
@@ -8829,6 +8857,17 @@
           ]
         }
       ]
+    },
+    {
+      "type": "text",
+      "id": "RJWLb",
+      "x": 0,
+      "y": 0,
+      "fill": "#000000",
+      "content": "967597",
+      "fontFamily": "Inter",
+      "fontSize": 12,
+      "fontWeight": "normal"
     }
   ],
   "variables": {
