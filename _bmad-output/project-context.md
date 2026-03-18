@@ -1,10 +1,10 @@
 ---
 project_name: 'sayit'
 user_name: 'Jackle'
-date: '2026-03-17'
-sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules', 'sentry_telemetry', 'i18n', 'smart_dictionary', 'model_registry_v2', 'esc_global_abort', 'hallucination_v3', 'sound_feedback']
+date: '2026-03-18'
+sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules', 'sentry_telemetry', 'i18n', 'smart_dictionary', 'model_registry_v2', 'esc_global_abort', 'hallucination_v3', 'sound_feedback', 'enhancement_anomaly', 'audio_input_device']
 status: 'complete'
-rule_count: 261
+rule_count: 275
 optimized_for_llm: true
 ---
 
@@ -83,7 +83,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 - Groq Whisper API — `https://api.groq.com/openai/v1/audio/transcriptions`（預設模型：`whisper-large-v3`，語言：由 `getWhisperLanguageCode()` 回傳 `string | null`（auto 模式回傳 `null` 表示 Whisper 自動偵測），Rust fallback `"zh"`，可選 `whisper-large-v3-turbo`）
 - Groq LLM API — `https://api.groq.com/openai/v1/chat/completions`，兩個獨立模型設定：
-  - **文字整理**（enhancer）：預設 `moonshotai/kimi-k2-instruct`，可選 Llama 3.3 70B / Llama 4 Scout 17B / Qwen3 32B，temperature: 0.3，timeout: 5s
+  - **文字整理**（enhancer）：預設 `moonshotai/kimi-k2-instruct`，可選 Llama 3.3 70B / Llama 4 Scout 17B / Qwen3 32B，temperature: 0.1，timeout: 5s
   - **字典分析**（vocabularyAnalyzer）：預設 `llama-3.3-70b-versatile`，可選 Kimi K2 Instruct，temperature: 0，max_tokens: 256
 - **模型註冊** — `src/lib/modelRegistry.ts` 集中管理：
   - 三組獨立型別：`LlmModelId`、`VocabularyAnalysisModelId`、`WhisperModelId`
@@ -244,7 +244,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 #### SettingsKey 跨視窗同步
 
-- **`SettingsKey` 型別** — 定義 `settings:updated` event 的 `key` 欄位（`events.ts`）：`hotkey` | `apiKey` | `aiPrompt` | `enhancementThreshold` | `llmModel` | `vocabularyAnalysisModel` | `whisperModel` | `muteOnRecording` | `smartDictionaryEnabled` | `locale` | `transcriptionLocale` | `soundEffectsEnabled` | `promptMode`
+- **`SettingsKey` 型別** — 定義 `settings:updated` event 的 `key` 欄位（`events.ts`）：`hotkey` | `apiKey` | `aiPrompt` | `enhancementThreshold` | `llmModel` | `vocabularyAnalysisModel` | `whisperModel` | `muteOnRecording` | `smartDictionaryEnabled` | `locale` | `transcriptionLocale` | `soundEffectsEnabled` | `promptMode` | `audioInputDevice`
 - **智慧字典開關** — `isSmartDictionaryEnabled`（macOS 預設啟用，Windows 預設關閉——因 Windows 尚未支援 `read_focused_text_field` AX API）
 - **字典分析模型獨立** — `selectedVocabularyAnalysisModelId` 與 `selectedLlmModelId` 分開儲存和選擇，各自有獨立的模型清單和設定 UI
 
@@ -255,7 +255,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Vue 元件翻譯** — `const { t } = useI18n()` + template 中 `$t('key')` / `{{ t('key') }}`
 - **lib/store 層翻譯** — `i18n.global.t('key', params)` — 因為不在 Vue 元件 setup 中，不能用 `useI18n()`
 - **翻譯檔案** — `src/i18n/locales/{locale}.json`，key 結構按功能分組（`settings.*`, `dashboard.*`, `errors.*`, `voiceFlow.*` 等），5 個檔案的 key 集合必須完全一致
-- **AI Prompt 多語言** — `src/i18n/prompts.ts` 管理三層 prompt map：`LEGACY_DEFAULT_PROMPTS`（遷移用）、`MINIMAL_PROMPTS`、`ACTIVE_PROMPTS`。函式：`getMinimalPromptForLocale()`、`getPromptForModeAndLocale(mode, locale)`、`isKnownDefaultPrompt()`
+- **AI Prompt 多語言** — `src/i18n/prompts.ts` 管理三層 prompt map：`LEGACY_DEFAULT_PROMPTS`（遷移用）、`MINIMAL_PROMPTS`、`ACTIVE_PROMPTS`。函式：`getMinimalPromptForLocale()`、`getPromptForModeAndLocale(mode, locale)`、`isKnownDefaultPrompt()`。Active prompt 規則：合併重複表達時保留原語氣（問句仍是問句、請求仍是請求）、禁止將問句改寫為肯定句
 - **語言偵測** — `detectSystemLocale()` 5 層匹配：精確 → script subtag（`zh-Hant` → `zh-TW`）→ 語言前綴 → 裸 `zh` → fallback `zh-TW`（保護既有中文使用者升級路徑）
 - **HTML lang 屬性** — `document.documentElement.lang` 隨 locale 更新（zh-TW → `zh-Hant`、zh-CN → `zh-Hans`）
 
@@ -266,18 +266,33 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **回傳型別** — `{ reason: "speed-anomaly" | "no-speech-detected" | null }`
 - **二層判定邏輯**（優先級由高到低）：
   - **Layer 1（語速異常）** — `recordingDurationMs < 1000 && charCount > 10` → reason: `speed-anomaly`
-  - **Layer 2（無人聲偵測）** — 三個子條件（OR 關係）：
+  - **Layer 2（無人聲偵測）** — 兩個子條件（OR 關係）：
     - **2a**：`peakEnergyLevel < 0.02`（SILENCE_PEAK_ENERGY_THRESHOLD）→ 峰值極低，幾乎確定無聲音
-    - **2b**：`rmsEnergyLevel < 0.008`（SILENCE_RMS_HARD_THRESHOLD）→ 極低 RMS，幾乎確定無人聲
-    - **2c**：`rmsEnergyLevel < 0.015`（SILENCE_RMS_SOFT_THRESHOLD）且 `noSpeechProbability > 0.7`（SILENCE_NSP_THRESHOLD）→ 低 RMS + 高 NSP 聯合判斷
+    - **2b**：`peakEnergyLevel < 0.03`（LAYER2B_PEAK_ENERGY_CEILING）且 `rmsEnergyLevel < 0.015`（SILENCE_RMS_THRESHOLD）且 `noSpeechProbability > 0.7`（SILENCE_NSP_THRESHOLD）→ peak 偏低 + 低 RMS + 高 NSP 聯合判斷。若 peak >= 0.03 表示有明確可聽聲音，跳過此檢查避免小聲說話因 RMS 被靜音段稀釋而誤判
     - → reason: `no-speech-detected`
   - **其他** — 放行，正常流程
-- **RMS 能量** — Rust `audio_recorder.rs` 的 `stop_recording()` 同時計算 `peak_energy_level`（峰值）和 `rms_energy_level`（均方根），單次遍歷。RMS 比 peak 更能區分「持續人聲」vs「偶發噪音尖峰」（背景噪音 peak 可高達 0.15，但 RMS 通常 < 0.01）
-- **NSP 使用策略** — `noSpeechProbability` 不單獨使用（已知不可靠，Whisper 對幻覺可能給出 NSP=0.0），僅作為 Layer 2c 的輔助信號搭配 RMS 使用
+- **RMS 能量** — Rust `audio_recorder.rs` 的 `stop_recording()` 同時計算 `peak_energy_level`（峰值）和 `rms_energy_level`（均方根），單次遍歷。RMS 是整段錄音的平均值，會被錄音前後的靜音段稀釋，因此不適合單獨作為語音判斷依據
+- **NSP 使用策略** — `noSpeechProbability` 不單獨使用（已知不可靠，Whisper 對中文軟音常報高 NSP），僅作為 Layer 2b 的輔助信號搭配 peak + RMS 使用
 - **無幻覺詞庫** — 已移除 `hallucination_terms` 表和 `useHallucinationStore`，偵測完全基於錄音品質信號，不依賴詞庫比對
 - **幻覺攔截行為** — 判定為幻覺 → 不貼上，HUD 顯示「未偵測到語音」，寫入 `transcriptions` 表 `status: 'failed'`，設定重送狀態（`canRetry`）
 - **整合位置** — `useVoiceFlowStore` 的 `handleStopRecording()` 和 `handleRetryTranscription()` 在轉錄結果回傳後、`isEmptyTranscription` 檢查之後執行幻覺偵測
 - **`isEmptyTranscription()`** — 仍保留，只攔截完全空白文字（`!rawText.trim()`），與幻覺偵測互補
+
+#### 增強後異常偵測（Enhancement Anomaly Detection）
+
+- **偵測函式** — `detectEnhancementAnomaly()`（`src/lib/hallucinationDetector.ts`），純函式，檢查 LLM 增強是否產出異常結果
+- **長度爆炸偵測** — `enhancedText.length >= rawText.length * 2`（`ENHANCEMENT_LENGTH_EXPLOSION_RATIO = 2`）→ LLM 在回答問題或產生幻覺
+- **重試機制** — `useVoiceFlowStore` 偵測到異常後自動重試（最多 `MAX_ENHANCEMENT_RETRY_COUNT = 3` 次），重試仍異常則 fallback 到 rawText（`wasEnhanced: false`）
+- **整合位置** — `handleStopRecording()` 在 `enhanceText()` 之後，`completePasteFlow()` 之前
+
+#### 音訊輸入裝置選擇
+
+- **Rust Command** — `list_audio_input_devices` → `Vec<AudioInputDeviceInfo>`（列舉 cpal 輸入裝置）
+- **`start_recording` 參數** — 新增 `device_name: String`，空字串 = 系統預設，依名稱查找失敗時 fallback 到預設裝置
+- **前端型別** — `AudioInputDeviceInfo { name: string }`（`src/types/audio.ts`）
+- **設定儲存** — `useSettingsStore.selectedAudioInputDeviceName`（預設空字串），持久化 key `audioInputDeviceName`
+- **UI** — `SettingsView.vue` 的「輸入裝置」Card，Select 元件 + 重新整理按鈕
+- **i18n key** — `settings.audioInput.{title, description, deviceLabel, systemDefault, refresh, updated}`
 
 #### 轉錄語言分離（TranscriptionLocale）
 
@@ -635,8 +650,8 @@ src/
 - **❌ 使用 ESC（keycode 53 / VK 0x1B）作為 Custom trigger key** — ESC 已保留為全域中斷鍵，`keycodeMap.ts` 的 `getDangerousKeyWarning("Escape")` 回傳 null（不走 warning 路徑），由 `getEscapeReservedMessage()` 提供 hard block 錯誤訊息
 - **❌ 重送成功時 INSERT 新 transcription 記錄** — 重送路徑必須使用 `completePasteFlow({ skipRecordSaving: true })` + `updateTranscriptionOnRetrySuccess()` UPDATE 現有 failed 記錄，禁止 INSERT（PK 衝突 + FK 787 錯誤）
 - **❌ 重送的 API usage 不等 transcription UPDATE 完成** — `saveApiUsageRecordList` 必須串接在 `updateTranscriptionOnRetrySuccess().then()` 之後，確保 FK 依賴正確
-- **❌ 在幻覺偵測中單獨依賴 NSP** — `noSpeechProbability` 不可靠（Whisper 對幻覺可能回傳 NSP=0.0），只能搭配 RMS 能量作為輔助信號（Layer 2c），不可單獨用於判斷
-- **❌ 使用 peakEnergyLevel 判斷「有沒有人說話」** — peak 只反映瞬時最大振幅，背景噪音也能達到 0.15+。判斷持續語音活動應使用 `rmsEnergyLevel`（RMS 均方根能量）
+- **❌ 在幻覺偵測中單獨依賴 NSP** — `noSpeechProbability` 不可靠（Whisper 對中文軟音常報高 NSP），只能搭配 peak + RMS 能量作為輔助信號（Layer 2b），不可單獨用於判斷
+- **❌ 使用 peakEnergyLevel 判斷「有沒有人說話」** — peak 只反映瞬時最大振幅，背景噪音也能達到 0.15+。但 peak >= 0.03 可作為 Layer 2b 的 escape hatch，跳過 RMS+NSP 檢查避免小聲說話誤判
 
 #### 資料映射陷阱
 
@@ -654,7 +669,7 @@ src/
 - **LLM API 超時（5 秒）** → 跳過 AI 整理，直接貼上原始文字（`PASTE_SUCCESS_UNENHANCED_MESSAGE`）
 - **Enhancement 字元門檻** — 轉錄文字 < 10 字元跳過 AI 整理，直接貼上
 - **Rust Command 失敗** → `Result<T, E>` 自動轉前端 Promise rejection
-- **錯誤訊息本地化** — `src/lib/errorUtils.ts` 集中管理繁體中文錯誤訊息
+- **錯誤訊息本地化** — `src/lib/errorUtils.ts` 集中管理 i18n 錯誤訊息。`getMicrophoneErrorMessage()` 優先匹配 Rust `AudioRecorderError` 字串（`"No input device"` / `"Failed to build audio stream"` / `"Failed to get input config"`），fallback 到 `DOMException` 分支
 - **自動更新失敗** — 背景檢查靜默處理，手動檢查回傳 `{ status: 'error', error: message }` 供 UI 顯示
 
 #### 安全規則
@@ -699,4 +714,4 @@ src/
 - Review periodically for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-16 (v12 — 幻覺偵測簡化為二層、移除 hallucination_terms 表/useHallucinationStore/HallucinationView、captureError 計數 56、schema v7)
+Last Updated: 2026-03-18 (v13 — Layer 2b peak escape hatch、enhancement anomaly 偵測+重試、音訊輸入裝置選擇、enhancer temperature 0.1、Active prompt 語氣保留規則、errorUtils Rust 錯誤匹配)
