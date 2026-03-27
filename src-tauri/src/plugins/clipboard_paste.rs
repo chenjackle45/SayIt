@@ -135,7 +135,7 @@ fn restore_target_window(hwnd_value: isize) {
     use windows::Win32::UI::WindowsAndMessaging::{
         GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow,
     };
-    use windows::Win32::UI::Input::KeyboardAndMouse::AttachThreadInput;
+    use windows::Win32::System::Threading::AttachThreadInput;
 
     unsafe {
         let target = HWND(hwnd_value as *mut _);
