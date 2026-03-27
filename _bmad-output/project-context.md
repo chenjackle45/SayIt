@@ -1,10 +1,10 @@
 ---
 project_name: 'sayit'
 user_name: 'Jackle'
-date: '2026-03-19'
-sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules', 'sentry_telemetry', 'i18n', 'smart_dictionary', 'model_registry_v2', 'esc_global_abort', 'hallucination_v3', 'sound_feedback', 'enhancement_anomaly', 'audio_input_device']
+date: '2026-03-27'
+sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'code_quality', 'workflow_rules', 'critical_rules', 'sentry_telemetry', 'i18n', 'smart_dictionary', 'model_registry_v2', 'esc_global_abort', 'hallucination_v3', 'sound_feedback', 'enhancement_anomaly', 'audio_input_device', 'audio_preview']
 status: 'complete'
-rule_count: 276
+rule_count: 285
 optimized_for_llm: true
 ---
 
@@ -287,13 +287,27 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 #### 音訊輸入裝置選擇
 
-- **Rust Command** — `list_audio_input_devices` → `Vec<AudioInputDeviceInfo>`（列舉 cpal 輸入裝置）
-- **`start_recording` 參數** — 新增 `device_name: String`，空字串 = 系統預設，依名稱查找失敗時 fallback 到預設裝置
-- **macOS cpal 0.15.3 workaround** — `input_devices()` 回傳的 Device（`is_default=false`）會觸發 disconnect listener 的 Arc 循環引用，導致 `drop(stream)` 無法釋放 AudioUnit。因此裝置查找優先比對 `default_input_device()`（`is_default=true`），並在停止時顯式呼叫 `stream.pause()` 作為兜底
-- **前端型別** — `AudioInputDeviceInfo { name: string }`（`src/types/audio.ts`）
+- **Rust Commands** — `list_audio_input_devices` → `Vec<AudioInputDeviceInfo>`（列舉 cpal 輸入裝置）；`get_default_input_device_name` → `Option<String>`（查詢系統預設裝置名稱）
+- **`start_recording` 參數** — `device_name: String`，空字串 = 系統預設，依名稱查找失敗時 fallback 到預設裝置
+- **共用裝置選擇** — `select_input_device(host, device_name, tag)` helper 封裝 cpal Arc cycle workaround，recording/preview thread 共用
+- **macOS cpal 0.15.3 workaround** — `input_devices()` 回傳的 Device（`is_default=false`）會觸發 disconnect listener 的 Arc 循環引用，導致 `drop(stream)` 無法釋放 AudioUnit。因此 `select_input_device` 優先比對 `default_input_device()`（`is_default=true`），stream 結束時必須 `stream.pause()` before drop
+- **前端型別** — `AudioInputDeviceInfo { name: string }`、`AudioPreviewLevelPayload { level: number }`（`src/types/audio.ts`）
 - **設定儲存** — `useSettingsStore.selectedAudioInputDeviceName`（預設空字串），持久化 key `audioInputDeviceName`
-- **UI** — `SettingsView.vue` 的「輸入裝置」Card，Select 元件 + 重新整理按鈕
-- **i18n key** — `settings.audioInput.{title, description, deviceLabel, systemDefault, refresh, updated}`
+- **UI** — `SettingsView.vue` 的「輸入裝置」Card，Select 元件 + 重新整理按鈕 + 音量預覽條
+- **預設裝置名稱顯示** — 「系統預設」選項後方括號顯示實際裝置名稱（`systemDefaultWithDevice` i18n key）
+- **i18n key** — `settings.audioInput.{title, description, deviceLabel, systemDefault, systemDefaultWithDevice, volumePreview, refresh, refreshed, updated}`
+
+#### 音量預覽（Audio Preview）
+
+- **獨立 State** — `AudioPreviewState { handle: Mutex<Option<PreviewHandle>> }`，`PreviewHandle` 含 `should_stop: Arc<AtomicBool>` + `thread: Option<JoinHandle<()>>`，與 `AudioRecorderState` 完全隔離
+- **Rust Commands** — `start_audio_preview(app, preview_state, device_name)` → `Result<(), String>`；`stop_audio_preview(preview_state)` → `()`
+- **Event** — `audio:preview-level`（常量 `AUDIO_PREVIEW_LEVEL`），payload `AudioPreviewLevelPayload { level: f32 }`，30ms 間隔 emit
+- **RMS → dB 映射** — `PREVIEW_DB_FLOOR = -60.0`、`PREVIEW_DB_CEILING = -20.0`（40 dB 動態範圍），線性 RMS 轉 dB 後正規化。AirPods Pro 等低增益麥克風語音 RMS 約 0.005~0.018（-46 ~ -35 dB）→ 35%~63% 顯示
+- **preview stream** — `build_preview_stream<T>` 泛型，callback 計算 mono mix + clamp + 累積 `(sum_squares, sample_count)` 到單一 `Mutex<(f64, usize)>`（原子一致性），不存 samples、不做 FFT
+- **生命週期** — 設定頁 `onMounted` 啟動（先 `loadAudioInputDeviceList` 再 `startPreview`）、`onBeforeUnmount` 停止；切換裝置時重啟；錄音開始時自動停止（`start_recording` 持有 recording lock 期間呼叫 `stop_audio_preview_inner`）；錄音進行中不啟動（AC 11 檢查）
+- **Thread 清理** — `stop_audio_preview_inner` 會 `take()` handle → set flag → `thread.join()`，確保裝置完全釋放。`RunEvent::Exit` 中 preview shutdown 必須在 recorder shutdown 之前
+- **Composable** — `useAudioPreview.ts`：`useRafFn` + LERP(0.2) + `startRequestId` re-entrancy guard + `onUnmounted` cleanup
+- **UI** — `role="meter"` + `aria-valuenow` + `Mic` icon + `bg-primary` bar + `transition-[width] duration-75`
 
 #### 轉錄語言分離（TranscriptionLocale）
 
@@ -715,4 +729,4 @@ src/
 - Review periodically for outdated rules
 - Remove rules that become obvious over time
 
-Last Updated: 2026-03-18 (v13 — Layer 2b peak escape hatch、enhancement anomaly 偵測+重試、音訊輸入裝置選擇、enhancer temperature 0.1、Active prompt 語氣保留規則、errorUtils Rust 錯誤匹配)
+Last Updated: 2026-03-27 (v14 — 音量預覽系統：AudioPreviewState + dB 映射 + select_input_device 共用 helper + thread join cleanup + useAudioPreview composable + 預設裝置名稱顯示)

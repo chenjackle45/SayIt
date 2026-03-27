@@ -57,7 +57,10 @@
 | `read_focused_text_field` | `plugins/text_field_reader.rs` | useVoiceFlowStore | — | `Result<Option<String>, String>` |
 | `mute_system_audio` | `plugins/audio_control.rs` | useVoiceFlowStore | `state: State<AudioControlState>` | `Result<(), String>` |
 | `restore_system_audio` | `plugins/audio_control.rs` | useVoiceFlowStore | `state: State<AudioControlState>` | `Result<(), String>` |
+| `get_default_input_device_name` | `plugins/audio_recorder.rs` | SettingsView | — | `Option<String>` |
 | `list_audio_input_devices` | `plugins/audio_recorder.rs` | SettingsView | — | `Vec<AudioInputDeviceInfo>` |
+| `start_audio_preview` | `plugins/audio_recorder.rs` | SettingsView | `app: AppHandle, preview_state: State<AudioPreviewState>, device_name: String` | `Result<(), String>` |
+| `stop_audio_preview` | `plugins/audio_recorder.rs` | SettingsView | `preview_state: State<AudioPreviewState>` | `()` |
 | `start_recording` | `plugins/audio_recorder.rs` | useVoiceFlowStore | `app: AppHandle, state: State<AudioRecorderState>, device_name: String` | `Result<(), AudioRecorderError>` |
 | `stop_recording` | `plugins/audio_recorder.rs` | useVoiceFlowStore | `state: State<AudioRecorderState>` | `Result<StopRecordingResult, AudioRecorderError>` |
 | `save_recording_file` | `plugins/audio_recorder.rs` | useVoiceFlowStore | `id: String, app: AppHandle, state: State<AudioRecorderState>` | `Result<String, String>` |
@@ -82,6 +85,7 @@
 | `quality-monitor:result` | keyboard_monitor.rs | `QUALITY_MONITOR_RESULT` | `QualityMonitorResultPayload` |
 | `correction-monitor:result` | keyboard_monitor.rs | `CORRECTION_MONITOR_RESULT` | `CorrectionMonitorResultPayload` |
 | `audio:waveform` | audio_recorder.rs | `AUDIO_WAVEFORM` | `WaveformPayload { levels: [f32; 6] }` |
+| `audio:preview-level` | audio_recorder.rs | `AUDIO_PREVIEW_LEVEL` | `AudioPreviewLevelPayload { level: f32 }` |
 
 ### Frontend-only Events（不經 Rust）
 
