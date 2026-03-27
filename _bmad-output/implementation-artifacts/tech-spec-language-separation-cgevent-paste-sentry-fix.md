@@ -149,7 +149,7 @@ test_patterns:
 
 4. **Rust transcription.rs 修改**：`language` 參數為 `None` 時，**不加入** `language` field 到 multipart form（而非 fallback 到 `"zh"`）。移除 `TRANSCRIPTION_LANGUAGE` 常數。
 
-5. **CGEvent 實作**：用 `CGEventCreateKeyboardEvent(source, keycode, keydown)` + `CGEventPost` 送出 4 事件。macOS keycodes: Command=55, V=9。設定 `CGEventFlags::CGEventFlagMaskCommand` 修飾鍵。
+5. **CGEvent 實作**：用 `CGEventCreateKeyboardEvent(source, keycode, keydown)` + `CGEventPost` 送出 4 事件。macOS keycodes: Command=55, V=9。設定 `CGEventFlags::CGEventFlagMaskCommand` 修飾鍵。事件源使用 `CGEventSourceStateID::Private`（隔離狀態，不繼承物理鍵盤的 modifier flag），投遞位置使用 `CGEventTapLocation::Session`。⚠️ 禁止使用 `HIDSystemState`/`CombinedSessionState`（Toggle 模式 + modifier trigger key 會殘留 flag 導致重複貼上）。
 
 6. **paste_text 失敗處理**：macOS 和 Windows 都改為回傳 `Err(ClipboardError::KeyboardSimulation(msg))`。前端 `completePasteFlow()` 的 catch 已有 `failRecordingFlow()` + `captureError()`，Rust 改回傳 Err 後前端自動生效。HUD 顯示 `t("voiceFlow.pasteFailed")` 訊息。
 

@@ -65,7 +65,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | 元件 | 現狀 | V2 動作 |
 |------|------|---------|
 | `fn_key_listener.rs` | CGEventTap（僅 macOS） | 擴展重寫 → OS-native 雙平台（macOS CGEventTap + Windows SetWindowsHookExW） |
-| `clipboard_paste.rs` | arboard + AX API menu press（macOS）+ SendInput（Windows） | 保留，擴展貼上後監控 |
+| `clipboard_paste.rs` | arboard + CGEvent Cmd+V（macOS, Private source + Session posting）+ SendInput（Windows） | 保留，擴展貼上後監控 |
 | `lib.rs` | 單視窗設定 + System Tray | 擴展支援雙視窗 |
 | `recorder.ts` | MediaRecorder 錄音 | **DELETED** — 遷移至 `audio_recorder.rs`（Rust cpal） |
 | `transcriber.ts` | Groq Whisper API | **DELETED** — 遷移至 `transcription.rs`（Rust reqwest） |
@@ -607,7 +607,7 @@ sayit/
 │   │   ├── plugins/
 │   │   │   ├── mod.rs                 # Plugin 統一匯出 [現有，擴展]
 │   │   │   ├── hotkey_listener.rs     # OS-native 跨平台全域熱鍵 [擴展重寫]
-│   │   │   ├── clipboard_paste.rs     # arboard + AX API menu press（macOS）+ SendInput（Windows） [現有，擴展]
+│   │   │   ├── clipboard_paste.rs     # arboard + CGEvent Cmd+V（macOS）+ SendInput（Windows） [現有，擴展]
 │   │   │   ├── keyboard_monitor.rs    # 貼上後鍵盤監控 [新增]
 │   │   │   ├── audio_recorder.rs      # cpal 音訊錄製 + WAV 編碼 + FFT 波形 [新增]
 │   │   │   └── transcription.rs       # Groq Whisper API via reqwest [新增]
@@ -806,7 +806,7 @@ pnpm tauri build  # 1. Vite 打包前端 → dist/
 | FR1-5 | 語音觸發與錄音 | hotkey_listener.rs (OS-native) + audio_recorder.rs (cpal) + useVoiceFlow.ts |
 | FR6-7 | 語音轉文字 | transcription.rs (Rust reqwest → Groq Whisper API + 詞彙 prompt 注入) |
 | FR8-12 | AI 文字整理 | enhancer.ts (Groq LLM) + useSettingsStore (prompt) + 詞彙/剪貼簿上下文注入 |
-| FR13-15 | 文字輸出 | clipboard_paste.rs (arboard + AX API menu press / SendInput) + keyboard_monitor.rs |
+| FR13-15 | 文字輸出 | clipboard_paste.rs (arboard + CGEvent Cmd+V / SendInput) + keyboard_monitor.rs |
 | FR16-19 | 自訂詞彙字典 | useVocabularyStore + DictionaryView.vue + SQLite vocabulary table |
 | FR20-25 | 歷史記錄與統計 | useHistoryStore + DashboardView.vue + HistoryView.vue + SQLite transcriptions table |
 | FR26-29 | 狀態回饋 HUD | NotchHud.vue (6-state) + useHudState.ts + voice-flow:state-changed events |

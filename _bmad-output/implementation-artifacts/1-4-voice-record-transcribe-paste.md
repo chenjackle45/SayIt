@@ -360,13 +360,12 @@ await invoke("paste_text", { text: transcriptionText });
 ```
 
 **內部流程（已實作，不需修改）：**
-1. 隱藏 Tauri HUD 視窗
-2. 等待 200ms 讓 OS 切換焦點到目標應用
-3. 寫入文字到系統剪貼簿（arboard）
-4. 驗證剪貼簿內容
-5. 等待 50ms
-6. macOS：模擬 Cmd+V（CGEvent）
-7. Windows：模擬 Ctrl+V
+1. 寫入文字到系統剪貼簿（arboard）
+2. 等待 50ms（剪貼簿同步）
+3. macOS：模擬 Cmd+V（CGEvent，事件源=`Private`，投遞位置=`Session`）
+4. Windows：恢復目標前景視窗 → 模擬 Ctrl+V（SendInput）
+
+> ⚠️ macOS CGEvent 事件源必須使用 `CGEventSourceStateID::Private`，不可使用 `HIDSystemState` 或 `CombinedSessionState`。Toggle 模式下 modifier trigger key（如右 Option）的殘留 Alternate flag 會污染 Cmd+V 事件，導致目標 app 重複貼上。
 
 **重要時序問題：** `paste_text` 內部已經會隱藏 HUD 視窗。但 store 的 `transitionTo('idle')` 也會呼叫 `hideHud()`。建議的處理方式：在呼叫 `paste_text` 前先 `transitionTo('idle')`（觸發 hideHud），然後 `paste_text` 內部的 hide 會是 no-op（視窗已隱藏）。這是現有 `useVoiceFlow.ts` 的做法（line 149: `transitionTo("idle")` → line 151: `invoke("paste_text")`）。
 

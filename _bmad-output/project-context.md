@@ -206,6 +206,12 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **新 Plugin 加入時** — 必須在對應位置加入 `shutdown()` 呼叫，並考慮順序依賴
 - **`try_state::<T>()`** — 使用 `try_state` 而非 `state`，因為 Exit 事件不保證所有 state 都已註冊
 
+#### CGEvent 貼上機制（clipboard_paste）
+
+- **事件源** — 使用 `CGEventSourceStateID::Private`（隔離事件源），不繼承物理鍵盤的 modifier 狀態。禁止使用 `HIDSystemState` 或 `CombinedSessionState`，否則 Toggle 模式下 modifier trigger key（如右 Option）的殘留 Alternate flag 會污染模擬的 Cmd+V，導致目標 app 收到 Opt+Cmd+V 觸發重複貼上
+- **投遞位置** — 使用 `CGEventTapLocation::Session`（Session 層），不走 HID 管線。新版 macOS（15.x+）的 HID 層事件可能經由多重路徑投遞導致重複
+- **事件序列** — Cmd↓ → V↓ → V↑ → Cmd↑（4 事件完整配對），V↓/V↑ 帶 `CGEventFlagCommand`，Cmd↑ 帶 `CGEventFlagNull`
+
 #### Persistent Event Tap 模式（keyboard_monitor）
 
 - **持久監聽器** — `keyboard_monitor.rs` 在 `KeyboardMonitorState::new()` 時建立一次 CGEventTap（macOS）/ Windows Hook，App 生命週期內永不銷毀
@@ -651,6 +657,7 @@ src/
 - **❌ 假設 `sql:default` 包含寫入權限** — Tauri v2 的 `sql:default` 只有 `load/select/close`，任何 DDL/DML 操作需要額外的 `sql:allow-execute`。新增 Tauri plugin 時務必用 `acl-manifests.json` 確認 default 權限組的實際內容
 - **❌ mount 前未初始化 DB** — `main-window.ts` 中 `app.mount()` 會觸發所有元件的 `onMounted`，若 DB 尚未初始化，Store 的 `getDatabase()` 會拋錯且被 try-catch 靜默吞掉
 - **❌ 每次轉錄重建/銷毀 CGEventTap** — `keyboard_monitor` 必須使用持久 CGEventTap/Hook 模式：App 啟動時建立一次，靠 `is_monitoring: AtomicBool` flag 控制是否處理事件。重複建立/銷毀 CGEventTap 會產生幽靈按鍵（ghost Enter key），這是已確認的 bug 根因
+- **❌ CGEvent 貼上使用 HIDSystemState / CombinedSessionState 事件源** — `simulate_paste_via_cgevent()` 必須使用 `CGEventSourceStateID::Private`，否則 Toggle 模式 + modifier trigger key（如右 Option）會殘留 Alternate flag 導致重複貼上。投遞位置必須用 `CGEventTapLocation::Session`
 - **❌ `RunEvent::Exit` 中用 `state()` 取 managed state** — 必須用 `try_state::<T>()` + `if let Some(state)` 模式，避免 state 未註冊時 panic
 - **❌ 硬編碼使用者可見字串** — 所有使用者看得到的文字必須使用 i18n 翻譯鍵（Vue 元件用 `$t()` / `t()`，lib/store 用 `i18n.global.t()`），禁止中文/英文硬編碼。程式碼註解和日誌不需翻譯
 - **❌ 字串解析提取結構化資訊** — 禁止用 regex 從 `error.message` 提取 status code 等資訊（如 `match(/：(\d+)/)`），必須用 Error class 屬性（如 `EnhancerApiError.statusCode`）

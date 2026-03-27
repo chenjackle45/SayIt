@@ -54,7 +54,9 @@ fn simulate_paste_via_cgevent() -> Result<(), String> {
     const KEYCODE_COMMAND_L: u16 = 55;
     const KEYCODE_V: u16 = 9;
 
-    let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState)
+    // Private source：隔離的事件源，不繼承物理鍵盤的 modifier 狀態
+    // 解決 Toggle 模式下右 Option 殘留 Alternate flag 導致重複貼上的問題
+    let source = CGEventSource::new(CGEventSourceStateID::Private)
         .map_err(|_| "Failed to create CGEventSource".to_string())?;
 
     // Cmd ↓
