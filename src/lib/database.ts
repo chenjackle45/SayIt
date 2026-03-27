@@ -393,6 +393,32 @@ async function doInitializeDatabase(): Promise<Database> {
     );
   }
 
+  // --- Migration v7 → v8: edit mode columns ---
+  const v8VersionRows = await connection.select<{ version: number }[]>(
+    "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1",
+  );
+  const v8CurrentVersion = v8VersionRows[0]?.version ?? 1;
+
+  if (v8CurrentVersion < 8) {
+    await addColumnIfNotExists(
+      connection,
+      "transcriptions",
+      "is_edit_mode INTEGER NOT NULL DEFAULT 0",
+    );
+    await addColumnIfNotExists(
+      connection,
+      "transcriptions",
+      "edit_source_text TEXT",
+    );
+
+    await connection.execute(
+      "INSERT OR REPLACE INTO schema_version (version) VALUES (8);",
+    );
+    console.log(
+      "[database] Migration v7 → v8: edit mode columns",
+    );
+  }
+
   // --- 關鍵表驗證與恢復 ---
   // 先前版本的 migration 可能因連線池覆蓋導致 DROP TABLE 後未 RENAME，
   // 若 api_usage 不存在則以最新 schema 重建（資料已遺失，但 app 可正常運作）

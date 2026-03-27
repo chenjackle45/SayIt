@@ -33,6 +33,7 @@ const props = defineProps<{
   canRetry: boolean;
   promptModeLabel: string;
   modeSwitchLabel: string;
+  isEditMode: boolean;
 }>();
 
 defineEmits<{
@@ -284,7 +285,11 @@ watch(
       return;
     }
 
-    if (nextStatus === "transcribing" || nextStatus === "enhancing") {
+    if (
+      nextStatus === "transcribing" ||
+      nextStatus === "enhancing" ||
+      nextStatus === "editing"
+    ) {
       stopWaveformAnimation();
       if (
         visualMode.value === "recording" ||
@@ -431,7 +436,8 @@ onUnmounted(() => {
             {{ props.modeSwitchLabel }}
           </span>
           <template v-else-if="visualMode === 'recording'">
-            <span v-if="props.promptModeLabel" class="prompt-mode-badge">{{ props.promptModeLabel }}</span>
+            <span v-if="props.isEditMode" class="hud-badge edit-mode-badge">{{ t('voiceFlow.editMode') }}</span>
+            <span v-else-if="props.promptModeLabel" class="hud-badge prompt-mode-badge">{{ props.promptModeLabel }}</span>
             <span class="elapsed-timer">
               {{ formattedElapsedTime }}
             </span>
@@ -736,16 +742,16 @@ onUnmounted(() => {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ---- Prompt Mode Badge (recording) ---- */
-.prompt-mode-badge {
+/* ---- HUD Badge (shared base) ---- */
+.hud-badge {
   font-size: 10px;
   padding: 1px 6px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.7);
   white-space: nowrap;
   margin-right: 6px;
 }
+.prompt-mode-badge { background: rgba(255, 255, 255, 0.15); color: rgba(255, 255, 255, 0.7); }
+.edit-mode-badge   { background: rgba(251, 191, 36, 0.25);  color: rgba(251, 191, 36, 0.9); }
 
 /* ---- Error: scatter + shake ---- */
 .waveform-scatter {

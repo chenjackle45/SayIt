@@ -103,6 +103,7 @@ onUnmounted(() => {
       :can-retry="voiceFlowStore.canRetry"
       :prompt-mode-label="promptModeLabel"
       :mode-switch-label="voiceFlowStore.modeSwitchLabel"
+      :is-edit-mode="voiceFlowStore.isEditMode"
       @retry="handleRetry"
     />
   </div>

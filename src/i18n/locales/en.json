@@ -260,6 +260,10 @@
     "pasteSuccessUnenhanced": "Pasted (unenhanced)",
     "enhancing": "Enhancing...",
     "pasteFailed": "Paste failed",
+    "editMode": "Edit",
+    "editing": "Editing...",
+    "editSuccess": "Edited ✓",
+    "editFailed": "Edit failed",
     "recordingTooShort": "Recording too short",
     "vocabularyLearnedLabel": "Added to dictionary",
     "vocabularyLearned": "{terms}",
@@ -356,14 +360,15 @@
     },
     "upgradeNotice": {
       "title": "SayIt Update Summary",
-      "item1": "Combo hotkeys: use ⌘+J or similar combos as your trigger — no more accidental activations",
-      "item2": "Quick mode switch: double-tap or long-press your trigger key to switch between Minimal and Active without opening settings",
-      "item3": "Mode switch confirmation: a visual indicator appears on screen when you switch modes",
-      "item4": "Mode badge while recording: the on-screen notch shows which voice mode you're using",
+      "item1": "Edit selected text: select text first, then trigger SayIt — your voice becomes an instruction. Say \"translate to English\" or \"make it more formal\" and AI will process and replace it directly",
+      "item2": "Paid LLM support: Groq's free models aren't smart enough, so we've added OpenAI and Anthropic. Set up your own API Key in Settings — it's a paid service, but even $10 USD makes a noticeable difference",
+      "item3": "Combo hotkeys: use ⌘+J or similar combos as your trigger — no more accidental activations",
+      "item4": "Quick mode switch: double-tap or long-press your trigger key to switch between Minimal and Active without opening settings",
       "item5": "Better mic selector: shows default device name with a volume preview bar",
-      "item6": "Toggle mode paste fix: resolved an issue where text was pasted twice in certain scenarios",
-      "item7": "Usage note: SayIt is designed for quick voice-to-text dictation. Long meeting recordings are not yet supported, but we're working on it for future updates",
-      "item8": "Paid LLM support: Groq's free models aren't smart enough, so we've added OpenAI and Anthropic. Set up your own API Key in Settings — it's a paid service, but even $10 USD makes a noticeable difference",
+      "item6": "Mode badge while recording: the on-screen notch shows which voice mode you're using",
+      "item7": "Mode switch confirmation: a visual indicator appears on screen when you switch modes",
+      "item8": "Toggle mode paste fix: resolved an issue where text was pasted twice in certain scenarios",
+      "item9": "Usage note: SayIt is designed for quick voice-to-text dictation. Long meeting recordings are not yet supported, but we're working on it for future updates",
       "dismiss": "Got it"
     }
   }

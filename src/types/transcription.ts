@@ -17,6 +17,8 @@ export interface TranscriptionRecord {
   createdAt: string;
   audioFilePath: string | null;
   status: TranscriptionStatus;
+  isEditMode: boolean;
+  editSourceText: string | null;
 }
 
 export interface DailyQuotaUsage {

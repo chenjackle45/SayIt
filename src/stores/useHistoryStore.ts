@@ -35,6 +35,8 @@ interface RawTranscriptionRow {
   created_at: string;
   audio_file_path: string | null;
   status: string;
+  is_edit_mode: number;
+  edit_source_text: string | null;
 }
 
 function mapRowToRecord(row: RawTranscriptionRow): TranscriptionRecord {
@@ -53,42 +55,40 @@ function mapRowToRecord(row: RawTranscriptionRow): TranscriptionRecord {
     createdAt: row.created_at,
     audioFilePath: row.audio_file_path,
     status: row.status as TranscriptionRecord["status"],
+    isEditMode: row.is_edit_mode === 1,
+    editSourceText: row.edit_source_text,
   };
 }
+
+const TRANSCRIPTION_SELECT_COLUMNS = `id, timestamp, raw_text, processed_text,
+         recording_duration_ms, transcription_duration_ms, enhancement_duration_ms,
+         char_count, trigger_mode, was_enhanced, was_modified, created_at,
+         audio_file_path, status, is_edit_mode, edit_source_text`;
 
 const INSERT_SQL = `
   INSERT INTO transcriptions (
     id, timestamp, raw_text, processed_text,
     recording_duration_ms, transcription_duration_ms, enhancement_duration_ms,
     char_count, trigger_mode, was_enhanced, was_modified,
-    audio_file_path, status
-  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    audio_file_path, status, is_edit_mode, edit_source_text
+  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 `;
 
 const SELECT_ALL_SQL = `
-  SELECT id, timestamp, raw_text, processed_text,
-         recording_duration_ms, transcription_duration_ms, enhancement_duration_ms,
-         char_count, trigger_mode, was_enhanced, was_modified, created_at,
-         audio_file_path, status
+  SELECT ${TRANSCRIPTION_SELECT_COLUMNS}
   FROM transcriptions
   ORDER BY timestamp DESC
 `;
 
 const SELECT_PAGED_SQL = `
-  SELECT id, timestamp, raw_text, processed_text,
-         recording_duration_ms, transcription_duration_ms, enhancement_duration_ms,
-         char_count, trigger_mode, was_enhanced, was_modified, created_at,
-         audio_file_path, status
+  SELECT ${TRANSCRIPTION_SELECT_COLUMNS}
   FROM transcriptions
   ORDER BY timestamp DESC
   LIMIT $1 OFFSET $2
 `;
 
 const SEARCH_PAGED_SQL = `
-  SELECT id, timestamp, raw_text, processed_text,
-         recording_duration_ms, transcription_duration_ms, enhancement_duration_ms,
-         char_count, trigger_mode, was_enhanced, was_modified, created_at,
-         audio_file_path, status
+  SELECT ${TRANSCRIPTION_SELECT_COLUMNS}
   FROM transcriptions
   WHERE raw_text LIKE $1 ESCAPE '\\' OR processed_text LIKE $1 ESCAPE '\\'
   ORDER BY timestamp DESC
@@ -157,10 +157,7 @@ const DELETE_TRANSCRIPTION_SQL = `
 `;
 
 const SELECT_RECENT_SQL = `
-  SELECT id, timestamp, raw_text, processed_text,
-         recording_duration_ms, transcription_duration_ms, enhancement_duration_ms,
-         char_count, trigger_mode, was_enhanced, was_modified, created_at,
-         audio_file_path, status
+  SELECT ${TRANSCRIPTION_SELECT_COLUMNS}
   FROM transcriptions
   ORDER BY timestamp DESC
   LIMIT $1
@@ -289,6 +286,8 @@ export const useHistoryStore = defineStore("history", () => {
         record.wasModified === null ? null : record.wasModified ? 1 : 0,
         record.audioFilePath,
         record.status,
+        record.isEditMode ? 1 : 0,
+        record.editSourceText,
       ]);
     } catch (err) {
       console.error(

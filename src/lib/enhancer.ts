@@ -34,6 +34,7 @@ export interface EnhanceOptions {
   vocabularyTermList?: string[];
   modelId?: string;
   signal?: AbortSignal;
+  maxTokens?: number;
 }
 
 async function withTimeout<T>(
@@ -120,7 +121,7 @@ export async function enhanceText(
       { role: "user", content: rawText },
     ],
     temperature: 0.1,
-    maxTokens: 2048,
+    maxTokens: options?.maxTokens ?? 2048,
   };
 
   const { url, init } = buildFetchParams(providerId, request, apiKey);
