@@ -1,7 +1,27 @@
 use arboard::Clipboard;
 use std::thread;
 use std::time::Duration;
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Runtime, State};
+
+// ========== Focus State ==========
+
+/// 儲存使用者啟動錄音前的前景視窗，貼上時恢復焦點。
+/// Windows 上 SendInput 會送到當前前景視窗，若 HUD 搶了焦點，Ctrl+V 會進 HUD 而非目標 app。
+pub struct FocusState {
+    #[cfg(target_os = "windows")]
+    target_hwnd: std::sync::Mutex<isize>,
+}
+
+impl FocusState {
+    pub fn new() -> Self {
+        Self {
+            #[cfg(target_os = "windows")]
+            target_hwnd: std::sync::Mutex::new(0),
+        }
+    }
+}
+
+// ========== Errors ==========
 
 #[derive(Debug, thiserror::Error)]
 pub enum ClipboardError {
@@ -34,7 +54,7 @@ fn simulate_paste_via_cgevent() -> Result<(), String> {
     const KEYCODE_COMMAND_L: u16 = 55;
     const KEYCODE_V: u16 = 9;
 
-    let source = CGEventSource::new(CGEventSourceStateID::HIDSystemState)
+    let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState)
         .map_err(|_| "Failed to create CGEventSource".to_string())?;
 
     // Cmd ↓
@@ -57,11 +77,11 @@ fn simulate_paste_via_cgevent() -> Result<(), String> {
         .map_err(|_| "Failed to create Cmd up event".to_string())?;
     cmd_up.set_flags(CGEventFlags::CGEventFlagNull);
 
-    // Post events in sequence
-    cmd_down.post(CGEventTapLocation::HID);
-    v_down.post(CGEventTapLocation::HID);
-    v_up.post(CGEventTapLocation::HID);
-    cmd_up.post(CGEventTapLocation::HID);
+    // Post events in sequence (Session 層：避免新版 macOS HID 管線重複投遞)
+    cmd_down.post(CGEventTapLocation::Session);
+    v_down.post(CGEventTapLocation::Session);
+    v_up.post(CGEventTapLocation::Session);
+    cmd_up.post(CGEventTapLocation::Session);
 
     Ok(())
 }
@@ -69,6 +89,7 @@ fn simulate_paste_via_cgevent() -> Result<(), String> {
 /// 透過 SendInput 模擬 Ctrl+V 按鍵來觸發貼上。
 ///
 /// Windows 不像 macOS 有 CGEvent 殘留問題，SendInput 是標準做法。
+/// SendInput 會送到當前前景視窗，因此呼叫前必須確保目標視窗已是前景。
 #[cfg(target_os = "windows")]
 fn simulate_paste_via_keyboard() -> Result<(), String> {
     use std::mem;
@@ -104,6 +125,60 @@ fn simulate_paste_via_keyboard() -> Result<(), String> {
     Ok(())
 }
 
+/// 恢復先前捕獲的前景視窗焦點。
+/// 使用 AttachThreadInput 技巧繞過 Windows 對 SetForegroundWindow 的限制。
+#[cfg(target_os = "windows")]
+fn restore_target_window(hwnd_value: isize) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow,
+    };
+    use windows::Win32::UI::Input::KeyboardAndMouse::AttachThreadInput;
+
+    unsafe {
+        let target = HWND(hwnd_value as *mut _);
+        let current_fg = GetForegroundWindow();
+
+        if current_fg == target {
+            return; // 已是前景，無需操作
+        }
+
+        let current_thread = GetWindowThreadProcessId(current_fg, None);
+        let target_thread = GetWindowThreadProcessId(target, None);
+
+        if current_thread != target_thread && current_thread != 0 && target_thread != 0 {
+            let _ = AttachThreadInput(current_thread, target_thread, true);
+            let _ = SetForegroundWindow(target);
+            let _ = AttachThreadInput(current_thread, target_thread, false);
+        } else {
+            let _ = SetForegroundWindow(target);
+        }
+
+        println!("[clipboard-paste] Restored target window: {:?}", target);
+    }
+}
+
+/// 捕獲當前前景視窗，供後續 paste_text 恢復焦點。
+/// 應在 hotkey 觸發時（HUD 顯示前）呼叫。
+#[tauri::command]
+pub fn capture_target_window(state: State<'_, FocusState>) {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+        unsafe {
+            let hwnd = GetForegroundWindow();
+            if let Ok(mut guard) = state.target_hwnd.lock() {
+                *guard = hwnd.0 as isize;
+            }
+            println!("[clipboard-paste] Captured target window: {:?}", hwnd);
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = state;
+    }
+}
+
 #[tauri::command]
 pub fn copy_to_clipboard(text: String) -> Result<(), ClipboardError> {
     let mut clipboard =
@@ -115,7 +190,20 @@ pub fn copy_to_clipboard(text: String) -> Result<(), ClipboardError> {
 }
 
 #[tauri::command]
-pub fn paste_text<R: Runtime>(_app: AppHandle<R>, text: String) -> Result<(), ClipboardError> {
+pub fn paste_text<R: Runtime>(
+    _app: AppHandle<R>,
+    focus_state: State<'_, FocusState>,
+    text: String,
+) -> Result<(), ClipboardError> {
+    // DEBUG: 追蹤 paste_text 被呼叫次數
+    use std::sync::atomic::AtomicU32;
+    static PASTE_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
+    let call_id = PASTE_CALL_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    println!(
+        "🔴🔴🔴 [clipboard-paste] paste_text CALLED (#{}) — {} chars",
+        call_id,
+        text.len()
+    );
     #[cfg(debug_assertions)]
     println!(
         "[clipboard-paste] Pasting {} chars: \"{}\"",
@@ -139,6 +227,7 @@ pub fn paste_text<R: Runtime>(_app: AppHandle<R>, text: String) -> Result<(), Cl
     // 3) 觸發目標 app 的貼上動作
     #[cfg(target_os = "macos")]
     {
+        let _ = &focus_state; // macOS 不需要焦點恢復（CGEvent 是進程級）
         simulate_paste_via_cgevent().map_err(|e| {
             eprintln!("[clipboard-paste] CGEvent paste failed: {}", e);
             ClipboardError::KeyboardSimulation(e)
@@ -148,6 +237,13 @@ pub fn paste_text<R: Runtime>(_app: AppHandle<R>, text: String) -> Result<(), Cl
 
     #[cfg(target_os = "windows")]
     {
+        // 恢復錄音前的前景視窗，確保 SendInput 送到正確目標
+        let saved_hwnd = focus_state.target_hwnd.lock().ok().map(|g| *g).unwrap_or(0);
+        if saved_hwnd != 0 {
+            restore_target_window(saved_hwnd);
+            thread::sleep(Duration::from_millis(50));
+        }
+
         simulate_paste_via_keyboard().map_err(|e| {
             eprintln!("[clipboard-paste] SendInput paste failed: {}", e);
             ClipboardError::KeyboardSimulation(e)

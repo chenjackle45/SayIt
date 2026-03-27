@@ -98,12 +98,19 @@ fn handle_key_event<R: Runtime>(
     pressed: bool,
     state: &HotkeyListenerState,
 ) {
+    // DEBUG: 追蹤每次呼叫
+    println!(
+        "🟡🟡🟡 [hotkey-listener] handle_key_event(pressed={}, is_pressed={}, is_toggled={})",
+        pressed,
+        state.is_pressed.load(Ordering::SeqCst),
+        state.is_toggled_on.load(Ordering::SeqCst),
+    );
     let mode = state.trigger_mode.lock().unwrap().clone();
     match mode {
         TriggerMode::Hold => {
             if pressed {
                 if !state.is_pressed.swap(true, Ordering::SeqCst) {
-                    println!("[hotkey-listener] Hold: key pressed → start");
+                    println!("🟢🟢🟢 [hotkey-listener] EMIT hotkey:pressed");
                     let _ = app_handle.emit(
                         "hotkey:pressed",
                         HotkeyEventPayload {
@@ -113,7 +120,7 @@ fn handle_key_event<R: Runtime>(
                     );
                 }
             } else if state.is_pressed.swap(false, Ordering::SeqCst) {
-                println!("[hotkey-listener] Hold: key released → stop");
+                println!("🟢🟢🟢 [hotkey-listener] EMIT hotkey:released");
                 let _ = app_handle.emit(
                     "hotkey:released",
                     HotkeyEventPayload {
