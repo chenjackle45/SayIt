@@ -2,6 +2,15 @@
 
 SayIt 版本更新紀錄。
 
+## [0.9.1] - 2026-03-28
+
+### Fixed
+
+- HUD notch 寬度加寬（350→420px），避免錄音中模式標籤被 MacBook camera 區域遮擋
+- mode-switch notch 寬度加寬（200→350px），確保切換模式標籤完整顯示
+- mode-switch 消失時新增 collapsing 縮小動畫（原為直接淡出）
+- Tauri HUD 視窗與 Rust 定位常數同步更新（400→470px）
+
 ## [0.9.0] - 2026-03-28
 
 ### Added
