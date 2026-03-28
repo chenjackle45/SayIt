@@ -992,7 +992,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     // 捕獲當前前景視窗（Windows: HUD show 前記住目標，貼上前恢復焦點）
     void invoke("capture_target_window").catch(() => {});
 
-    // 偵測選取文字（非阻塞）：AX IPC ~1-5ms，遠在錄音結束前完成
+    // 偵測選取文字（非阻塞）：模擬 Cmd+C 讀剪貼簿，~100ms，遠在錄音結束前完成
     editSourceText.value = null;
     invoke<string | null>("read_selected_text")
       .then((selectedText) => {

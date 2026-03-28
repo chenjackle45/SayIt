@@ -156,7 +156,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Plugin 模式** — 每個功能模組是獨立的 `TauriPlugin<R>`，在 `plugins/mod.rs` 中 `pub mod` 匯出（目前：`clipboard_paste`, `hotkey_listener`, `keyboard_monitor`, `audio_control`, `audio_recorder`, `transcription`, `sound_feedback`, `text_field_reader`）。`hotkey_listener` 額外提供 `reset_hotkey_state` command（ESC 中斷後重置 toggle 狀態）。`sound_feedback` 提供 `play_start_sound`/`play_stop_sound`/`play_error_sound`/`play_learned_sound` commands，前端透過 `playSoundIfEnabled()` 依 `isSoundEffectsEnabled` 設定條件呼叫
 - **audio_recorder 錄音檔管理 Commands（Story 4.4）** — `save_recording_file`（寫入 WAV 至 `{APP_DATA}/recordings/`）、`read_recording_file`（接受 `id` 參數，Rust 端組合路徑讀取 WAV 位元組，回傳 `Response`）、`delete_all_recordings`（清除所有錄音檔）、`cleanup_old_recordings`（按天數清理過期檔案，回傳被刪除的 transcription ID list）
 - **transcription 重送 Command（Story 4.5）** — `retranscribe_from_file`（從磁碟讀取 WAV 重新轉錄），內部共用 `send_transcription_request()` 函式（與 `transcribe_audio` 共用 Groq API 邏輯，避免重複實作）
-- **text_field_reader: `read_selected_text` command** — 使用 `AXSelectedText` 屬性讀取選取文字（比 `AXSelectedTextRange` 切片更可靠）。`FocusedElementContext` struct 封裝共用 AX 走訪邏輯（system-wide → focused app → element → role check → WebArea child），`read_focused_text_field_impl` 和 `get_selected_text_impl` 共用此結構，呼叫端負責 `cleanup()`
+- **text_field_reader: `read_selected_text` command** — 透過模擬 Cmd+C（macOS）/ Ctrl+C（Windows）擷取剪貼簿內容偵測選取文字，不依賴 Accessibility API。流程：儲存剪貼簿 → 清空 → 模擬複製 → 等 100ms → 讀取 → 還原。實作位於 `clipboard_paste::capture_selected_text_via_clipboard()`。`read_focused_text_field` 仍使用 AX API（`FocusedElementContext` + role check）
 - **Plugin State shutdown 慣例** — 每個 Plugin State struct 必須實作 `pub fn shutdown(&self)` 方法，用於 App 退出時清理資源（停止錄音、恢復音量、取消 CGEventTap 等）。`shutdown()` 內部必須處理 `Mutex` poisoned 的情況（`match lock() { Err(_) => return }`）
 - **Serde JSON 序列化** — Rust → 前端的 payload struct 使用 `#[serde(rename_all = "camelCase")]` 確保前端收到 camelCase JSON
 - **Crate 命名** — `name = "sayit_lib"`，`crate-type = ["staticlib", "cdylib", "rlib"]`
@@ -325,7 +325,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 
 #### Edit Mode（編輯選取文字）
 
-- **偵測邏輯** — `handleStartRecording` 中非阻塞呼叫 `read_selected_text`（`.then()` 設定 `editSourceText`），不阻塞開始音效和錄音
+- **偵測邏輯** — `handleStartRecording` 中非阻塞呼叫 `read_selected_text`（`.then()` 設定 `editSourceText`）。底層透過模擬 Cmd+C 讀剪貼簿（~100ms），不阻塞開始音效和錄音
 - **狀態推導** — `isEditMode` 是 `computed(() => editSourceText.value !== null)`，不是獨立 ref。只需設定 `editSourceText` 即可
 - **流程分支** — transcription 成功後，`isEditMode && editSourceText` 為真時走 `handleEditModeFlow()`，否則走既有增強流程
 - **Prompt 結構** — system prompt = `EDIT_MODE_PROMPTS[locale]` + `<instruction>語音指令</instruction>`，user message = 選取的文字。不傳 `vocabularyTermList`
@@ -720,7 +720,7 @@ src/
 - **❌ 使用 ESC（keycode 53 / VK 0x1B）作為 Custom trigger key** — ESC 已保留為全域中斷鍵，`keycodeMap.ts` 的 `getDangerousKeyWarning("Escape")` 回傳 null（不走 warning 路徑），由 `getEscapeReservedMessage()` 提供 hard block 錯誤訊息
 - **❌ 重送成功時 INSERT 新 transcription 記錄** — 重送路徑必須使用 `completePasteFlow({ skipRecordSaving: true })` + `updateTranscriptionOnRetrySuccess()` UPDATE 現有 failed 記錄，禁止 INSERT（PK 衝突 + FK 787 錯誤）
 - **❌ 重送的 API usage 不等 transcription UPDATE 完成** — `saveApiUsageRecordList` 必須串接在 `updateTranscriptionOnRetrySuccess().then()` 之後，確保 FK 依賴正確
-- **❌ `read_selected_text` 用 await 阻塞 hot path** — 必須用 `.then()` 非阻塞呼叫，避免 AX IPC 延遲影響開始音效。結果在 `handleStopRecording` 前早已就緒
+- **❌ `read_selected_text` 用 await 阻塞 hot path** — 必須用 `.then()` 非阻塞呼叫，避免模擬 Cmd+C ~100ms 延遲影響開始音效。結果在 `handleStopRecording` 前早已就緒
 - **❌ 編輯失敗時貼上任何東西** — edit mode LLM 失敗必須走 `failRecordingFlow()`，禁止 fallback 貼上語音指令（會覆蓋使用者選取的原文）
 - **❌ edit mode 使用 `detectEnhancementAnomaly`** — 翻譯/摘要會合法改變長度，禁止對 edit mode 結果做長度爆炸偵測
 - **❌ 在幻覺偵測中單獨依賴 NSP** — `noSpeechProbability` 不可靠（Whisper 對中文軟音常報高 NSP），只能搭配 peak + RMS 能量作為輔助信號（Layer 2b），不可單獨用於判斷

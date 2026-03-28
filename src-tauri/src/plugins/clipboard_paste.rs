@@ -88,6 +88,77 @@ fn simulate_paste_via_cgevent() -> Result<(), String> {
     Ok(())
 }
 
+/// 透過 CGEvent 模擬 Cmd+C 鍵盤事件來觸發複製。
+///
+/// 事件序列：Cmd↓ → C↓ → C↑ → Cmd↑
+/// keycodes: Command_L=55, C=8
+#[cfg(target_os = "macos")]
+fn simulate_copy_via_cgevent() -> Result<(), String> {
+    use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation};
+    use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
+
+    const KEYCODE_COMMAND_L: u16 = 55;
+    const KEYCODE_C: u16 = 8;
+
+    let source = CGEventSource::new(CGEventSourceStateID::Private)
+        .map_err(|_| "Failed to create CGEventSource".to_string())?;
+
+    let cmd_down = CGEvent::new_keyboard_event(source.clone(), KEYCODE_COMMAND_L, true)
+        .map_err(|_| "Failed to create Cmd down event".to_string())?;
+    cmd_down.set_flags(CGEventFlags::CGEventFlagCommand);
+
+    let c_down = CGEvent::new_keyboard_event(source.clone(), KEYCODE_C, true)
+        .map_err(|_| "Failed to create C down event".to_string())?;
+    c_down.set_flags(CGEventFlags::CGEventFlagCommand);
+
+    let c_up = CGEvent::new_keyboard_event(source.clone(), KEYCODE_C, false)
+        .map_err(|_| "Failed to create C up event".to_string())?;
+    c_up.set_flags(CGEventFlags::CGEventFlagCommand);
+
+    let cmd_up = CGEvent::new_keyboard_event(source, KEYCODE_COMMAND_L, false)
+        .map_err(|_| "Failed to create Cmd up event".to_string())?;
+    cmd_up.set_flags(CGEventFlags::CGEventFlagNull);
+
+    cmd_down.post(CGEventTapLocation::Session);
+    c_down.post(CGEventTapLocation::Session);
+    c_up.post(CGEventTapLocation::Session);
+    cmd_up.post(CGEventTapLocation::Session);
+
+    Ok(())
+}
+
+/// 透過 SendInput 模擬 Ctrl+C 按鍵來觸發複製。
+#[cfg(target_os = "windows")]
+fn simulate_copy_via_keyboard() -> Result<(), String> {
+    use std::mem;
+    use windows::Win32::UI::Input::KeyboardAndMouse::*;
+
+    unsafe {
+        let mut inputs: [INPUT; 4] = mem::zeroed();
+
+        inputs[0].r#type = INPUT_KEYBOARD;
+        inputs[0].Anonymous.ki.wVk = VK_CONTROL;
+
+        inputs[1].r#type = INPUT_KEYBOARD;
+        inputs[1].Anonymous.ki.wVk = VK_C;
+
+        inputs[2].r#type = INPUT_KEYBOARD;
+        inputs[2].Anonymous.ki.wVk = VK_C;
+        inputs[2].Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
+
+        inputs[3].r#type = INPUT_KEYBOARD;
+        inputs[3].Anonymous.ki.wVk = VK_CONTROL;
+        inputs[3].Anonymous.ki.dwFlags = KEYEVENTF_KEYUP;
+
+        let sent = SendInput(&inputs, mem::size_of::<INPUT>() as i32);
+        if sent != 4 {
+            return Err(format!("SendInput returned {}, expected 4", sent));
+        }
+    }
+
+    Ok(())
+}
+
 /// 透過 SendInput 模擬 Ctrl+V 按鍵來觸發貼上。
 ///
 /// Windows 不像 macOS 有 CGEvent 殘留問題，SendInput 是標準做法。
@@ -132,10 +203,10 @@ fn simulate_paste_via_keyboard() -> Result<(), String> {
 #[cfg(target_os = "windows")]
 fn restore_target_window(hwnd_value: isize) {
     use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::Threading::AttachThreadInput;
     use windows::Win32::UI::WindowsAndMessaging::{
         GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow,
     };
-    use windows::Win32::System::Threading::AttachThreadInput;
 
     unsafe {
         let target = HWND(hwnd_value as *mut _);
@@ -178,6 +249,64 @@ pub fn capture_target_window(state: State<'_, FocusState>) {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = state;
+    }
+}
+
+/// 透過模擬 Cmd+C（macOS）/ Ctrl+C（Windows）擷取當前選取的文字。
+///
+/// 流程：儲存剪貼簿 → 清空 → 模擬複製 → 等待 → 讀取 → 還原 → 回傳。
+/// 對任何支援 Cmd+C 的 app 都有效，不依賴 Accessibility API。
+pub fn capture_selected_text_via_clipboard() -> Result<Option<String>, String> {
+    let mut clipboard = Clipboard::new().map_err(|e| e.to_string())?;
+
+    // 1. 儲存當前剪貼簿文字
+    let original_text = clipboard.get_text().ok();
+
+    // 2. 清空剪貼簿作為哨兵值
+    clipboard.set_text("").map_err(|e| e.to_string())?;
+
+    // 3. 模擬 Cmd+C / Ctrl+C（失敗時先還原剪貼簿再 return）
+    let copy_result = {
+        #[cfg(target_os = "macos")]
+        { simulate_copy_via_cgevent() }
+        #[cfg(target_os = "windows")]
+        { simulate_copy_via_keyboard() }
+    };
+    if let Err(e) = copy_result {
+        restore_clipboard(&mut clipboard, &original_text);
+        return Err(e);
+    }
+
+    // 4. 等待剪貼簿更新
+    thread::sleep(Duration::from_millis(100));
+
+    // 5. 讀取剪貼簿
+    let copied_text = clipboard.get_text().ok().filter(|t| !t.is_empty());
+
+    // 6. 還原剪貼簿
+    restore_clipboard(&mut clipboard, &original_text);
+
+    // 7. 回傳
+    match copied_text {
+        Some(text) => {
+            eprintln!(
+                "[clipboard-paste] capture_selected_text: got {} chars",
+                text.len()
+            );
+            Ok(Some(text))
+        }
+        None => {
+            eprintln!("[clipboard-paste] capture_selected_text: no selection detected");
+            Ok(None)
+        }
+    }
+}
+
+fn restore_clipboard(clipboard: &mut Clipboard, original_text: &Option<String>) {
+    if let Some(ref text) = original_text {
+        if let Err(e) = clipboard.set_text(text) {
+            eprintln!("[clipboard-paste] failed to restore clipboard: {}", e);
+        }
     }
 }
 

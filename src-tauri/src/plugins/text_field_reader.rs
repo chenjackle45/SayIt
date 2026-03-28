@@ -22,24 +22,10 @@ pub fn read_focused_text_field() -> Result<Option<String>, String> {
 
 /// 讀取當前聚焦文字欄位中被選取（highlight）的文字。
 /// 用於編輯模式偵測：有選取文字時進入編輯模式，語音變成指令。
-/// macOS: 透過 AXSelectedText Accessibility 屬性
-/// Windows: 目前為 no-op placeholder
+/// 透過模擬 Cmd+C / Ctrl+C 擷取剪貼簿內容，不依賴 Accessibility API。
 #[tauri::command]
 pub fn read_selected_text() -> Result<Option<String>, String> {
-    #[cfg(target_os = "macos")]
-    {
-        macos::get_selected_text_impl()
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        Ok(None)
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    {
-        Ok(None)
-    }
+    super::clipboard_paste::capture_selected_text_via_clipboard()
 }
 
 // ========== macOS: AXUIElement ==========
@@ -62,7 +48,6 @@ mod macos {
     const K_AX_VALUE_ATTRIBUTE: &str = "AXValue";
     const K_AX_SELECTED_TEXT_RANGE_ATTRIBUTE: &str = "AXSelectedTextRange";
     const K_AX_ROLE_ATTRIBUTE: &str = "AXRole";
-    const K_AX_SELECTED_TEXT_ATTRIBUTE: &str = "AXSelectedText";
 
     const CONTEXT_CHARS: usize = 50;
     const FALLBACK_CHARS: usize = 100;
@@ -263,22 +248,6 @@ mod macos {
                     Ok(Some(excerpt))
                 }
             }
-            _ => Ok(None),
-        }
-    }
-
-    pub fn get_selected_text_impl() -> Result<Option<String>, String> {
-        let ctx = match resolve_focused_text_element() {
-            Some(c) => c,
-            None => return Ok(None),
-        };
-
-        let selected_text =
-            get_ax_string_attribute(ctx.target_element, K_AX_SELECTED_TEXT_ATTRIBUTE);
-        ctx.cleanup();
-
-        match selected_text {
-            Some(text) if !text.is_empty() => Ok(Some(text)),
             _ => Ok(None),
         }
     }
