@@ -2,6 +2,12 @@
 
 SayIt 版本更新紀錄。
 
+## [0.9.3] - 2026-03-28
+
+### Fixed
+
+- 簡易模式 Fn 快捷鍵在 Globe 鍵 MacBook 上一觸發就馬上送出的問題：FlagsChanged handler 從 toggle-based 改為 flag-based 偵測，只回應 keycode 63 事件
+
 ## [0.9.2] - 2026-03-28
 
 ### Added
