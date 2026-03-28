@@ -63,10 +63,11 @@
     },
     "provider": {
       "title": "LLM Provider",
-      "description": "Select the AI service for text enhancement and dictionary analysis. Groq offers free quota, OpenAI and Anthropic are paid services.",
+      "description": "Select the AI service for text enhancement and dictionary analysis. Groq and Gemini offer free quota, OpenAI and Anthropic are paid services.",
       "groq": "Groq (Free)",
-      "openai": "OpenAI",
+      "openai": "OpenAI (Recommended)",
       "anthropic": "Anthropic",
+      "gemini": "Google Gemini (Free Quota)",
       "groqNote": "Uses Groq API Key above"
     },
     "providerApiKey": {
@@ -75,7 +76,10 @@
       "openaiInstruction": "Get your API Key from OpenAI Platform",
       "anthropicInstruction": "Get your API Key from Anthropic Console",
       "goToOpenai": "Go to OpenAI Platform",
-      "goToAnthropic": "Go to Anthropic Console"
+      "goToAnthropic": "Go to Anthropic Console",
+      "geminiTitle": "Gemini API Key",
+      "geminiInstruction": "Get your API Key from Google AI Studio (free quota available)",
+      "goToGemini": "Go to Google AI Studio"
     },
     "model": {
       "title": "Model Selection",
@@ -361,8 +365,8 @@
     },
     "upgradeNotice": {
       "title": "SayIt Update Summary",
-      "item1": "Edit selected text: select text first, then trigger SayIt — your voice becomes an instruction. Say \"translate to English\" or \"make it more formal\" and AI will process and replace it directly",
-      "item2": "Paid LLM support: Groq's free models aren't smart enough, so we've added OpenAI and Anthropic. Set up your own API Key in Settings — it's a paid service, but even $10 USD makes a noticeable difference",
+      "item1": "More LLM choices: added Google Gemini (free quota), OpenAI (recommended), and Anthropic. If Groq's free models aren't smart enough, switch Provider in Settings for a much better experience",
+      "item2": "Edit selected text: select text first, then trigger SayIt — your voice becomes an instruction. Say \"translate to English\" or \"make it more formal\" and AI will process and replace it directly",
       "item3": "Combo hotkeys: use ⌘+J or similar combos as your trigger — no more accidental activations",
       "item4": "Quick mode switch: double-tap or long-press your trigger key to switch between Minimal and Active without opening settings",
       "item5": "Better mic selector: shows default device name with a volume preview bar",

@@ -63,10 +63,11 @@
     },
     "provider": {
       "title": "LLM 模型服務",
-      "description": "選擇文字整理和字典分析使用的 AI 服務。Groq 提供免費額度，OpenAI 和 Anthropic 為付費服務。",
+      "description": "選擇文字整理和字典分析使用的 AI 服務。Groq 和 Gemini 提供免費額度，OpenAI 和 Anthropic 為付費服務。",
       "groq": "Groq（免費）",
-      "openai": "OpenAI",
+      "openai": "OpenAI（推薦）",
       "anthropic": "Anthropic",
+      "gemini": "Google Gemini（免費額度）",
       "groqNote": "使用上方 Groq API Key"
     },
     "providerApiKey": {
@@ -75,7 +76,10 @@
       "openaiInstruction": "前往 OpenAI Platform 取得 API Key",
       "anthropicInstruction": "前往 Anthropic Console 取得 API Key",
       "goToOpenai": "前往 OpenAI Platform",
-      "goToAnthropic": "前往 Anthropic Console"
+      "goToAnthropic": "前往 Anthropic Console",
+      "geminiTitle": "Gemini API Key",
+      "geminiInstruction": "前往 Google AI Studio 取得 API Key（有免費額度）",
+      "goToGemini": "前往 Google AI Studio"
     },
     "model": {
       "title": "模型選擇",
@@ -361,8 +365,8 @@
     },
     "upgradeNotice": {
       "title": "SayIt 更新摘要",
-      "item1": "編輯選取文字：先選取文字再觸發 SayIt，語音就變成指令。說「翻譯成英文」或「讓語氣更正式」，AI 會直接改好貼回去",
-      "item2": "付費 LLM 支援：受不了 Groq 免費模型太笨了，所以加上 OpenAI 和 Anthropic。如果你有 API Key 可以自行設定，但要付費給 LLM 服務商。推薦儲值個 300 元，體感會好很多",
+      "item1": "更多 LLM 選擇：新增 Google Gemini（有免費額度）、OpenAI（推薦）和 Anthropic。Groq 免費模型不夠聰明的話，到設定切換 Provider 試試看，體感會好很多",
+      "item2": "編輯選取文字：先選取文字再觸發 SayIt，語音就變成指令。說「翻譯成英文」或「讓語氣更正式」，AI 會直接改好貼回去",
       "item3": "組合鍵觸發：用 ⌘+J 這樣的組合鍵啟動錄音，不怕再按錯觸發",
       "item4": "快速切模式：按兩下或長按觸發鍵，不用進設定就能切換精簡和積極模式",
       "item5": "麥克風選擇器改善：顯示預設裝置名稱，還有音量預覽條",

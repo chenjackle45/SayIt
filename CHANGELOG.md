@@ -2,6 +2,23 @@
 
 SayIt 版本更新紀錄。
 
+## [0.9.2] - 2026-03-28
+
+### Added
+
+- Google Gemini LLM Provider：支援 Gemini 2.5 Flash 和 Flash-Lite（有免費額度），新增 API Key 管理、request/response 格式轉換
+- Gemini SAFETY block 偵測：`finishReason` 非 STOP 時拋出有意義的錯誤，不再靜默 fallback
+- Gemini 單元測試：buildFetchParams + parseProviderResponse + helpers（6 個測試）
+- Tauri HTTP scope + CSP 加入 `generativelanguage.googleapis.com`
+- 升級通知合併 LLM provider 項目，新增 Gemini 說明
+- OpenAI 標示「推薦」（5 語系）
+
+### Changed
+
+- Provider 排序：Groq → Gemini → OpenAI → Anthropic（免費的在前面）
+- Provider RadioGroup 從 3 欄改 2 欄（4 個 provider 排 2×2）
+- 5 語系 provider description 加入 Gemini 有免費額度
+
 ## [0.9.1] - 2026-03-28
 
 ### Fixed

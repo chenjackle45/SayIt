@@ -91,6 +91,54 @@ describe("llmProvider.ts", () => {
       expect(body.max_tokens).toBe(2048);
     });
 
+    it("[P0] Gemini：URL 含 model、x-goog-api-key header、system_instruction 格式", () => {
+      const { url, init } = buildFetchParams("gemini", BASE_REQUEST, TEST_API_KEY);
+
+      expect(url).toBe("https://generativelanguage.googleapis.com/v1beta/models/test-model:generateContent");
+      expect(init.method).toBe("POST");
+
+      const headers = init.headers as Record<string, string>;
+      expect(headers["x-goog-api-key"]).toBe(TEST_API_KEY);
+      expect(headers.Authorization).toBeUndefined();
+
+      const body = JSON.parse(init.body as string);
+      expect(body.system_instruction.parts[0].text).toBe("You are a helper");
+      expect(body.contents).toHaveLength(1);
+      expect(body.contents[0].role).toBe("user");
+      expect(body.contents[0].parts[0].text).toBe("Hello");
+      expect(body.generationConfig.temperature).toBe(0.1);
+      expect(body.generationConfig.maxOutputTokens).toBe(2048);
+      expect(body.model).toBeUndefined();
+    });
+
+    it("[P1] Gemini：無 system message 時不含 system_instruction", () => {
+      const requestNoSystem: LlmChatRequest = {
+        model: "test-model",
+        messages: [{ role: "user", content: "Hello" }],
+        temperature: 0.5,
+      };
+      const { init } = buildFetchParams("gemini", requestNoSystem, TEST_API_KEY);
+      const body = JSON.parse(init.body as string);
+
+      expect(body.system_instruction).toBeUndefined();
+      expect(body.contents).toHaveLength(1);
+    });
+
+    it("[P1] Gemini：assistant role 轉換為 model", () => {
+      const requestWithAssistant: LlmChatRequest = {
+        model: "test-model",
+        messages: [
+          { role: "user", content: "Hi" },
+          { role: "assistant", content: "Hello" },
+          { role: "user", content: "Thanks" },
+        ],
+      };
+      const { init } = buildFetchParams("gemini", requestWithAssistant, TEST_API_KEY);
+      const body = JSON.parse(init.body as string);
+
+      expect(body.contents[1].role).toBe("model");
+    });
+
     it("[P1] Anthropic：無 system message 時不含 system 欄位", () => {
       const requestNoSystem: LlmChatRequest = {
         model: "test-model",
@@ -172,6 +220,44 @@ describe("llmProvider.ts", () => {
       });
     });
 
+    it("[P0] Gemini：candidates[0].content.parts[0].text、usageMetadata", () => {
+      const result = parseProviderResponse("gemini", {
+        candidates: [{
+          content: { parts: [{ text: "Gemini result" }] },
+          finishReason: "STOP",
+        }],
+        usageMetadata: {
+          promptTokenCount: 15,
+          candidatesTokenCount: 30,
+          totalTokenCount: 45,
+        },
+      });
+
+      expect(result.text).toBe("Gemini result");
+      expect(result.usage).toEqual({
+        promptTokens: 15,
+        completionTokens: 30,
+        totalTokens: 45,
+      });
+    });
+
+    it("[P1] Gemini：finishReason 為 SAFETY 時拋出錯誤", () => {
+      expect(() =>
+        parseProviderResponse("gemini", {
+          candidates: [{
+            content: { parts: [] },
+            finishReason: "SAFETY",
+          }],
+        }),
+      ).toThrow("Gemini blocked response (reason: SAFETY)");
+    });
+
+    it("[P1] Gemini：空 candidates 回傳空字串", () => {
+      const result = parseProviderResponse("gemini", { candidates: [] });
+      expect(result.text).toBe("");
+      expect(result.usage).toBeNull();
+    });
+
     it("[P1] 空 choices 回傳空字串", () => {
       const result = parseProviderResponse("groq", { choices: [] });
       expect(result.text).toBe("");
@@ -194,6 +280,7 @@ describe("llmProvider.ts", () => {
       expect(getProviderTimeout("groq")).toBe(5000);
       expect(getProviderTimeout("openai")).toBe(30000);
       expect(getProviderTimeout("anthropic")).toBe(30000);
+      expect(getProviderTimeout("gemini")).toBe(30000);
     });
 
     it("[P0] findProviderConfig 回傳正確設定", () => {
@@ -205,12 +292,16 @@ describe("llmProvider.ts", () => {
 
       const anthropic = findProviderConfig("anthropic");
       expect(anthropic?.baseUrl).toContain("anthropic.com");
+
+      const gemini = findProviderConfig("gemini");
+      expect(gemini?.baseUrl).toContain("googleapis.com");
     });
 
     it("[P0] getProviderIdForModel 根據 modelId 回傳 providerId", () => {
       expect(getProviderIdForModel("llama-3.3-70b-versatile")).toBe("groq");
       expect(getProviderIdForModel("gpt-5.4-mini")).toBe("openai");
       expect(getProviderIdForModel("claude-haiku-4-5-20251001")).toBe("anthropic");
+      expect(getProviderIdForModel("gemini-2.5-flash")).toBe("gemini");
     });
 
     it("[P1] getProviderIdForModel 未知模型 fallback 到 groq", () => {

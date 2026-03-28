@@ -111,6 +111,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const selectedWhisperModelId = ref<WhisperModelId>(DEFAULT_WHISPER_MODEL_ID);
   const openaiApiKey = ref<string>("");
   const anthropicApiKey = ref<string>("");
+  const geminiApiKey = ref<string>("");
   const hasLlmApiKey = computed(() => {
     switch (selectedLlmProviderId.value) {
       case "groq":
@@ -119,6 +120,8 @@ export const useSettingsStore = defineStore("settings", () => {
         return openaiApiKey.value !== "";
       case "anthropic":
         return anthropicApiKey.value !== "";
+      case "gemini":
+        return geminiApiKey.value !== "";
     }
   });
   const customTriggerKey = ref<CustomTriggerKey | ComboTriggerKey | null>(null);
@@ -158,6 +161,8 @@ export const useSettingsStore = defineStore("settings", () => {
         return openaiApiKey.value;
       case "anthropic":
         return anthropicApiKey.value;
+      case "gemini":
+        return geminiApiKey.value;
     }
   }
 
@@ -283,6 +288,8 @@ export const useSettingsStore = defineStore("settings", () => {
       openaiApiKey.value = savedOpenaiApiKey?.trim() ?? "";
       const savedAnthropicApiKey = await store.get<string>("anthropicApiKey");
       anthropicApiKey.value = savedAnthropicApiKey?.trim() ?? "";
+      const savedGeminiApiKey = await store.get<string>("geminiApiKey");
+      geminiApiKey.value = savedGeminiApiKey?.trim() ?? "";
 
       // LLM Model ID（含 Kimi K2 遷移）
       const savedLlmModelId = await store.get<string>("llmModelId");
@@ -843,6 +850,46 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveGeminiApiKey(key: string) {
+    const trimmedKey = key.trim();
+    if (trimmedKey === "") {
+      throw new Error(i18n.global.t("errors.apiKeyEmpty"));
+    }
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("geminiApiKey", trimmedKey);
+      await store.save();
+      geminiApiKey.value = trimmedKey;
+      console.log("[useSettingsStore] Gemini API Key saved");
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveGeminiApiKey failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, {
+        source: "settings",
+        step: "save-gemini-api-key",
+      });
+      throw err;
+    }
+  }
+
+  async function deleteGeminiApiKey() {
+    try {
+      const store = await load(STORE_NAME);
+      await store.delete("geminiApiKey");
+      await store.save();
+      geminiApiKey.value = "";
+      console.log("[useSettingsStore] Gemini API Key deleted");
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] deleteGeminiApiKey failed:",
+        extractErrorMessage(err),
+      );
+      throw err;
+    }
+  }
+
   async function refreshLlmApiKey() {
     try {
       const store = await load(STORE_NAME);
@@ -860,6 +907,11 @@ export const useSettingsStore = defineStore("settings", () => {
         case "anthropic": {
           const savedKey = await store.get<string>("anthropicApiKey");
           anthropicApiKey.value = savedKey?.trim() ?? "";
+          break;
+        }
+        case "gemini": {
+          const savedKey = await store.get<string>("geminiApiKey");
+          geminiApiKey.value = savedKey?.trim() ?? "";
           break;
         }
       }
@@ -1145,6 +1197,7 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedWhisperModelId = await store.get<string>("whisperModelId");
       const savedOpenaiKey = await store.get<string>("openaiApiKey");
       const savedAnthropicKey = await store.get<string>("anthropicApiKey");
+      const savedGeminiKey = await store.get<string>("geminiApiKey");
       const savedMuteOnRecording = await store.get<boolean>("muteOnRecording");
       const savedSoundEffects = await store.get<boolean>("soundEffectsEnabled");
       const savedSmartDictionary = await store.get<boolean>(
@@ -1206,6 +1259,7 @@ export const useSettingsStore = defineStore("settings", () => {
           : getDefaultModelIdForProvider(selectedLlmProviderId.value);
       openaiApiKey.value = savedOpenaiKey?.trim() ?? "";
       anthropicApiKey.value = savedAnthropicKey?.trim() ?? "";
+      geminiApiKey.value = savedGeminiKey?.trim() ?? "";
       selectedWhisperModelId.value = getEffectiveWhisperModelId(
         savedWhisperModelId ?? null,
       );
@@ -1277,6 +1331,7 @@ export const useSettingsStore = defineStore("settings", () => {
     hasLlmApiKey,
     openaiApiKey: computed(() => openaiApiKey.value),
     anthropicApiKey: computed(() => anthropicApiKey.value),
+    geminiApiKey: computed(() => geminiApiKey.value),
     getApiKey,
     getLlmApiKey,
     getAiPrompt,
@@ -1312,6 +1367,8 @@ export const useSettingsStore = defineStore("settings", () => {
     deleteOpenaiApiKey,
     saveAnthropicApiKey,
     deleteAnthropicApiKey,
+    saveGeminiApiKey,
+    deleteGeminiApiKey,
     refreshLlmApiKey,
     saveWhisperModel,
     isMuteOnRecordingEnabled,

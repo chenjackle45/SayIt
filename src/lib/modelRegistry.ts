@@ -1,6 +1,6 @@
 // ── LLM Provider ──────────────────────────────────────────
 
-export type LlmProviderId = "groq" | "openai" | "anthropic";
+export type LlmProviderId = "groq" | "openai" | "anthropic" | "gemini";
 
 export const DEFAULT_LLM_PROVIDER_ID: LlmProviderId = "groq";
 
@@ -13,7 +13,9 @@ export type LlmModelId =
   | "gpt-5.4-mini"
   | "gpt-5.4-nano"
   | "claude-haiku-4-5-20251001"
-  | "claude-3-5-haiku-20241022";
+  | "claude-3-5-haiku-20241022"
+  | "gemini-2.5-flash"
+  | "gemini-2.5-flash-lite";
 
 // ── Whisper 模型（語音轉錄用）─────────────────────────────
 
@@ -102,6 +104,31 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
     outputCostPerMillion: 0.34,
     freeQuotaRpd: 1_000,
     freeQuotaTpd: 500_000,
+    isDefault: false,
+  },
+  // ── Google Gemini（免費額度）──
+  {
+    id: "gemini-2.5-flash",
+    providerId: "gemini",
+    displayName: "Gemini 2.5 Flash",
+    badgeKey: "settings.modelBadge.balanced",
+    speedTps: 0,
+    inputCostPerMillion: 0.15,
+    outputCostPerMillion: 0.6,
+    freeQuotaRpd: 250,
+    freeQuotaTpd: 0,
+    isDefault: true,
+  },
+  {
+    id: "gemini-2.5-flash-lite",
+    providerId: "gemini",
+    displayName: "Gemini 2.5 Flash-Lite",
+    badgeKey: "settings.modelBadge.fastCheap",
+    speedTps: 0,
+    inputCostPerMillion: 0.075,
+    outputCostPerMillion: 0.3,
+    freeQuotaRpd: 1_000,
+    freeQuotaTpd: 0,
     isDefault: false,
   },
   // ── OpenAI（付費）──

@@ -63,10 +63,11 @@
     },
     "provider": {
       "title": "LLM プロバイダー",
-      "description": "テキスト整理と辞書分析に使用する AI サービスを選択します。Groq は無料枠あり、OpenAI と Anthropic は有料です。",
+      "description": "テキスト整理と辞書分析に使用する AI サービスを選択します。Groq と Gemini は無料枠あり、OpenAI と Anthropic は有料です。",
       "groq": "Groq（無料）",
-      "openai": "OpenAI",
+      "openai": "OpenAI（おすすめ）",
       "anthropic": "Anthropic",
+      "gemini": "Google Gemini（無料枠あり）",
       "groqNote": "上記の Groq API Key を使用"
     },
     "providerApiKey": {
@@ -75,7 +76,10 @@
       "openaiInstruction": "OpenAI Platform で API Key を取得",
       "anthropicInstruction": "Anthropic Console で API Key を取得",
       "goToOpenai": "OpenAI Platform へ",
-      "goToAnthropic": "Anthropic Console へ"
+      "goToAnthropic": "Anthropic Console へ",
+      "geminiTitle": "Gemini API Key",
+      "geminiInstruction": "Google AI Studio で API Key を取得してください（無料枠あり）",
+      "goToGemini": "Google AI Studio へ"
     },
     "model": {
       "title": "モデル選択",
@@ -361,8 +365,8 @@
     },
     "upgradeNotice": {
       "title": "SayIt アップデート概要",
-      "item1": "選択テキスト編集：テキストを選択してから SayIt を起動すると、音声が指示に変わります。「英語に翻訳して」「もっとフォーマルに」と言えば、AI が直接処理して置き換えます",
-      "item2": "有料 LLM 対応：Groq の無料モデルでは精度が不十分なため、OpenAI と Anthropic を追加しました。API Key をお持ちの方は設定から利用できます（LLM サービスへの課金が必要です）。1,500 円ほどチャージすると体感がかなり変わります",
+      "item1": "LLM の選択肢追加：Google Gemini（無料枠あり）、OpenAI（おすすめ）、Anthropic を追加。Groq の無料モデルで精度が足りない場合、設定で Provider を切り替えると体感がかなり変わります",
+      "item2": "選択テキスト編集：テキストを選択してから SayIt を起動すると、音声が指示に変わります。「英語に翻訳して」「もっとフォーマルに」と言えば、AI が直接処理して置き換えます",
       "item3": "コンボキー対応：⌘+J などの組み合わせキーで録音を開始でき、誤操作を防止",
       "item4": "素早いモード切替：ダブルタップまたは長押しで、設定画面を開かずに簡潔と積極を切替",
       "item5": "マイク選択の改善：デフォルトデバイス名と音量プレビューバーを表示",

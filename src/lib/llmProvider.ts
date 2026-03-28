@@ -20,6 +20,13 @@ export const LLM_PROVIDER_LIST: LlmProviderConfig[] = [
     apiKeyPrefix: "gsk_",
   },
   {
+    id: "gemini",
+    displayName: "Google Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    consoleUrl: "https://aistudio.google.com/apikey",
+    apiKeyPrefix: "AI",
+  },
+  {
     id: "openai",
     displayName: "OpenAI",
     baseUrl: "https://api.openai.com/v1/chat/completions",
@@ -47,6 +54,7 @@ const PROVIDER_TIMEOUT_MS: Record<LlmProviderId, number> = {
   groq: 5_000,
   openai: 30_000,
   anthropic: 30_000,
+  gemini: 30_000,
 };
 
 export function getProviderTimeout(providerId: LlmProviderId): number {
@@ -97,6 +105,10 @@ export function buildFetchParams(
 
   if (providerId === "anthropic") {
     return buildAnthropicFetchParams(url, request, apiKey);
+  }
+
+  if (providerId === "gemini") {
+    return buildGeminiFetchParams(url, request, apiKey);
   }
 
   return buildOpenAiCompatibleFetchParams(providerId, url, request, apiKey);
@@ -178,6 +190,56 @@ function buildAnthropicFetchParams(
   };
 }
 
+function buildGeminiFetchParams(
+  baseUrl: string,
+  request: LlmChatRequest,
+  apiKey: string,
+): { url: string; init: RequestInit } {
+  const url = `${baseUrl}/models/${request.model}:generateContent`;
+
+  // system message → system_instruction
+  const systemPartList: string[] = [];
+  const contentList: { role: string; parts: { text: string }[] }[] = [];
+
+  for (const msg of request.messages) {
+    if (msg.role === "system") {
+      systemPartList.push(msg.content);
+    } else {
+      contentList.push({
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: [{ text: msg.content }],
+      });
+    }
+  }
+
+  const body: Record<string, unknown> = { contents: contentList };
+  if (systemPartList.length > 0) {
+    body.system_instruction = {
+      parts: [{ text: systemPartList.join("\n\n") }],
+    };
+  }
+
+  const generationConfig: Record<string, unknown> = {};
+  if (request.temperature !== undefined)
+    generationConfig.temperature = request.temperature;
+  if (request.maxTokens !== undefined)
+    generationConfig.maxOutputTokens = request.maxTokens;
+  if (Object.keys(generationConfig).length > 0)
+    body.generationConfig = generationConfig;
+
+  return {
+    url,
+    init: {
+      method: "POST",
+      headers: {
+        "x-goog-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  };
+}
+
 // ── Provider-aware response 解析 ──────────────────────────
 
 interface OpenAiCompatibleResponse {
@@ -200,6 +262,18 @@ interface AnthropicResponse {
   };
 }
 
+interface GeminiResponse {
+  candidates?: {
+    content?: { parts?: { text: string }[] };
+    finishReason?: string;
+  }[];
+  usageMetadata?: {
+    promptTokenCount: number;
+    candidatesTokenCount: number;
+    totalTokenCount: number;
+  };
+}
+
 export function parseProviderResponse(
   providerId: LlmProviderId,
   json: unknown,
@@ -216,6 +290,9 @@ export function parseProviderResponse(
 
   if (providerId === "anthropic") {
     return parseAnthropicResponse(data as unknown as AnthropicResponse);
+  }
+  if (providerId === "gemini") {
+    return parseGeminiResponse(data as unknown as GeminiResponse);
   }
   return parseOpenAiCompatibleResponse(
     providerId,
@@ -261,6 +338,29 @@ function parseAnthropicResponse(data: AnthropicResponse): LlmChatResult {
       promptTokens: inputTokens,
       completionTokens: outputTokens,
       totalTokens: inputTokens + outputTokens,
+    };
+  }
+
+  return { text, usage };
+}
+
+function parseGeminiResponse(data: GeminiResponse): LlmChatResult {
+  const candidate = data.candidates?.[0];
+  const finishReason = candidate?.finishReason;
+  if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
+    throw new Error(`Gemini blocked response (reason: ${finishReason})`);
+  }
+
+  const text = candidate?.content?.parts?.[0]?.text?.trim() ?? "";
+  let usage: LlmUsageData | null = null;
+
+  if (data.usageMetadata) {
+    const promptTokens = data.usageMetadata.promptTokenCount ?? 0;
+    const completionTokens = data.usageMetadata.candidatesTokenCount ?? 0;
+    usage = {
+      promptTokens,
+      completionTokens,
+      totalTokens: data.usageMetadata.totalTokenCount ?? promptTokens + completionTokens,
     };
   }
 

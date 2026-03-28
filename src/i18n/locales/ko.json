@@ -63,10 +63,11 @@
     },
     "provider": {
       "title": "LLM 제공업체",
-      "description": "텍스트 정리와 사전 분석에 사용할 AI 서비스를 선택하세요. Groq는 무료 할당량을 제공하며, OpenAI와 Anthropic는 유료입니다.",
+      "description": "텍스트 정리와 사전 분석에 사용할 AI 서비스를 선택하세요. Groq와 Gemini는 무료 할당량을 제공하며, OpenAI와 Anthropic는 유료입니다.",
       "groq": "Groq (무료)",
-      "openai": "OpenAI",
+      "openai": "OpenAI (추천)",
       "anthropic": "Anthropic",
+      "gemini": "Google Gemini (무료 할당량)",
       "groqNote": "위의 Groq API Key 사용"
     },
     "providerApiKey": {
@@ -75,7 +76,10 @@
       "openaiInstruction": "OpenAI Platform에서 API Key를 받으세요",
       "anthropicInstruction": "Anthropic Console에서 API Key를 받으세요",
       "goToOpenai": "OpenAI Platform으로 이동",
-      "goToAnthropic": "Anthropic Console로 이동"
+      "goToAnthropic": "Anthropic Console로 이동",
+      "geminiTitle": "Gemini API Key",
+      "geminiInstruction": "Google AI Studio에서 API Key를 받으세요 (무료 할당량 제공)",
+      "goToGemini": "Google AI Studio로 이동"
     },
     "model": {
       "title": "모델 선택",
@@ -361,8 +365,8 @@
     },
     "upgradeNotice": {
       "title": "SayIt 업데이트 요약",
-      "item1": "선택 텍스트 편집: 텍스트를 선택한 후 SayIt을 실행하면 음성이 지시가 됩니다. \"영어로 번역해\" 또는 \"더 격식 있게\"라고 말하면 AI가 직접 처리하여 교체합니다",
-      "item2": "유료 LLM 지원: Groq 무료 모델이 너무 부족해서 OpenAI와 Anthropic를 추가했습니다. API Key가 있으면 설정에서 직접 입력할 수 있지만, LLM 서비스에 비용이 발생합니다. 5,000원 정도 충전하면 체감이 확 달라집니다",
+      "item1": "LLM 선택지 추가: Google Gemini(무료 할당량), OpenAI(추천), Anthropic 추가. Groq 무료 모델이 부족하다면 설정에서 Provider를 전환해보세요, 체감이 확 달라집니다",
+      "item2": "선택 텍스트 편집: 텍스트를 선택한 후 SayIt을 실행하면 음성이 지시가 됩니다. \"영어로 번역해\" 또는 \"더 격식 있게\"라고 말하면 AI가 직접 처리하여 교체합니다",
       "item3": "콤보 키 트리거: ⌘+J 같은 조합키로 녹음 시작 — 실수로 눌릴 걱정 없음",
       "item4": "빠른 모드 전환: 더블탭 또는 길게 눌러 설정 없이 간결과 적극 모드 전환",
       "item5": "마이크 선택기 개선: 기본 장치 이름과 볼륨 미리보기 바 표시",

@@ -545,8 +545,10 @@ async function handleLlmModelChange(newId: LlmModelId) {
 const providerFeedback = useFeedbackMessage();
 const openaiApiKeyInput = ref("");
 const anthropicApiKeyInput = ref("");
+const geminiApiKeyInput = ref("");
 const isOpenaiApiKeyVisible = ref(false);
 const isAnthropicApiKeyVisible = ref(false);
+const isGeminiApiKeyVisible = ref(false);
 
 async function handleProviderChange(providerId: LlmProviderId) {
   try {
@@ -589,6 +591,25 @@ async function handleSaveAnthropicApiKey() {
 async function handleDeleteAnthropicApiKey() {
   try {
     await settingsStore.deleteAnthropicApiKey();
+    providerFeedback.show("success", t("settings.apiKey.deleted"));
+  } catch (err) {
+    providerFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleSaveGeminiApiKey() {
+  try {
+    await settingsStore.saveGeminiApiKey(geminiApiKeyInput.value);
+    geminiApiKeyInput.value = "";
+    providerFeedback.show("success", t("settings.apiKey.saved"));
+  } catch (err) {
+    providerFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleDeleteGeminiApiKey() {
+  try {
+    await settingsStore.deleteGeminiApiKey();
     providerFeedback.show("success", t("settings.apiKey.deleted"));
   } catch (err) {
     providerFeedback.show("error", extractErrorMessage(err));
@@ -1172,7 +1193,7 @@ onBeforeUnmount(() => {
           <p class="text-xs text-muted-foreground">{{ $t("settings.provider.description") }}</p>
           <RadioGroup
             :model-value="settingsStore.selectedLlmProviderId"
-            class="grid grid-cols-3 gap-2"
+            class="grid grid-cols-2 gap-2"
             @update:model-value="(v: unknown) => handleProviderChange(v as LlmProviderId)"
           >
             <Label
@@ -1260,6 +1281,41 @@ onBeforeUnmount(() => {
             {{ $t("settings.providerApiKey.anthropicInstruction") }}
             ·
             <a :href="findProviderConfig('anthropic')?.consoleUrl" target="_blank" rel="noopener noreferrer" class="underline">{{ $t("settings.providerApiKey.goToAnthropic") }}</a>
+          </p>
+        </div>
+
+        <div v-else-if="settingsStore.selectedLlmProviderId === 'gemini'" class="space-y-2">
+          <Label for="gemini-api-key">{{ $t("settings.providerApiKey.geminiTitle") }}</Label>
+          <div v-if="settingsStore.geminiApiKey" class="flex items-center gap-2">
+            <Input
+              id="gemini-api-key"
+              :model-value="isGeminiApiKeyVisible ? settingsStore.geminiApiKey : '••••••••••'"
+              readonly
+              class="flex-1 font-mono text-xs"
+            />
+            <Button variant="ghost" size="sm" @click="isGeminiApiKeyVisible = !isGeminiApiKeyVisible">
+              {{ isGeminiApiKeyVisible ? $t('settings.apiKey.hide') : $t('settings.apiKey.show') }}
+            </Button>
+            <Button variant="ghost" size="sm" class="text-destructive" @click="handleDeleteGeminiApiKey">
+              {{ $t('settings.apiKey.delete') }}
+            </Button>
+          </div>
+          <div v-else class="flex gap-2">
+            <Input
+              id="gemini-api-key"
+              v-model="geminiApiKeyInput"
+              type="password"
+              :placeholder="findProviderConfig('gemini')?.apiKeyPrefix + '...'"
+              class="flex-1 font-mono text-xs"
+            />
+            <Button size="sm" :disabled="!geminiApiKeyInput.trim()" @click="handleSaveGeminiApiKey">
+              {{ $t('common.save') }}
+            </Button>
+          </div>
+          <p class="text-xs text-muted-foreground">
+            {{ $t("settings.providerApiKey.geminiInstruction") }}
+            ·
+            <a :href="findProviderConfig('gemini')?.consoleUrl" target="_blank" rel="noopener noreferrer" class="underline">{{ $t("settings.providerApiKey.goToGemini") }}</a>
           </p>
         </div>
 
