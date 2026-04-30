@@ -2,6 +2,12 @@
 
 SayIt 版本更新紀錄。
 
+## [0.9.5] - 2026-05-01
+
+### Fixed
+
+- 同時啟動多個 SayIt 實例造成熱鍵觸發後重複錄音、重複貼上的問題（Windows 受影響，macOS 因 Launch Services 預設單例較少觸發）：導入 `tauri-plugin-single-instance`，第二個實例啟動時立即退出，並把現有實例的 Dashboard 視窗叫到前景
+
 ## [0.9.4] - 2026-04-07
 
 ### Fixed
