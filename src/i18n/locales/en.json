@@ -374,6 +374,7 @@
       "item7": "Mode switch confirmation: a visual indicator appears on screen when you switch modes",
       "item8": "Toggle mode paste fix: resolved an issue where text was pasted twice in certain scenarios",
       "item9": "Usage note: SayIt is designed for quick voice-to-text dictation. Long meeting recordings are not yet supported, but we're working on it for future updates",
+      "item10": "No more duplicate pastes: launching SayIt twice (especially on Windows) used to cause hotkeys to record and paste twice — now the second launch refocuses the existing window instead",
       "dismiss": "Got it"
     }
   },
