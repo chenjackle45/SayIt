@@ -118,7 +118,7 @@ describe("enhancer.ts", () => {
       const body = JSON.parse(callArgs[1].body);
       expect(body.model).toBe("llama-3.3-70b-versatile");
       expect(body.temperature).toBe(0.1);
-      expect(body.max_tokens).toBe(2048);
+      expect(body.max_tokens).toBe(8192);
       expect(body.messages).toHaveLength(2);
       expect(body.messages[0].role).toBe("system");
       expect(body.messages[1].role).toBe("user");
@@ -161,7 +161,7 @@ describe("enhancer.ts", () => {
       expect(body.system).toBeDefined();
       expect(body.messages).toHaveLength(1);
       expect(body.messages[0].role).toBe("user");
-      expect(body.max_tokens).toBe(2048);
+      expect(body.max_tokens).toBe(8192);
     });
 
     it("[P0] 應 trim 回傳的文字", async () => {
