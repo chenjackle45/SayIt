@@ -1409,6 +1409,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         lastFailedAudioFilePath.value = audioFilePath;
         lastFailedRecordingDurationMs.value = recordingDurationMs;
         lastFailedPeakEnergyLevel.value = peakEnergyLevel;
+        lastFailedRmsEnergyLevel.value = rmsEnergyLevel;
       }
 
       const userMessage = getTranscriptionErrorMessage(error);
