@@ -33,3 +33,6 @@ playwright/.auth/
 # Tauri signing keys
 *.key
 *.key.pub
+
+# Auto-generated documentation scanner output
+docs/project-scan-report.json
