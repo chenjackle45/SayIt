@@ -81,6 +81,11 @@
       "geminiInstruction": "Get your API Key from Google AI Studio (free quota available)",
       "goToGemini": "Go to Google AI Studio"
     },
+    "connectionTest": {
+      "button": "Test connection",
+      "testing": "Testing...",
+      "success": "Connected ({ms}ms)"
+    },
     "model": {
       "title": "Model Selection",
       "description": "Choose the AI models for speech transcription and text enhancement. Faster models respond quicker, while larger models offer better quality.",

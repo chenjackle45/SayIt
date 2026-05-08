@@ -81,6 +81,11 @@
       "geminiInstruction": "Google AI Studio で API Key を取得してください（無料枠あり）",
       "goToGemini": "Google AI Studio へ"
     },
+    "connectionTest": {
+      "button": "接続テスト",
+      "testing": "テスト中...",
+      "success": "接続成功（{ms}ms）"
+    },
     "model": {
       "title": "モデル選択",
       "description": "音声文字起こしとテキスト整理に使用する AI モデルを選択します。高速なモデルはより即時に応答し、大型モデルはより高品質です。",

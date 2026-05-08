@@ -440,9 +440,7 @@ fn run_recording_thread(
         return;
     }
 
-    println!(
-        "[audio-recorder] Recording started ({sample_rate}Hz, {channels}ch)"
-    );
+    println!("[audio-recorder] Recording started ({sample_rate}Hz, {channels}ch)");
     let _ = ready_tx.send(Ok(sample_rate));
 
     // ── Keep stream alive until told to stop ──
@@ -456,7 +454,9 @@ fn run_recording_thread(
     // 已知限制：非預設裝置仍會因 Arc cycle 洩漏 ~1-2 KB/次（StreamInner + listener）。
     if let Err(e) = stream.pause() {
         // ⚠️ 安全相關：pause 失敗意味著麥克風可能仍在捕獲，且 drop 也無法停止
-        eprintln!("[audio-recorder] SECURITY: Failed to pause stream, mic may remain active: {e:?}");
+        eprintln!(
+            "[audio-recorder] SECURITY: Failed to pause stream, mic may remain active: {e:?}"
+        );
     }
     drop(stream);
     println!("[audio-recorder] Recording stopped, stream released");
@@ -489,7 +489,11 @@ fn run_preview_thread(
     println!(
         "[audio-preview] Using device: '{}' (requested: '{}')",
         device.name().unwrap_or_else(|_| "<unknown>".to_string()),
-        if device_name.is_empty() { "<system-default>" } else { &device_name }
+        if device_name.is_empty() {
+            "<system-default>"
+        } else {
+            &device_name
+        }
     );
 
     // ── 輸入格式 ──
@@ -511,16 +515,36 @@ fn run_preview_thread(
     let config = selection.supported_config.config();
 
     let build_result = match sample_format {
-        cpal::SampleFormat::I8 => build_preview_stream::<i8>(&device, &config, channels, accumulator_for_callback),
-        cpal::SampleFormat::I16 => build_preview_stream::<i16>(&device, &config, channels, accumulator_for_callback),
-        cpal::SampleFormat::I32 => build_preview_stream::<i32>(&device, &config, channels, accumulator_for_callback),
-        cpal::SampleFormat::I64 => build_preview_stream::<i64>(&device, &config, channels, accumulator_for_callback),
-        cpal::SampleFormat::U8 => build_preview_stream::<u8>(&device, &config, channels, accumulator_for_callback),
-        cpal::SampleFormat::U16 => build_preview_stream::<u16>(&device, &config, channels, accumulator_for_callback),
-        cpal::SampleFormat::U32 => build_preview_stream::<u32>(&device, &config, channels, accumulator_for_callback),
-        cpal::SampleFormat::U64 => build_preview_stream::<u64>(&device, &config, channels, accumulator_for_callback),
-        cpal::SampleFormat::F32 => build_preview_stream::<f32>(&device, &config, channels, accumulator_for_callback),
-        cpal::SampleFormat::F64 => build_preview_stream::<f64>(&device, &config, channels, accumulator_for_callback),
+        cpal::SampleFormat::I8 => {
+            build_preview_stream::<i8>(&device, &config, channels, accumulator_for_callback)
+        }
+        cpal::SampleFormat::I16 => {
+            build_preview_stream::<i16>(&device, &config, channels, accumulator_for_callback)
+        }
+        cpal::SampleFormat::I32 => {
+            build_preview_stream::<i32>(&device, &config, channels, accumulator_for_callback)
+        }
+        cpal::SampleFormat::I64 => {
+            build_preview_stream::<i64>(&device, &config, channels, accumulator_for_callback)
+        }
+        cpal::SampleFormat::U8 => {
+            build_preview_stream::<u8>(&device, &config, channels, accumulator_for_callback)
+        }
+        cpal::SampleFormat::U16 => {
+            build_preview_stream::<u16>(&device, &config, channels, accumulator_for_callback)
+        }
+        cpal::SampleFormat::U32 => {
+            build_preview_stream::<u32>(&device, &config, channels, accumulator_for_callback)
+        }
+        cpal::SampleFormat::U64 => {
+            build_preview_stream::<u64>(&device, &config, channels, accumulator_for_callback)
+        }
+        cpal::SampleFormat::F32 => {
+            build_preview_stream::<f32>(&device, &config, channels, accumulator_for_callback)
+        }
+        cpal::SampleFormat::F64 => {
+            build_preview_stream::<f64>(&device, &config, channels, accumulator_for_callback)
+        }
         other => Err(format!("Unsupported sample format: {other}")),
     };
 
@@ -630,11 +654,7 @@ where
 
 /// 共用裝置選擇邏輯（F10 fix: 消除 recording/preview 間的重複）
 /// WORKAROUND: cpal 0.15.3 macOS CoreAudio 的 Arc cycle — 優先 default_input_device() 路徑
-fn select_input_device(
-    host: &cpal::Host,
-    device_name: &str,
-    tag: &str,
-) -> Option<cpal::Device> {
+fn select_input_device(host: &cpal::Host, device_name: &str, tag: &str) -> Option<cpal::Device> {
     if device_name.is_empty() {
         host.default_input_device()
     } else {
@@ -653,13 +673,9 @@ fn select_input_device(
             let found = host
                 .input_devices()
                 .ok()
-                .and_then(|mut devices| {
-                    devices.find(|d| d.name().is_ok_and(|n| n == device_name))
-                });
+                .and_then(|mut devices| devices.find(|d| d.name().is_ok_and(|n| n == device_name)));
             if found.is_none() {
-                println!(
-                    "[{tag}] Device '{device_name}' not found, falling back to default"
-                );
+                println!("[{tag}] Device '{device_name}' not found, falling back to default");
             }
             found.or(default_device)
         }
@@ -700,9 +716,7 @@ fn determine_input_config(
     let sr = supported_config.sample_rate().0;
     let ch = supported_config.channels();
 
-    println!(
-        "[audio-recorder] 16 kHz not supported, using device default: {sr}Hz, {ch}ch"
-    );
+    println!("[audio-recorder] 16 kHz not supported, using device default: {sr}Hz, {ch}ch");
 
     Ok(InputConfigSelection {
         supported_config,
@@ -846,7 +860,7 @@ where
 
 // ========== WAV Encoding ==========
 
-fn encode_wav(samples: &[i16], sample_rate: u32) -> Result<Vec<u8>, AudioRecorderError> {
+pub(super) fn encode_wav(samples: &[i16], sample_rate: u32) -> Result<Vec<u8>, AudioRecorderError> {
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate,
@@ -896,8 +910,7 @@ pub fn save_recording_file(
         .map_err(|e| format!("Failed to create recordings dir: {e}"))?;
 
     let file_path = recordings_dir.join(format!("{id}.wav"));
-    std::fs::write(&file_path, &wav_data)
-        .map_err(|e| format!("Failed to write WAV file: {e}"))?;
+    std::fs::write(&file_path, &wav_data).map_err(|e| format!("Failed to write WAV file: {e}"))?;
 
     println!(
         "[audio-recorder] Recording saved: {} ({} bytes)",
@@ -916,8 +929,8 @@ pub fn read_recording_file(id: String, app: AppHandle) -> Result<Response, Strin
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
 
     let file_path = app_data_dir.join("recordings").join(format!("{id}.wav"));
-    let data = std::fs::read(&file_path)
-        .map_err(|e| format!("Failed to read recording file: {e}"))?;
+    let data =
+        std::fs::read(&file_path).map_err(|e| format!("Failed to read recording file: {e}"))?;
     Ok(Response::new(data))
 }
 

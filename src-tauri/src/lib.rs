@@ -444,6 +444,7 @@ pub fn run() {
             plugins::audio_recorder::cleanup_old_recordings,
             plugins::transcription::transcribe_audio,
             plugins::transcription::retranscribe_from_file,
+            plugins::transcription::test_whisper_connection,
             plugins::sound_feedback::play_start_sound,
             plugins::sound_feedback::play_stop_sound,
             plugins::sound_feedback::play_error_sound,

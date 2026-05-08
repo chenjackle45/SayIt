@@ -81,6 +81,11 @@
       "geminiInstruction": "前往 Google AI Studio 取得 API Key（有免費額度）",
       "goToGemini": "前往 Google AI Studio"
     },
+    "connectionTest": {
+      "button": "測試連線",
+      "testing": "測試中...",
+      "success": "測試成功（{ms}ms）"
+    },
     "model": {
       "title": "模型選擇",
       "description": "選擇語音轉錄和文字整理使用的 AI 模型。速度較快的模型回應更即時，較大的模型品質更好。",

@@ -273,6 +273,26 @@ pub async fn retranscribe_from_file(
     .await
 }
 
+#[command]
+pub async fn test_whisper_connection(
+    transcription_state: State<'_, TranscriptionState>,
+    api_key: String,
+    model_id: Option<String>,
+) -> Result<(), TranscriptionError> {
+    if api_key.trim().is_empty() {
+        return Err(TranscriptionError::ApiKeyMissing);
+    }
+
+    // 1 秒 16kHz silence ≈ 32044 bytes，遠超過 MINIMUM_AUDIO_SIZE 的 1000 byte 下限。
+    let silence_samples = vec![0i16; 16_000];
+    let wav_data = super::audio_recorder::encode_wav(&silence_samples, 16_000)
+        .map_err(|e| TranscriptionError::RequestFailed(e.to_string()))?;
+
+    send_transcription_request(wav_data, &transcription_state, api_key, None, model_id, None)
+        .await
+        .map(|_| ())
+}
+
 // ========== Tests ==========
 
 #[cfg(test)]

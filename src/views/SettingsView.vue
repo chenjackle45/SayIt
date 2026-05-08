@@ -94,6 +94,11 @@ import {
 } from "lucide-vue-next";
 import type { AudioInputDeviceInfo } from "../types/audio";
 import { useAudioPreview } from "../composables/useAudioPreview";
+import ConnectionTestButton from "../components/ConnectionTestButton.vue";
+import {
+  testLlmConnection,
+  testWhisperConnection,
+} from "../lib/connectionTest";
 
 const settingsStore = useSettingsStore();
 const historyStore = useHistoryStore();
@@ -1183,6 +1188,10 @@ onBeforeUnmount(() => {
             </SelectContent>
           </Select>
           <p class="text-xs text-muted-foreground">{{ whisperModelDescription }}</p>
+          <ConnectionTestButton
+            :on-test="() => testWhisperConnection(settingsStore.selectedWhisperModelId, settingsStore.getApiKey())"
+            :disabled="!settingsStore.hasApiKey"
+          />
         </div>
 
         <Separator />
@@ -1318,6 +1327,11 @@ onBeforeUnmount(() => {
             <a :href="findProviderConfig('gemini')?.consoleUrl" target="_blank" rel="noopener noreferrer" class="underline">{{ $t("settings.providerApiKey.goToGemini") }}</a>
           </p>
         </div>
+
+        <ConnectionTestButton
+          :on-test="() => testLlmConnection(settingsStore.selectedLlmModelId, settingsStore.getLlmApiKey())"
+          :disabled="!settingsStore.hasLlmApiKey"
+        />
 
         <transition name="feedback-fade">
           <p
