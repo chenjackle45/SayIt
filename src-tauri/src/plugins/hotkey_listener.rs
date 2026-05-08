@@ -930,6 +930,7 @@ mod windows_hook {
     const VK_LMENU: u32 = 0xA4;
     const VK_RMENU: u32 = 0xA5;
     const VK_ESCAPE: u32 = 0x1B;
+    const VK_F23: u32 = 0x86;
 
     // Windows modifier VK codes for combo detection
     const VK_LWIN: u32 = 0x5B;
@@ -1110,6 +1111,10 @@ mod windows_hook {
         if n_code >= 0 {
             if let Some(ctx) = CONTEXT.get() {
                 let kbd = *(l_param.0 as *const KBDLLHOOKSTRUCT);
+                // Ignore Copilot's dedicated VK_F23 signal to avoid interfering with Quick View.
+                if kbd.vkCode == VK_F23 {
+                    return CallNextHookEx(None, n_code, w_param, l_param);
+                }
                 let w = w_param.0 as u32;
 
                 let is_key_down = w == WM_KEYDOWN || w == WM_SYSKEYDOWN;
