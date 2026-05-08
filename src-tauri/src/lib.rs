@@ -38,7 +38,7 @@ fn configure_macos_notch_window(window: &tauri::WebviewWindow) {
             println!("[macos] Notch window configured: level=27");
         }
         Err(e) => {
-            eprintln!("[macos] Failed to get NSWindow: {}", e);
+            eprintln!("[macos] Failed to get NSWindow: {e}");
         }
     }
 }
@@ -90,9 +90,9 @@ fn request_app_restart<R: Runtime>(app: AppHandle<R>) {
 #[command]
 fn debug_log(level: String, message: String) {
     match level.as_str() {
-        "error" => eprintln!("[webview:ERROR] {}", message),
-        "warn" => println!("[webview:WARN] {}", message),
-        _ => println!("[webview] {}", message),
+        "error" => eprintln!("[webview:ERROR] {message}"),
+        "warn" => println!("[webview:WARN] {message}"),
+        _ => println!("[webview] {message}"),
     }
 }
 
@@ -104,8 +104,7 @@ fn update_hotkey_config(
 ) -> Result<(), String> {
     let state = app.state::<plugins::hotkey_listener::HotkeyListenerState>();
     println!(
-        "[hotkey-listener] Config updated: key={:?}, mode={:?}",
-        trigger_key, trigger_mode
+        "[hotkey-listener] Config updated: key={trigger_key:?}, mode={trigger_mode:?}"
     );
     state.update_config(trigger_key, trigger_mode);
     Ok(())
@@ -495,15 +494,13 @@ pub fn run() {
                 #[cfg(target_os = "windows")]
                 configure_windows_topmost_window(&window);
 
-                if let Ok(monitor) = window.current_monitor() {
-                    if let Some(monitor) = monitor {
-                        let x = calculate_centered_window_x(
-                            monitor.size().width,
-                            monitor.scale_factor(),
-                            HUD_WINDOW_WIDTH_LOGICAL,
-                        );
-                        let _ = window.set_position(tauri::PhysicalPosition::new(x, 0));
-                    }
+                if let Ok(Some(monitor)) = window.current_monitor() {
+                    let x = calculate_centered_window_x(
+                        monitor.size().width,
+                        monitor.scale_factor(),
+                        HUD_WINDOW_WIDTH_LOGICAL,
+                    );
+                    let _ = window.set_position(tauri::PhysicalPosition::new(x, 0));
                 }
             }
 
@@ -562,13 +559,13 @@ pub fn run() {
                     if RESTART_REQUESTED.load(Ordering::SeqCst) {
                         match std::env::current_exe() {
                             Ok(exe_path) => {
-                                println!("[app] Spawning new process for restart: {:?}", exe_path);
+                                println!("[app] Spawning new process for restart: {exe_path:?}");
                                 match std::process::Command::new(&exe_path).spawn() {
                                     Ok(_) => println!("[app] New process spawned successfully"),
-                                    Err(e) => eprintln!("[app] Failed to spawn new process: {}", e),
+                                    Err(e) => eprintln!("[app] Failed to spawn new process: {e}"),
                                 }
                             }
-                            Err(e) => eprintln!("[app] Failed to get current exe path: {}", e),
+                            Err(e) => eprintln!("[app] Failed to get current exe path: {e}"),
                         }
                     }
 

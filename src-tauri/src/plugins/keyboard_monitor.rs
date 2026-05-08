@@ -128,8 +128,7 @@ fn emit_quality_result<R: Runtime>(app_handle: &AppHandle<R>, was_modified: bool
     let _ = app_handle.emit("quality-monitor:result", payload);
     #[cfg(debug_assertions)]
     println!(
-        "[keyboard-monitor] Emitted quality result: wasModified={}",
-        was_modified
+        "[keyboard-monitor] Emitted quality result: wasModified={was_modified}"
     );
 }
 
@@ -147,8 +146,7 @@ fn emit_correction_result<R: Runtime>(
     let _ = app_handle.emit("correction-monitor:result", payload);
     #[cfg(debug_assertions)]
     println!(
-        "[keyboard-monitor] Emitted correction result: anyKeyPressed={}, enterPressed={}, idleTimeout={}",
-        any_key_pressed, enter_pressed, idle_timeout
+        "[keyboard-monitor] Emitted correction result: anyKeyPressed={any_key_pressed}, enterPressed={enter_pressed}, idleTimeout={idle_timeout}"
     );
 }
 
@@ -187,16 +185,14 @@ fn run_persistent_event_tap(
             ) as u16;
 
             // Quality monitor logic (unchanged)
-            if is_monitoring.load(Ordering::SeqCst) {
-                if keycode == macos_keycodes::BACKSPACE || keycode == macos_keycodes::DELETE {
+            if is_monitoring.load(Ordering::SeqCst)
+                && (keycode == macos_keycodes::BACKSPACE || keycode == macos_keycodes::DELETE) {
                     was_modified.store(true, Ordering::SeqCst);
                     #[cfg(debug_assertions)]
                     println!(
-                        "[keyboard-monitor] Quality: detected modify key: keycode={}",
-                        keycode
+                        "[keyboard-monitor] Quality: detected modify key: keycode={keycode}"
                     );
                 }
-            }
 
             // Correction monitor logic (independent)
             if correction_monitoring.load(Ordering::SeqCst) {
@@ -466,7 +462,7 @@ pub fn start_correction_monitor<R: Runtime>(app: AppHandle<R>) {
                 let key_time_at_enter = last_key_time.lock().map(|t| *t).unwrap_or(enter_time);
 
                 #[cfg(debug_assertions)]
-                println!("[keyboard-monitor] Correction: Enter debounce started ({}ms)", CORRECTION_ENTER_DEBOUNCE_MS);
+                println!("[keyboard-monitor] Correction: Enter debounce started ({CORRECTION_ENTER_DEBOUNCE_MS}ms)");
 
                 let mut ime_followup = false;
                 while enter_time.elapsed() < Duration::from_millis(CORRECTION_ENTER_DEBOUNCE_MS) {

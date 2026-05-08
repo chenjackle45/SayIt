@@ -192,8 +192,7 @@ async fn send_transcription_request(
     let transcription_duration_ms = start_time.elapsed().as_secs_f64() * 1000.0;
 
     println!(
-        "[transcription] Response in {:.0}ms: \"{}\" (noSpeechProb={:.3})",
-        transcription_duration_ms, raw_text, no_speech_probability
+        "[transcription] Response in {transcription_duration_ms:.0}ms: \"{raw_text}\" (noSpeechProb={no_speech_probability:.3})"
     );
 
     Ok(TranscriptionResult {
@@ -254,7 +253,7 @@ pub async fn retranscribe_from_file(
     // 注意：std::fs::read 是同步 I/O，但 WAV 檔案通常很小（< 1MB），
     // 在 Tauri command 的 async context 中可接受。
     let wav_data = std::fs::read(&file_path).map_err(|e| {
-        TranscriptionError::RequestFailed(format!("Failed to read WAV file: {}", e))
+        TranscriptionError::RequestFailed(format!("Failed to read WAV file: {e}"))
     })?;
 
     println!(
@@ -296,7 +295,7 @@ mod tests {
 
     #[test]
     fn test_format_whisper_prompt_exceeds_max() {
-        let terms: Vec<String> = (0..100).map(|i| format!("term{}", i)).collect();
+        let terms: Vec<String> = (0..100).map(|i| format!("term{i}")).collect();
         let result = format_whisper_prompt(&terms);
         // Should only include first 30 terms
         let parts: Vec<&str> = result

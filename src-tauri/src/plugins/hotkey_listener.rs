@@ -379,7 +379,7 @@ fn check_accessibility_permission() -> bool {
         fn AXIsProcessTrusted() -> bool;
     }
     let trusted = unsafe { AXIsProcessTrusted() };
-    println!("[hotkey-listener] AXIsProcessTrusted = {}", trusted);
+    println!("[hotkey-listener] AXIsProcessTrusted = {trusted}");
     trusted
 }
 
@@ -387,7 +387,7 @@ fn check_accessibility_permission() -> bool {
 pub fn check_accessibility_permission_command() -> bool {
     #[cfg(target_os = "macos")]
     {
-        return check_accessibility_permission();
+        check_accessibility_permission()
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -593,8 +593,7 @@ fn handle_recording_event_macos<R: Runtime>(
                 shared.recording.reset();
                 drop(shared);
                 println!(
-                    "[hotkey-listener] recording: captured single modifier keycode={}",
-                    last_kc
+                    "[hotkey-listener] recording: captured single modifier keycode={last_kc}"
                 );
                 let _ = app_handle.emit(
                     "hotkey:recording-captured",
@@ -634,8 +633,7 @@ fn handle_recording_event_macos<R: Runtime>(
             shared.recording.reset();
             drop(shared);
             println!(
-                "[hotkey-listener] recording: captured keycode={}, modifiers={:?}",
-                keycode, mods
+                "[hotkey-listener] recording: captured keycode={keycode}, modifiers={mods:?}"
             );
             let _ = app_handle.emit(
                 "hotkey:recording-captured",
@@ -1339,7 +1337,7 @@ mod tests {
         ];
         for (json_str, expected) in presets {
             let deserialized: TriggerKey = serde_json::from_str(json_str).unwrap();
-            assert_eq!(deserialized, expected, "Failed for {}", json_str);
+            assert_eq!(deserialized, expected, "Failed for {json_str}");
         }
     }
 

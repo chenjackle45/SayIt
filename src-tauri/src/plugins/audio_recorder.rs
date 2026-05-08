@@ -163,7 +163,7 @@ pub fn start_audio_preview(
         .spawn(move || {
             run_preview_thread(app, should_stop_for_thread, device_name, ready_tx);
         })
-        .map_err(|e| format!("Thread spawn failed: {}", e))?;
+        .map_err(|e| format!("Thread spawn failed: {e}"))?;
 
     // 等待 stream 建立成功/失敗
     match ready_rx.recv() {
@@ -248,12 +248,12 @@ pub fn get_default_input_device_name() -> Option<String> {
     let result = host.default_input_device().and_then(|d| {
         d.name()
             .map_err(|e| {
-                eprintln!("[audio-recorder] Failed to get default device name: {}", e);
+                eprintln!("[audio-recorder] Failed to get default device name: {e}");
                 e
             })
             .ok()
     });
-    println!("[audio-recorder] Default input device: {:?}", result);
+    println!("[audio-recorder] Default input device: {result:?}");
     result
 }
 
@@ -297,7 +297,7 @@ pub fn start_recording(
         .spawn(move || {
             run_recording_thread(app, inner_for_thread, ready_tx, device_name_for_thread);
         })
-        .map_err(|e| AudioRecorderError::BuildStream(format!("Thread spawn failed: {}", e)))?;
+        .map_err(|e| AudioRecorderError::BuildStream(format!("Thread spawn failed: {e}")))?;
 
     // Wait for the recording thread to report success or failure
     match ready_rx.recv() {
@@ -441,8 +441,7 @@ fn run_recording_thread(
     }
 
     println!(
-        "[audio-recorder] Recording started ({}Hz, {}ch)",
-        sample_rate, channels
+        "[audio-recorder] Recording started ({sample_rate}Hz, {channels}ch)"
     );
     let _ = ready_tx.send(Ok(sample_rate));
 
@@ -457,7 +456,7 @@ fn run_recording_thread(
     // 已知限制：非預設裝置仍會因 Arc cycle 洩漏 ~1-2 KB/次（StreamInner + listener）。
     if let Err(e) = stream.pause() {
         // ⚠️ 安全相關：pause 失敗意味著麥克風可能仍在捕獲，且 drop 也無法停止
-        eprintln!("[audio-recorder] SECURITY: Failed to pause stream, mic may remain active: {:?}", e);
+        eprintln!("[audio-recorder] SECURITY: Failed to pause stream, mic may remain active: {e:?}");
     }
     drop(stream);
     println!("[audio-recorder] Recording stopped, stream released");
@@ -522,7 +521,7 @@ fn run_preview_thread(
         cpal::SampleFormat::U64 => build_preview_stream::<u64>(&device, &config, channels, accumulator_for_callback),
         cpal::SampleFormat::F32 => build_preview_stream::<f32>(&device, &config, channels, accumulator_for_callback),
         cpal::SampleFormat::F64 => build_preview_stream::<f64>(&device, &config, channels, accumulator_for_callback),
-        other => Err(format!("Unsupported sample format: {}", other)),
+        other => Err(format!("Unsupported sample format: {other}")),
     };
 
     let stream = match build_result {
@@ -534,7 +533,7 @@ fn run_preview_thread(
     };
 
     if let Err(e) = stream.play() {
-        let _ = ready_tx.send(Err(format!("Failed to play preview stream: {}", e)));
+        let _ = ready_tx.send(Err(format!("Failed to play preview stream: {e}")));
         return;
     }
 
@@ -574,7 +573,7 @@ fn run_preview_thread(
 
     // ── 清理（遵循 cpal macOS workaround） ──
     if let Err(e) = stream.pause() {
-        eprintln!("[audio-preview] Failed to pause preview stream: {:?}", e);
+        eprintln!("[audio-preview] Failed to pause preview stream: {e:?}");
     }
     drop(stream);
     println!("[audio-preview] Preview stopped, stream released");
@@ -620,11 +619,11 @@ where
                 }
             },
             move |err| {
-                eprintln!("[audio-preview] Stream error: {}", err);
+                eprintln!("[audio-preview] Stream error: {err}");
             },
             None,
         )
-        .map_err(|e| format!("Failed to build preview stream: {}", e))
+        .map_err(|e| format!("Failed to build preview stream: {e}"))
 }
 
 // ========== Device Selection ==========
@@ -643,12 +642,11 @@ fn select_input_device(
         let default_matches = default_device
             .as_ref()
             .and_then(|d| d.name().ok())
-            .map_or(false, |n| n == device_name);
+            .is_some_and(|n| n == device_name);
 
         if default_matches {
             println!(
-                "[{}] Device '{}' matches system default, using default_input_device",
-                tag, device_name
+                "[{tag}] Device '{device_name}' matches system default, using default_input_device"
             );
             default_device
         } else {
@@ -656,12 +654,11 @@ fn select_input_device(
                 .input_devices()
                 .ok()
                 .and_then(|mut devices| {
-                    devices.find(|d| d.name().map_or(false, |n| n == device_name))
+                    devices.find(|d| d.name().is_ok_and(|n| n == device_name))
                 });
             if found.is_none() {
                 println!(
-                    "[{}] Device '{}' not found, falling back to default",
-                    tag, device_name
+                    "[{tag}] Device '{device_name}' not found, falling back to default"
                 );
             }
             found.or(default_device)
@@ -704,8 +701,7 @@ fn determine_input_config(
     let ch = supported_config.channels();
 
     println!(
-        "[audio-recorder] 16 kHz not supported, using device default: {}Hz, {}ch",
-        sr, ch
+        "[audio-recorder] 16 kHz not supported, using device default: {sr}Hz, {ch}ch"
     );
 
     Ok(InputConfigSelection {
@@ -757,8 +753,7 @@ fn build_input_stream(
             build_typed_input_stream::<f64>(device, &config, channels, inner, app)
         }
         other => Err(AudioRecorderError::BuildStream(format!(
-            "Unsupported sample format: {}",
-            other
+            "Unsupported sample format: {other}"
         ))),
     }
 }
@@ -842,7 +837,7 @@ where
                 }
             },
             move |err| {
-                eprintln!("[audio-recorder] Stream error: {}", err);
+                eprintln!("[audio-recorder] Stream error: {err}");
             },
             None,
         )
@@ -887,22 +882,22 @@ pub fn save_recording_file(
     let wav_data = state
         .wav_buffer
         .lock()
-        .map_err(|e| format!("Failed to lock wav_buffer: {}", e))?
+        .map_err(|e| format!("Failed to lock wav_buffer: {e}"))?
         .clone()
         .ok_or_else(|| "No WAV data available".to_string())?;
 
     let app_data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
 
     let recordings_dir = app_data_dir.join("recordings");
     std::fs::create_dir_all(&recordings_dir)
-        .map_err(|e| format!("Failed to create recordings dir: {}", e))?;
+        .map_err(|e| format!("Failed to create recordings dir: {e}"))?;
 
-    let file_path = recordings_dir.join(format!("{}.wav", id));
+    let file_path = recordings_dir.join(format!("{id}.wav"));
     std::fs::write(&file_path, &wav_data)
-        .map_err(|e| format!("Failed to write WAV file: {}", e))?;
+        .map_err(|e| format!("Failed to write WAV file: {e}"))?;
 
     println!(
         "[audio-recorder] Recording saved: {} ({} bytes)",
@@ -918,11 +913,11 @@ pub fn read_recording_file(id: String, app: AppHandle) -> Result<Response, Strin
     let app_data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
 
-    let file_path = app_data_dir.join("recordings").join(format!("{}.wav", id));
+    let file_path = app_data_dir.join("recordings").join(format!("{id}.wav"));
     let data = std::fs::read(&file_path)
-        .map_err(|e| format!("Failed to read recording file: {}", e))?;
+        .map_err(|e| format!("Failed to read recording file: {e}"))?;
     Ok(Response::new(data))
 }
 
@@ -931,7 +926,7 @@ pub fn delete_all_recordings(app: AppHandle) -> Result<u32, String> {
     let app_data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
 
     let recordings_dir = app_data_dir.join("recordings");
     if !recordings_dir.exists() {
@@ -940,18 +935,18 @@ pub fn delete_all_recordings(app: AppHandle) -> Result<u32, String> {
 
     let mut count = 0u32;
     for entry in std::fs::read_dir(&recordings_dir)
-        .map_err(|e| format!("Failed to read recordings dir: {}", e))?
+        .map_err(|e| format!("Failed to read recordings dir: {e}"))?
     {
-        let entry = entry.map_err(|e| format!("Failed to read dir entry: {}", e))?;
+        let entry = entry.map_err(|e| format!("Failed to read dir entry: {e}"))?;
         let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "wav") {
+        if path.extension().is_some_and(|ext| ext == "wav") {
             std::fs::remove_file(&path)
                 .map_err(|e| format!("Failed to delete {}: {}", path.display(), e))?;
             count += 1;
         }
     }
 
-    println!("[audio-recorder] Deleted {} recording files", count);
+    println!("[audio-recorder] Deleted {count} recording files");
     Ok(count)
 }
 
@@ -960,7 +955,7 @@ pub fn cleanup_old_recordings(days: u32, app: AppHandle) -> Result<Vec<String>, 
     let app_data_dir = app
         .path()
         .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
 
     let recordings_dir = app_data_dir.join("recordings");
     if !recordings_dir.exists() {
@@ -972,18 +967,18 @@ pub fn cleanup_old_recordings(days: u32, app: AppHandle) -> Result<Vec<String>, 
 
     let mut deleted_id_list: Vec<String> = Vec::new();
     for entry in std::fs::read_dir(&recordings_dir)
-        .map_err(|e| format!("Failed to read recordings dir: {}", e))?
+        .map_err(|e| format!("Failed to read recordings dir: {e}"))?
     {
-        let entry = entry.map_err(|e| format!("Failed to read dir entry: {}", e))?;
+        let entry = entry.map_err(|e| format!("Failed to read dir entry: {e}"))?;
         let path = entry.path();
-        if !path.extension().map_or(false, |ext| ext == "wav") {
+        if path.extension().is_none_or(|ext| ext != "wav") {
             continue;
         }
         let metadata =
-            std::fs::metadata(&path).map_err(|e| format!("Failed to get metadata: {}", e))?;
+            std::fs::metadata(&path).map_err(|e| format!("Failed to get metadata: {e}"))?;
         let modified = metadata
             .modified()
-            .map_err(|e| format!("Failed to get modified time: {}", e))?;
+            .map_err(|e| format!("Failed to get modified time: {e}"))?;
         if modified < cutoff {
             if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                 deleted_id_list.push(stem.to_string());

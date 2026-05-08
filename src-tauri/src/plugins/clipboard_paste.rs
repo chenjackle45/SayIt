@@ -305,7 +305,7 @@ pub fn capture_selected_text_via_clipboard() -> Result<Option<String>, String> {
 fn restore_clipboard(clipboard: &mut Clipboard, original_text: &Option<String>) {
     if let Some(ref text) = original_text {
         if let Err(e) = clipboard.set_text(text) {
-            eprintln!("[clipboard-paste] failed to restore clipboard: {}", e);
+            eprintln!("[clipboard-paste] failed to restore clipboard: {e}");
         }
     }
 }
@@ -360,7 +360,7 @@ pub fn paste_text<R: Runtime>(
     {
         let _ = &focus_state; // macOS 不需要焦點恢復（CGEvent 是進程級）
         simulate_paste_via_cgevent().map_err(|e| {
-            eprintln!("[clipboard-paste] CGEvent paste failed: {}", e);
+            eprintln!("[clipboard-paste] CGEvent paste failed: {e}");
             ClipboardError::KeyboardSimulation(e)
         })?;
         println!("[clipboard-paste] Paste triggered via CGEvent (Cmd+V)");
@@ -468,7 +468,7 @@ mod tests {
     #[test]
     fn test_clipboard_error_debug_format() {
         let error = ClipboardError::ClipboardAccess("test".to_string());
-        let debug_str = format!("{:?}", error);
+        let debug_str = format!("{error:?}");
         assert!(debug_str.contains("ClipboardAccess"));
         assert!(debug_str.contains("test"));
     }
@@ -476,7 +476,7 @@ mod tests {
     #[test]
     fn test_keyboard_error_debug_format() {
         let error = ClipboardError::KeyboardSimulation("sim fail".to_string());
-        let debug_str = format!("{:?}", error);
+        let debug_str = format!("{error:?}");
         assert!(debug_str.contains("KeyboardSimulation"));
         assert!(debug_str.contains("sim fail"));
     }

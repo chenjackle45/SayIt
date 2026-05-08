@@ -94,8 +94,7 @@ mod macos {
 
         if status != 0 {
             eprintln!(
-                "[audio-control] Failed to get default output device: OSStatus {}",
-                status
+                "[audio-control] Failed to get default output device: OSStatus {status}"
             );
             return None;
         }
@@ -125,7 +124,7 @@ mod macos {
         };
 
         if status != 0 {
-            return Err(format!("Failed to get mute state: OSStatus {}", status));
+            return Err(format!("Failed to get mute state: OSStatus {status}"));
         }
 
         Ok(mute_value != 0)
@@ -153,7 +152,7 @@ mod macos {
         };
 
         if status != 0 {
-            return Err(format!("Failed to set mute state: OSStatus {}", status));
+            return Err(format!("Failed to set mute state: OSStatus {status}"));
         }
 
         Ok(())
@@ -301,7 +300,7 @@ pub fn mute_system_audio(state: State<AudioControlState>) -> Result<(), String> 
     let mut guard = state
         .was_muted_before
         .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
+        .map_err(|e| format!("Lock poisoned: {e}"))?;
 
     // 冪等：若已有 pending restore，跳過
     if guard.is_some() {
@@ -314,8 +313,7 @@ pub fn mute_system_audio(state: State<AudioControlState>) -> Result<(), String> 
     *guard = Some(current_mute);
 
     println!(
-        "[audio-control] mute_system_audio: muted (was_muted_before={})",
-        current_mute
+        "[audio-control] mute_system_audio: muted (was_muted_before={current_mute})"
     );
     Ok(())
 }
@@ -325,7 +323,7 @@ pub fn restore_system_audio(state: State<AudioControlState>) -> Result<(), Strin
     let mut guard = state
         .was_muted_before
         .lock()
-        .map_err(|e| format!("Lock poisoned: {}", e))?;
+        .map_err(|e| format!("Lock poisoned: {e}"))?;
 
     // 冪等：若沒有 pending restore，跳過
     let was_muted = match *guard {
@@ -341,15 +339,13 @@ pub fn restore_system_audio(state: State<AudioControlState>) -> Result<(), Strin
 
     if let Err(e) = platform_set_system_mute(was_muted) {
         eprintln!(
-            "[audio-control] restore_system_audio: failed to restore (was_muted={}): {}",
-            was_muted, e
+            "[audio-control] restore_system_audio: failed to restore (was_muted={was_muted}): {e}"
         );
         return Err(e);
     }
 
     println!(
-        "[audio-control] restore_system_audio: restored (was_muted={})",
-        was_muted
+        "[audio-control] restore_system_audio: restored (was_muted={was_muted})"
     );
     Ok(())
 }

@@ -23,7 +23,7 @@ mod macos {
         let url = match CFURL::from_path(std::path::Path::new(path), false) {
             Some(url) => url,
             None => {
-                eprintln!("[sound-feedback] Failed to create CFURL for: {}", path);
+                eprintln!("[sound-feedback] Failed to create CFURL for: {path}");
                 return;
             }
         };
@@ -38,8 +38,7 @@ mod macos {
 
         if status != 0 {
             eprintln!(
-                "[sound-feedback] AudioServicesCreateSystemSoundID failed: OSStatus {}",
-                status
+                "[sound-feedback] AudioServicesCreateSystemSoundID failed: OSStatus {status}"
             );
             return;
         }
