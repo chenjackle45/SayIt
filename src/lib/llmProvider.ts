@@ -61,6 +61,20 @@ export function getProviderTimeout(providerId: LlmProviderId): number {
   return PROVIDER_TIMEOUT_MS[providerId];
 }
 
+// Anthropic Claude (Haiku 4.5 / 3.5 Haiku) standard 模式 max_tokens 上限 8192；
+// Groq 模型多數上限也接近 8192。OpenAI / Gemini 支援更高，且 Gemini 2.5 的
+// thinking tokens 計入 maxOutputTokens 配額，需要更高 buffer 避免長轉錄被截斷。
+const PROVIDER_DEFAULT_MAX_TOKENS: Record<LlmProviderId, number> = {
+  groq: 8192,
+  openai: 16384,
+  anthropic: 8192,
+  gemini: 16384,
+};
+
+export function getDefaultMaxTokens(providerId: LlmProviderId): number {
+  return PROVIDER_DEFAULT_MAX_TOKENS[providerId];
+}
+
 // ── 統一型別 ──────────────────────────────────────────────
 
 export interface LlmChatMessage {
@@ -169,7 +183,7 @@ function buildAnthropicFetchParams(
   const body: Record<string, unknown> = {
     model: request.model,
     messages: filteredMessageList,
-    max_tokens: request.maxTokens ?? 2048,
+    max_tokens: request.maxTokens ?? getDefaultMaxTokens("anthropic"),
   };
   if (systemPrompt) body.system = systemPrompt;
   if (request.temperature !== undefined) {
