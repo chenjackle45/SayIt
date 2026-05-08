@@ -2,6 +2,24 @@
 
 SayIt 版本更新紀錄。
 
+## [0.10.0] - 2026-05-08
+
+### Added
+
+- 設定中的「測試連線」按鈕：可即時驗證當前 LLM Provider / Whisper 模型的 API key 與連線是否正常，失敗時顯示具體原因（API key 無效 / 額度不足 / 服務端問題 / 網路問題），讓使用者能自助 debug 設定問題（#34）
+
+### Fixed
+
+- Gemini 2.5 系列做 AI 整理時長轉錄文字被截斷的問題（#23、#34）：根因是 Gemini 把 thinking tokens 計入 `maxOutputTokens` 配額，原本對所有 provider 統一給 2048 token 預算被 thinking 吃掉一部分後不夠用。改為 per-provider 預設：Gemini / OpenAI 16384、Anthropic / Groq 8192（後者模型上限 8192，給 16384 會被 API reject）
+- 使用 OpenAI 或 Anthropic 整理時被 Content Security Policy 阻擋的問題：`connect-src` 加入 `api.openai.com` 與 `api.anthropic.com`
+- 轉錄失敗 catch path 沒寫入 `rmsEnergyLevel` 的問題：補上 assignment，避免幻覺偵測 fallback 邏輯收到 undefined
+
+### Improved
+
+- LlmProviderId switch 加上 exhaustiveness assertion：未來新增 provider 時編譯期會抓到漏處理的 case
+- 錯誤傳遞鏈保留 `cause`：debug 時能看到完整堆疊
+- CI 升級：push/PR 觸發 ESLint + cargo clippy + cargo test，避免 lint/test 倒退被 merge
+
 ## [0.9.5] - 2026-05-01
 
 ### Fixed
