@@ -1,6 +1,6 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import type { ChatUsageData, EnhanceResult } from "../types/transcription";
-import { DEFAULT_LLM_MODEL_ID } from "./modelRegistry";
+import { DEFAULT_LLM_MODEL_ID, type LlmProviderId } from "./modelRegistry";
 import {
   buildFetchParams,
   parseProviderResponse,
@@ -99,6 +99,20 @@ export function stripReasoningTags(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 }
 
+// Anthropic Claude (Haiku 4.5 / 3.5 Haiku) standard 模式 max_tokens 上限 8192；
+// Groq 模型多數上限也接近 8192。OpenAI / Gemini 支援更高，且 Gemini 2.5 的
+// thinking tokens 計入 maxOutputTokens 配額，需要更高 buffer 避免長轉錄被截斷。
+function getDefaultMaxTokensForProvider(providerId: LlmProviderId): number {
+  switch (providerId) {
+    case "openai":
+    case "gemini":
+      return 16384;
+    case "anthropic":
+    case "groq":
+      return 8192;
+  }
+}
+
 export async function enhanceText(
   rawText: string,
   apiKey: string,
@@ -121,7 +135,7 @@ export async function enhanceText(
       { role: "user", content: rawText },
     ],
     temperature: 0.1,
-    maxTokens: options?.maxTokens ?? 16384,
+    maxTokens: options?.maxTokens ?? getDefaultMaxTokensForProvider(providerId),
   };
 
   const { url, init } = buildFetchParams(providerId, request, apiKey);
