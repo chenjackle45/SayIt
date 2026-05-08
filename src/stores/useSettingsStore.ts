@@ -122,6 +122,10 @@ export const useSettingsStore = defineStore("settings", () => {
         return anthropicApiKey.value !== "";
       case "gemini":
         return geminiApiKey.value !== "";
+      default:
+        // exhaustiveness：若 LlmProviderId 新增成員，這行會 type error
+        selectedLlmProviderId.value satisfies never;
+        return false;
     }
   });
   const customTriggerKey = ref<CustomTriggerKey | ComboTriggerKey | null>(null);

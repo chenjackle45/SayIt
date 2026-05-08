@@ -81,7 +81,9 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     } catch (error) {
       const message = extractErrorMessage(error);
       if (message.includes("UNIQUE")) {
-        throw new Error(i18n.global.t("dictionary.duplicateEntry"));
+        throw new Error(i18n.global.t("dictionary.duplicateEntry"), {
+          cause: error,
+        });
       }
       console.error(`[vocabulary-store] addTerm failed: ${message}`);
       captureError(error, { source: "vocabulary", step: "add" });
