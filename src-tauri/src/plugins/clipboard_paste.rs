@@ -3,6 +3,11 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Runtime, State};
 
+/// 貼上指令觸發後等多久才把剪貼簿還原成原內容（毫秒）。
+/// 太短：目標 app 還沒消費完 paste，會貼到舊內容；太長：使用者感受得到延遲。
+/// 200ms 在實測下對絕大部分 app 足夠。
+const RESTORE_DELAY_MS: u64 = 200;
+
 // ========== Focus State ==========
 
 /// 儲存使用者啟動錄音前的前景視窗，貼上時恢復焦點。
@@ -268,12 +273,16 @@ pub fn capture_selected_text_via_clipboard() -> Result<Option<String>, String> {
     // 3. 模擬 Cmd+C / Ctrl+C（失敗時先還原剪貼簿再 return）
     let copy_result = {
         #[cfg(target_os = "macos")]
-        { simulate_copy_via_cgevent() }
+        {
+            simulate_copy_via_cgevent()
+        }
         #[cfg(target_os = "windows")]
-        { simulate_copy_via_keyboard() }
+        {
+            simulate_copy_via_keyboard()
+        }
     };
     if let Err(e) = copy_result {
-        restore_clipboard(&mut clipboard, &original_text);
+        restore_clipboard_text(&mut clipboard, &original_text);
         return Err(e);
     }
 
@@ -284,7 +293,7 @@ pub fn capture_selected_text_via_clipboard() -> Result<Option<String>, String> {
     let copied_text = clipboard.get_text().ok().filter(|t| !t.is_empty());
 
     // 6. 還原剪貼簿
-    restore_clipboard(&mut clipboard, &original_text);
+    restore_clipboard_text(&mut clipboard, &original_text);
 
     // 7. 回傳
     match copied_text {
@@ -302,7 +311,7 @@ pub fn capture_selected_text_via_clipboard() -> Result<Option<String>, String> {
     }
 }
 
-fn restore_clipboard(clipboard: &mut Clipboard, original_text: &Option<String>) {
+fn restore_clipboard_text(clipboard: &mut Clipboard, original_text: &Option<String>) {
     if let Some(ref text) = original_text {
         if let Err(e) = clipboard.set_text(text) {
             eprintln!("[clipboard-paste] failed to restore clipboard: {e}");
@@ -325,15 +334,17 @@ pub fn paste_text<R: Runtime>(
     _app: AppHandle<R>,
     focus_state: State<'_, FocusState>,
     text: String,
+    restore_clipboard: bool,
 ) -> Result<(), ClipboardError> {
     // DEBUG: 追蹤 paste_text 被呼叫次數
     use std::sync::atomic::AtomicU32;
     static PASTE_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
     let call_id = PASTE_CALL_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
     println!(
-        "🔴🔴🔴 [clipboard-paste] paste_text CALLED (#{}) — {} chars",
+        "🔴🔴🔴 [clipboard-paste] paste_text CALLED (#{}) — {} chars (restore={})",
         call_id,
-        text.len()
+        text.len(),
+        restore_clipboard
     );
     #[cfg(debug_assertions)]
     println!(
@@ -344,26 +355,54 @@ pub fn paste_text<R: Runtime>(
     #[cfg(not(debug_assertions))]
     println!("[clipboard-paste] Pasting {} chars", text.len());
 
-    // 1) 寫入剪貼簿
     let mut clipboard =
         Clipboard::new().map_err(|e| ClipboardError::ClipboardAccess(e.to_string()))?;
+
+    // 若使用者要求還原，先抓快照。Err 涵蓋非文字內容／暫時鎖等情況，視為「無可還原」
+    let original_text = if restore_clipboard {
+        match clipboard.get_text() {
+            Ok(t) if !t.is_empty() => {
+                println!(
+                    "[clipboard-paste] Snapshot original clipboard ({} chars)",
+                    t.len()
+                );
+                Some(t)
+            }
+            Ok(_) => {
+                println!("[clipboard-paste] Snapshot: clipboard was empty");
+                None
+            }
+            Err(e) => {
+                eprintln!(
+                    "[clipboard-paste] Snapshot: read failed (likely non-text content): {e}"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     clipboard
         .set_text(&text)
         .map_err(|e| ClipboardError::ClipboardAccess(e.to_string()))?;
     println!("[clipboard-paste] Text copied to clipboard");
 
-    // 2) 等待剪貼簿同步
     thread::sleep(Duration::from_millis(50));
 
-    // 3) 觸發目標 app 的貼上動作
+    // 捕獲錯誤而非 ?-propagate：要先跑完還原才回報錯誤，避免轉錄文字遺留在剪貼簿
+    let mut paste_err: Option<String> = None;
+
     #[cfg(target_os = "macos")]
     {
         let _ = &focus_state; // macOS 不需要焦點恢復（CGEvent 是進程級）
-        simulate_paste_via_cgevent().map_err(|e| {
-            eprintln!("[clipboard-paste] CGEvent paste failed: {e}");
-            ClipboardError::KeyboardSimulation(e)
-        })?;
-        println!("[clipboard-paste] Paste triggered via CGEvent (Cmd+V)");
+        match simulate_paste_via_cgevent() {
+            Ok(()) => println!("[clipboard-paste] Paste triggered via CGEvent (Cmd+V)"),
+            Err(e) => {
+                eprintln!("[clipboard-paste] CGEvent paste failed: {e}");
+                paste_err = Some(e);
+            }
+        }
     }
 
     #[cfg(target_os = "windows")]
@@ -375,16 +414,28 @@ pub fn paste_text<R: Runtime>(
             thread::sleep(Duration::from_millis(50));
         }
 
-        simulate_paste_via_keyboard().map_err(|e| {
-            eprintln!("[clipboard-paste] SendInput paste failed: {}", e);
-            ClipboardError::KeyboardSimulation(e)
-        })?;
-        println!("[clipboard-paste] Paste triggered via SendInput (Ctrl+V)");
+        match simulate_paste_via_keyboard() {
+            Ok(()) => println!("[clipboard-paste] Paste triggered via SendInput (Ctrl+V)"),
+            Err(e) => {
+                eprintln!("[clipboard-paste] SendInput paste failed: {}", e);
+                paste_err = Some(e);
+            }
+        }
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         compile_error!("paste_text keyboard simulation is not implemented for this platform");
+    }
+
+    // 即使 paste 失敗也要還原，避免轉錄文字遺留在剪貼簿
+    if restore_clipboard {
+        thread::sleep(Duration::from_millis(RESTORE_DELAY_MS));
+        restore_clipboard_text(&mut clipboard, &original_text);
+    }
+
+    if let Some(e) = paste_err {
+        return Err(ClipboardError::KeyboardSimulation(e));
     }
 
     println!("[clipboard-paste] Done");
@@ -479,5 +530,15 @@ mod tests {
         let debug_str = format!("{error:?}");
         assert!(debug_str.contains("KeyboardSimulation"));
         assert!(debug_str.contains("sim fail"));
+    }
+
+    /// 還原延遲區間守門：避免改成 0（還沒貼完就還原）或數秒（使用者感受到延遲）。
+    /// 改動延遲值前須做手動實測，僅靠單元測試無法保證真實 paste 已消費完。
+    #[test]
+    fn test_restore_delay_ms_within_sane_range() {
+        assert!(
+            (50..=1000).contains(&RESTORE_DELAY_MS),
+            "RESTORE_DELAY_MS={RESTORE_DELAY_MS} 應落在 50ms..=1000ms 之間"
+        );
     }
 }

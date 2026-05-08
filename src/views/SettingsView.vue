@@ -652,6 +652,26 @@ async function handleToggleSoundFeedback(newValue: boolean) {
   }
 }
 
+// ── 轉錄文字是否複製到剪貼簿 (gh-35) ──────────────────────────
+const copyTranscriptionToClipboardFeedback = useFeedbackMessage();
+
+async function handleToggleCopyTranscriptionToClipboard(newValue: boolean) {
+  try {
+    await settingsStore.saveCopyTranscriptionToClipboard(newValue);
+    copyTranscriptionToClipboardFeedback.show(
+      "success",
+      newValue
+        ? t("settings.app.copyTranscriptionToClipboard.enabled")
+        : t("settings.app.copyTranscriptionToClipboard.disabled"),
+    );
+  } catch (err) {
+    copyTranscriptionToClipboardFeedback.show(
+      "error",
+      extractErrorMessage(err),
+    );
+  }
+}
+
 // ── 介面語言 ──────────────────────────────────────────────
 const localeFeedback = useFeedbackMessage();
 
@@ -847,6 +867,7 @@ onBeforeUnmount(() => {
   modelFeedback.clearTimer();
   muteOnRecordingFeedback.clearTimer();
   soundFeedbackFeedback.clearTimer();
+  copyTranscriptionToClipboardFeedback.clearTimer();
   localeFeedback.clearTimer();
   transcriptionLocaleFeedback.clearTimer();
   autoStartFeedback.clearTimer();
@@ -1844,6 +1865,46 @@ onBeforeUnmount(() => {
             "
           >
             {{ muteOnRecordingFeedback.message.value }}
+          </p>
+        </transition>
+
+        <div class="border-t border-border" />
+
+        <div class="flex items-center justify-between">
+          <div class="pr-4">
+            <Label for="copy-transcription-to-clipboard">{{
+              $t("settings.app.copyTranscriptionToClipboard.label")
+            }}</Label>
+            <p class="text-sm text-muted-foreground">
+              {{
+                settingsStore.isCopyTranscriptionToClipboardEnabled
+                  ? $t(
+                    "settings.app.copyTranscriptionToClipboard.descriptionOn",
+                  )
+                  : $t(
+                    "settings.app.copyTranscriptionToClipboard.descriptionOff",
+                  )
+              }}
+            </p>
+          </div>
+          <Switch
+            id="copy-transcription-to-clipboard"
+            :model-value="settingsStore.isCopyTranscriptionToClipboardEnabled"
+            @update:model-value="handleToggleCopyTranscriptionToClipboard"
+          />
+        </div>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="copyTranscriptionToClipboardFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              copyTranscriptionToClipboardFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            {{ copyTranscriptionToClipboardFeedback.message.value }}
           </p>
         </transition>
 

@@ -136,6 +136,13 @@
       "muteDescription": "Automatically mute system speakers when recording starts, and restore when finished",
       "muteEnabled": "Mute on recording enabled",
       "muteDisabled": "Mute on recording disabled",
+      "copyTranscriptionToClipboard": {
+        "label": "Copy transcription to clipboard",
+        "descriptionOn": "After auto-paste, the transcription stays in your clipboard so you can paste it again with Cmd+V — but it overwrites whatever you had copied before.",
+        "descriptionOff": "After auto-paste, your previous clipboard content is preserved so you can keep using it.",
+        "enabled": "Enabled: transcription will stay in clipboard",
+        "disabled": "Disabled: previous clipboard content will be preserved"
+      },
       "soundFeedback": "Sound Feedback",
       "soundFeedbackDescription": "Play sound effects when recording starts, stops, or encounters an error",
       "soundFeedbackEnabled": "Sound feedback enabled",
@@ -370,16 +377,8 @@
     },
     "upgradeNotice": {
       "title": "SayIt Update Summary",
-      "item1": "More LLM choices: added Google Gemini (free quota), OpenAI (recommended), and Anthropic. If Groq's free models aren't smart enough, switch Provider in Settings for a much better experience",
-      "item2": "Edit selected text: select text first, then trigger SayIt — your voice becomes an instruction. Say \"translate to English\" or \"make it more formal\" and AI will process and replace it directly",
-      "item3": "Combo hotkeys: use ⌘+J or similar combos as your trigger — no more accidental activations",
-      "item4": "Quick mode switch: double-tap or long-press your trigger key to switch between Minimal and Active without opening settings",
-      "item5": "Better mic selector: shows default device name with a volume preview bar",
-      "item6": "Mode badge while recording: the on-screen notch shows which voice mode you're using",
-      "item7": "Mode switch confirmation: a visual indicator appears on screen when you switch modes",
-      "item8": "Toggle mode paste fix: resolved an issue where text was pasted twice in certain scenarios",
-      "item9": "Usage note: SayIt is designed for quick voice-to-text dictation. Long meeting recordings are not yet supported, but we're working on it for future updates",
-      "item10": "No more duplicate pastes: launching SayIt twice (especially on Windows) used to cause hotkeys to record and paste twice — now the second launch refocuses the existing window instead",
+      "item1": "Test Connection button: tap it in Settings to instantly verify whether your LLM and Whisper API keys actually work — no more wondering why nothing's happening after you've configured everything",
+      "item2": "Gemini long-text truncation fixed: long passages enhanced with Gemini sometimes got cut off mid-sentence. This release identifies the root cause (thinking tokens consuming the output budget) and resolves it — your full text now comes through intact",
       "dismiss": "Got it"
     }
   },

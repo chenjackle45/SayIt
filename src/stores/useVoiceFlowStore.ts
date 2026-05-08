@@ -753,7 +753,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     skipRecordSaving?: boolean;
   }) {
     try {
-      await invoke("paste_text", { text: params.text });
+      const settingsStore = useSettingsStore();
+      await invoke("paste_text", {
+        text: params.text,
+        restoreClipboard: !settingsStore.isCopyTranscriptionToClipboardEnabled,
+      });
       isRecording.value = false;
       transitionTo("success", params.successMessage);
       startQualityMonitorAfterPaste();
@@ -770,7 +774,6 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       updateVocabularyWeightsAfterPaste(finalText);
 
       // 修正偵測（fire-and-forget，需 LLM API key）
-      const settingsStore = useSettingsStore();
       const llmApiKey = settingsStore.getLlmApiKey();
       if (llmApiKey) {
         startCorrectionDetectionFlow(params.text, params.record.id, llmApiKey);

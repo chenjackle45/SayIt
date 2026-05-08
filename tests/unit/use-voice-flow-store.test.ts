@@ -91,6 +91,7 @@ const {
       isMuteOnRecordingEnabled: false,
       isSoundEffectsEnabled: true,
       isSmartDictionaryEnabled: false,
+      isCopyTranscriptionToClipboardEnabled: true,
       whisperLanguageCode: "zh" as string | null,
     },
     mockVocabularyState: {
@@ -201,6 +202,9 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
     },
     get isSmartDictionaryEnabled() {
       return mockSettingsState.isSmartDictionaryEnabled;
+    },
+    get isCopyTranscriptionToClipboardEnabled() {
+      return mockSettingsState.isCopyTranscriptionToClipboardEnabled;
     },
     getWhisperLanguageCode: () => mockSettingsState.whisperLanguageCode,
     selectedAudioInputDeviceName: "",
@@ -435,6 +439,7 @@ describe("useVoiceFlowStore", () => {
     await vi.waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
         text: "測試轉錄",
+        restoreClipboard: false,
       });
     });
 
@@ -627,6 +632,7 @@ describe("useVoiceFlowStore", () => {
     await vi.waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
         text: "你好",
+        restoreClipboard: false,
       });
     });
 
@@ -859,6 +865,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "整理後的書面語文字",
+          restoreClipboard: false,
         });
       });
 
@@ -907,6 +914,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "短文字",
+          restoreClipboard: false,
         });
       });
 
@@ -949,6 +957,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: longText,
+          restoreClipboard: false,
         });
       });
 
@@ -983,6 +992,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: longText,
+          restoreClipboard: false,
         });
       });
 
@@ -1024,6 +1034,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "整理後十個字",
+          restoreClipboard: false,
         });
       });
 
@@ -1056,6 +1067,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: nineChars,
+          restoreClipboard: false,
         });
       });
 
@@ -1093,6 +1105,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "這是 AI 整理過的短文字",
+          restoreClipboard: false,
         });
       });
 
@@ -1436,6 +1449,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "整理後的書面語文字",
+          restoreClipboard: false,
         });
       });
 
@@ -1471,6 +1485,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: longText,
+          restoreClipboard: false,
         });
       });
 
@@ -1504,6 +1519,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "短文字",
+          restoreClipboard: false,
         });
       });
 
@@ -1615,6 +1631,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "整理後的書面語文字",
+          restoreClipboard: false,
         });
       });
 
@@ -1661,6 +1678,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: longText,
+          restoreClipboard: false,
         });
       });
 
@@ -1702,6 +1720,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "短文字",
+          restoreClipboard: false,
         });
       });
 
@@ -1809,6 +1828,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "短文字",
+          restoreClipboard: false,
         });
       });
 
@@ -1848,6 +1868,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "短文字",
+          restoreClipboard: false,
         });
       });
 
@@ -1899,6 +1920,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "整理後的書面語文字",
+          restoreClipboard: false,
         });
       });
 
@@ -1945,6 +1967,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: longText,
+          restoreClipboard: false,
         });
       });
 
@@ -2029,6 +2052,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "重送成功的文字",
+          restoreClipboard: false,
         });
       });
 
@@ -2245,6 +2269,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "測試轉錄",
+          restoreClipboard: false,
         });
       });
 
@@ -2281,6 +2306,7 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
           text: "測試轉錄",
+          restoreClipboard: false,
         });
       });
       expect(mockInvoke).not.toHaveBeenCalledWith("play_stop_sound");

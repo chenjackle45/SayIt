@@ -71,6 +71,7 @@ const DEFAULT_SOUND_EFFECTS_ENABLED = true;
 const DEFAULT_PROMPT_MODE: PromptMode = "minimal";
 const DEFAULT_RECORDING_AUTO_CLEANUP_ENABLED = false;
 const DEFAULT_RECORDING_AUTO_CLEANUP_DAYS = 7;
+const DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD = true;
 
 function getDefaultTriggerKey(): TriggerKey {
   const isMac = navigator.userAgent.includes("Mac");
@@ -144,6 +145,9 @@ export const useSettingsStore = defineStore("settings", () => {
     DEFAULT_RECORDING_AUTO_CLEANUP_DAYS,
   );
   const selectedAudioInputDeviceName = ref<string>("");
+  const isCopyTranscriptionToClipboardEnabled = ref<boolean>(
+    DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD,
+  );
   let isLoaded = false;
 
   /** Resolve which SupportedLocale to use for prompt default (shared logic). */
@@ -363,6 +367,13 @@ export const useSettingsStore = defineStore("settings", () => {
       );
       selectedAudioInputDeviceName.value = savedAudioInputDeviceName ?? "";
 
+      const savedCopyTranscriptionToClipboard = await store.get<boolean>(
+        "copyTranscriptionToClipboard",
+      );
+      isCopyTranscriptionToClipboardEnabled.value =
+        savedCopyTranscriptionToClipboard ??
+        DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD;
+
       // Sync saved (or default) config to Rust on startup
       await syncHotkeyConfigToRust(key, mode);
       isLoaded = true;
@@ -385,6 +396,8 @@ export const useSettingsStore = defineStore("settings", () => {
         DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT;
       isMuteOnRecordingEnabled.value = DEFAULT_MUTE_ON_RECORDING;
       isSoundEffectsEnabled.value = DEFAULT_SOUND_EFFECTS_ENABLED;
+      isCopyTranscriptionToClipboardEnabled.value =
+        DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD;
     }
   }
 
@@ -1177,6 +1190,35 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveCopyTranscriptionToClipboard(enabled: boolean) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("copyTranscriptionToClipboard", enabled);
+      await store.save();
+      isCopyTranscriptionToClipboardEnabled.value = enabled;
+
+      const payload: SettingsUpdatedPayload = {
+        key: "copyTranscriptionToClipboard",
+        value: enabled,
+      };
+      await emitEvent(SETTINGS_UPDATED, payload);
+
+      console.log(
+        `[useSettingsStore] copyTranscriptionToClipboard saved: ${enabled}`,
+      );
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveCopyTranscriptionToClipboard failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, {
+        source: "settings",
+        step: "save-copy-transcription-to-clipboard",
+      });
+      throw err;
+    }
+  }
+
   async function refreshCrossWindowSettings() {
     try {
       const store = await load(STORE_NAME);
@@ -1287,6 +1329,13 @@ export const useSettingsStore = defineStore("settings", () => {
 
       const savedAudioDevice = await store.get<string>("audioInputDeviceName");
       selectedAudioInputDeviceName.value = savedAudioDevice ?? "";
+
+      const savedCopyTranscriptionToClipboard = await store.get<boolean>(
+        "copyTranscriptionToClipboard",
+      );
+      isCopyTranscriptionToClipboardEnabled.value =
+        savedCopyTranscriptionToClipboard ??
+        DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD;
     } catch (err) {
       console.error(
         "[useSettingsStore] refreshCrossWindowSettings failed:",
@@ -1386,6 +1435,8 @@ export const useSettingsStore = defineStore("settings", () => {
     saveRecordingAutoCleanup,
     selectedAudioInputDeviceName,
     saveAudioInputDevice,
+    isCopyTranscriptionToClipboardEnabled,
+    saveCopyTranscriptionToClipboard,
     selectedLocale,
     saveLocale,
     selectedTranscriptionLocale,

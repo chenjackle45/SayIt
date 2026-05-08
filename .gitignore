@@ -29,6 +29,8 @@ playwright/.auth/
 
 # Claude Code local settings
 .claude/settings.local.json
+# Claude Code runtime artifacts (per-machine sessionId / pid lock files)
+.claude/*.lock
 
 # Tauri signing keys
 *.key
