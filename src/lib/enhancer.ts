@@ -121,7 +121,7 @@ export async function enhanceText(
       { role: "user", content: rawText },
     ],
     temperature: 0.1,
-    maxTokens: options?.maxTokens ?? 2048,
+    maxTokens: options?.maxTokens ?? 16384,
   };
 
   const { url, init } = buildFetchParams(providerId, request, apiKey);
