@@ -1,3 +1,7 @@
+// objc 0.2 的 sel_impl 巨集展開後產生 #[cfg(feature = "cargo-clippy")]，
+// 新版 rustc 視為 unexpected_cfg；函式級 allow 對巨集展開後的 cfg 屬性不夠用，改用 crate 級
+#![allow(unexpected_cfgs)]
+
 #[cfg(target_os = "macos")]
 #[macro_use]
 extern crate objc;
@@ -18,7 +22,6 @@ static RESTART_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 /// 設定 macOS 視窗為瀏海覆蓋層級（與 BoringNotch 相同）
 #[cfg(target_os = "macos")]
-#[allow(unexpected_cfgs)]
 fn configure_macos_notch_window(window: &tauri::WebviewWindow) {
     match window.ns_window() {
         Ok(ns_ptr) => {
