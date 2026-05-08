@@ -247,6 +247,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - **Toggle 模式 Long-press** — Toggle 改為 release-based。按下時 spawn thread sleep 1s，若 `is_pressed` 仍 true → emit `hotkey:mode-toggle`（HUD 立即出現）。放開時 `toggle_long_press_fired` = true 跳過 toggle。短按 < 1s → 正常 toggle
 - **Mode-switch HUD 生命週期** — store 設 `modeSwitchLabel` + `showHud()`，3s 後清 label + `transitionTo("idle")`，與 success 流程一致（collapse 動畫 400ms → hideHud）。NotchHud 的 `modeSwitchLabel` watcher 只設 `visualMode = "mode-switch"`，不自行計時
 - **ESC 同時清除 DoubleTapState** — `handleEscapeAbort` 也 resolve pending `doubleTapResolve(false)` + 清除 `modeSwitchLabel`
+- **Windows Copilot 鍵 (`VK_F23`, `0x86`) 必須 early-return（硬規則）** — `windows_hook` 取出 `kbd` 結構後第一件事就是 `if kbd.vkCode == VK_F23 { return CallNextHookEx(None, n_code, w_param, l_param); }` 把信號放行，否則 SayIt 開啟期間 Copilot 實體鍵失效（干擾 Windows 11 Quick View）。**禁止把 F23 開放為 SayIt 自訂熱鍵**。詳見 [`docs/adr-windows-vk-f23.md`](../docs/adr-windows-vk-f23.md)（PR #29，v0.9.5+）
 
 #### Rust-Driven 錄鍵（Recording Mode）
 
@@ -662,6 +663,9 @@ src/
 - **Release 公開流程** — `tauri-action` 先建立 Draft release，待 matrix build 全部成功後由 `publish-release` job 自動執行 `gh release edit --draft=false`
 - **Tag 推送陷阱** — `git push origin main --tags` 可能不觸發 tag 事件，必須分開推送（release.sh 已修正）
 - **版本同步硬規則** — 發版時 `git tag`、`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 必須一致，Sentry release 一律綁定同一個版本號
+- **Claude Code Review workflows** — `.github/workflows/claude.yml`（`@claude` comment 觸發）+ `.github/workflows/claude-code-review.yml`（PR 自動 review）。前置條件：安裝 [Claude Code GitHub App](https://github.com/apps/claude) 至 repo + 設定 `CLAUDE_CODE_OAUTH_TOKEN` secret（不是 `ANTHROPIC_API_KEY`）
+- **Fork PR Claude review 跳過硬規則** — `claude-code-review.yml` 的 `claude-review` job 必須保留 `if: github.event.pull_request.head.repo.full_name == github.repository`，**禁止移除**。GitHub 不授予 fork PR `id-token: write` 權限（即使 workflow 寫了也被忽略），`anthropics/claude-code-action@v1` 的 OIDC 兌換永遠失敗。`@claude` comment 不受此限制（`issue_comment` 事件由 base repo 觸發）。詳見 [`docs/adr-claude-code-review-fork-pr.md`](../docs/adr-claude-code-review-fork-pr.md)
+- **Fork PR 第一次 workflow 需手動 approve** — GitHub 安全機制；可用 `gh api -X POST /repos/{owner}/{repo}/actions/runs/{id}/approve`
 
 #### 環境變數
 

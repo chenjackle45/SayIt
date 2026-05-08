@@ -282,11 +282,25 @@
 | macOS Intel | `https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-mac-x64.dmg` |
 | Windows | `https://github.com/chenjackle45/SayIt/releases/latest/download/SayIt-windows-x64.exe` |
 
+### Claude Code Review Workflow
+
+- **Workflows** — `.github/workflows/claude.yml`（`@claude` comment 觸發）+ `.github/workflows/claude-code-review.yml`（PR 自動 review）
+- **必要設定** — 安裝 [Claude Code GitHub App](https://github.com/apps/claude) 到 repo + 設定 `CLAUDE_CODE_OAUTH_TOKEN` secret（不是 `ANTHROPIC_API_KEY`）
+- **Fork PR 限制（硬規則）** — `claude-code-review.yml` 的 job 必須保留 `if: github.event.pull_request.head.repo.full_name == github.repository` guard，**禁止移除**。理由：GitHub 不會授予 fork PR `id-token: write`，OIDC token 兌換永遠失敗，此 guard 讓 fork PR 顯示「skipped」（灰色）而非紅色 ❌。詳見 [`docs/adr-claude-code-review-fork-pr.md`](docs/adr-claude-code-review-fork-pr.md)
+- **`@claude` comment 不受 fork 限制** — `claude.yml` 由 issue_comment 事件觸發，可正常用於任何 PR / issue
+- **Fork PR 第一次跑需手動 approve** — GitHub 安全機制；可用 `gh api -X POST /repos/{owner}/{repo}/actions/runs/{id}/approve`
+
 ## Tauri v2 macOS 注意事項
 
 - **IPC binary response**：`tauri::ipc::Response` raw bytes 在 macOS 走 JSON 序列化（`number[]`），非 `ArrayBuffer`。前端必須用 `new Uint8Array(raw)` 轉換
 - **CSP 與 asset protocol**：`convertFileSrc` 在 macOS 產生 `asset://localhost/` URL，但 CSP `media-src` 需要 `http://asset.localhost`。Dev mode 不受 CSP 影響，production build 會被阻擋。偏好使用 Rust IPC + Blob URL 繞過
 - **Dev vs Production 差異**：`pnpm tauri dev` 從 Vite dev server 載入，CSP 行為不同。安全性相關功能必須用 `pnpm tauri build --debug` 測試
+
+## Windows 鍵盤 Hook 注意事項
+
+- **Copilot 鍵 = `VK_F23` (`0x86`)（硬規則）**：低階鍵盤 hook（`mod windows_hook` 在 `src-tauri/src/plugins/hotkey_listener.rs`）必須在取出 `kbd` 後立刻判斷 `if kbd.vkCode == VK_F23 { return CallNextHookEx(...); }` 把信號放行，否則會干擾 Windows 11 Copilot Quick View。**禁止把 F23 開放成 SayIt 自訂熱鍵**。詳見 [`docs/adr-windows-vk-f23.md`](docs/adr-windows-vk-f23.md)
+- **macOS 本地 `cargo check` 無法驗證 Windows 鍵盤 hook**：`#[cfg(target_os = "windows")]` 區塊在 macOS 不編譯，必須靠 CI 的 windows runner 或實機測試
+- **`windows` crate 0.61 breaking change**：`AttachThreadInput` 從 `Win32::UI::Input::KeyboardAndMouse` 搬到 `Win32::System::Threading`，Cargo.toml features 需含 `Win32_System_Threading`
 
 ## Subagent
 
