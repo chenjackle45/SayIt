@@ -379,6 +379,7 @@
       "title": "SayIt Update Summary",
       "item1": "Test Connection button: tap it in Settings to instantly verify whether your LLM and Whisper API keys actually work — no more wondering why nothing's happening after you've configured everything",
       "item2": "Gemini long-text truncation fixed: long passages enhanced with Gemini sometimes got cut off mid-sentence. This release identifies the root cause (thinking tokens consuming the output budget) and resolves it — your full text now comes through intact",
+      "item3": "Clipboard isn't overwritten anymore: turn off \"Copy transcription to clipboard\" in Settings, and SayIt will restore whatever you had on the clipboard right after pasting — no need to re-copy what you had before just to use SayIt",
       "dismiss": "Got it"
     }
   },

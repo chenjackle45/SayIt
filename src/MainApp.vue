@@ -86,7 +86,7 @@ const showAutoInstallDialog = ref(false);
 // 升級提示（watch 而非 onMounted，因為 loadSettings 在 mount 之後才執行）
 const settingsStore = useSettingsStore();
 const showUpgradeNoticeDialog = ref(false);
-const upgradeNoticeItemCount = 2;
+const upgradeNoticeItemCount = 3;
 watch(() => settingsStore.showPromptUpgradeNotice, (shouldShow) => {
   if (shouldShow) {
     showUpgradeNoticeDialog.value = true;
