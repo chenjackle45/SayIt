@@ -80,7 +80,7 @@ describe("llmProvider.ts", () => {
       expect(body.messages[0].role).toBe("user");
     });
 
-    it("[P0] Anthropic：max_tokens 必填，未提供時預設 2048", () => {
+    it("[P0] Anthropic：max_tokens 必填，未提供時預設 8192", () => {
       const requestWithoutMaxTokens: LlmChatRequest = {
         model: "test-model",
         messages: [{ role: "user", content: "Hello" }],
@@ -88,7 +88,7 @@ describe("llmProvider.ts", () => {
       const { init } = buildFetchParams("anthropic", requestWithoutMaxTokens, TEST_API_KEY);
       const body = JSON.parse(init.body as string);
 
-      expect(body.max_tokens).toBe(2048);
+      expect(body.max_tokens).toBe(8192);
     });
 
     it("[P0] Gemini：URL 含 model、x-goog-api-key header、system_instruction 格式", () => {
