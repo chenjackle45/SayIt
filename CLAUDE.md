@@ -1,7 +1,7 @@
 # SayIt — Claude Code 專案記憶檔
 
 > Tauri v2 + Vue 3 + Rust 語音轉文字桌面應用
-> 完整規則請讀：`_bmad-output/project-context.md`（261 條）
+> 完整規則請讀：`_bmad-output/project-context.md`（323 條）
 
 ## Quick Reference
 

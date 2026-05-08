@@ -1,0 +1,75 @@
+{
+  "repository_type": "multi-part",
+  "scan_date": "2026-05-08",
+  "scan_level": "exhaustive",
+  "project_version": "0.9.5",
+  "primary_tech": "Tauri v2 + Vue 3 + Rust",
+  "parts": [
+    {
+      "part_id": "frontend",
+      "display_name": "SayIt Frontend (Vue 3 + Tauri JS API)",
+      "project_type_id": "web",
+      "root_path": "src",
+      "loc": 11503,
+      "primary_language": "TypeScript",
+      "framework": "Vue 3.5",
+      "entry_points": [
+        { "label": "main", "html": "index.html", "ts": "src/main.ts", "role": "HUD" },
+        { "label": "main-window", "html": "main-window.html", "ts": "src/main-window.ts", "role": "Dashboard" }
+      ],
+      "stores_count": 4,
+      "views_count": 5,
+      "components_count": 11,
+      "ui_components_count": 21
+    },
+    {
+      "part_id": "backend",
+      "display_name": "SayIt Backend (Tauri Rust Runtime)",
+      "project_type_id": "desktop",
+      "root_path": "src-tauri",
+      "loc": 6006,
+      "primary_language": "Rust",
+      "framework": "Tauri v2",
+      "edition": "2021",
+      "plugins_count": 8,
+      "managed_states_count": 7,
+      "tauri_commands_count": 34,
+      "tauri_events_count": 15
+    }
+  ],
+  "integration_points": [
+    {
+      "from": "frontend",
+      "to": "backend",
+      "type": "Tauri Command (invoke)",
+      "count": 34,
+      "details": "RPC-style synchronous calls returning Result<T, E>. Registered in src-tauri/src/lib.rs invoke_handler! macro."
+    },
+    {
+      "from": "backend",
+      "to": "frontend",
+      "type": "Tauri Event (emit/listen)",
+      "count": 15,
+      "details": "Async system push (hotkey, waveform, quality monitor). Constants in src/composables/useTauriEvents.ts."
+    },
+    {
+      "from": "frontend",
+      "to": "frontend",
+      "type": "Frontend-only Event (cross-window)",
+      "count": 5,
+      "details": "HUD ↔ Dashboard state sync (voice-flow, transcription, settings, vocabulary)."
+    }
+  ],
+  "external_apis": [
+    { "name": "Groq Whisper", "endpoint": "https://api.groq.com/openai/v1/audio/transcriptions", "caller": "backend (reqwest)" },
+    { "name": "Groq LLM", "endpoint": "https://api.groq.com/openai/v1/chat/completions", "caller": "frontend (plugin-http)" },
+    { "name": "OpenAI", "endpoint": "https://api.openai.com/v1/chat/completions", "caller": "frontend (plugin-http)" },
+    { "name": "Anthropic", "endpoint": "https://api.anthropic.com/v1/messages", "caller": "frontend (plugin-http)" },
+    { "name": "Gemini", "endpoint": "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", "caller": "frontend (plugin-http)" }
+  ],
+  "shared_dependencies": [
+    "tauri-plugin-sql (sqlite:app.db)",
+    "tauri-plugin-store (KV for API key + settings)",
+    "Sentry (Rust + Vue, production-only)"
+  ]
+}
