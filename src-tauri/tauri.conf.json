@@ -48,7 +48,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https://api.groq.com https://generativelanguage.googleapis.com; style-src 'self' 'unsafe-inline'; script-src 'self'; media-src 'self' blob: http://asset.localhost",
+      "csp": "default-src 'self'; connect-src 'self' https://api.groq.com https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com; style-src 'self' 'unsafe-inline'; script-src 'self'; media-src 'self' blob: http://asset.localhost",
       "assetProtocol": {
         "enable": true,
         "scope": [
