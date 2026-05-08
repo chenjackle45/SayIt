@@ -1111,7 +1111,7 @@ mod windows_hook {
         if n_code >= 0 {
             if let Some(ctx) = CONTEXT.get() {
                 let kbd = *(l_param.0 as *const KBDLLHOOKSTRUCT);
-                // Ignore Copilot's dedicated VK_F23 signal to avoid interfering with QuickFill.
+                // Ignore Copilot's dedicated VK_F23 signal to avoid interfering with Quick View.
                 if kbd.vkCode == VK_F23 {
                     return CallNextHookEx(None, n_code, w_param, l_param);
                 }
