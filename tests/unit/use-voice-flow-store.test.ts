@@ -847,7 +847,7 @@ describe("useVoiceFlowStore", () => {
         }),
       );
       mockEnhanceText.mockResolvedValueOnce({
-        text: "整理後的書面語文字",
+        text: "這是一段超過十個字的測試轉錄文字內容。",
         usage: null,
       });
 
@@ -864,7 +864,7 @@ describe("useVoiceFlowStore", () => {
       triggerHotkeyEvent("hotkey:released");
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
-          text: "整理後的書面語文字",
+          text: "這是一段超過十個字的測試轉錄文字內容。",
           restoreClipboard: false,
         });
       });
@@ -1016,7 +1016,7 @@ describe("useVoiceFlowStore", () => {
         }),
       );
       mockEnhanceText.mockResolvedValueOnce({
-        text: "整理後十個字",
+        text: "一二三四五六七八九十。",
         usage: null,
       });
 
@@ -1033,7 +1033,7 @@ describe("useVoiceFlowStore", () => {
       triggerHotkeyEvent("hotkey:released");
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
-          text: "整理後十個字",
+          text: "一二三四五六七八九十。",
           restoreClipboard: false,
         });
       });
@@ -1431,7 +1431,7 @@ describe("useVoiceFlowStore", () => {
         }),
       );
       mockEnhanceText.mockResolvedValueOnce({
-        text: "整理後的書面語文字",
+        text: "這是一段超過十個字的測試轉錄文字內容。",
         usage: null,
       });
 
@@ -1448,7 +1448,7 @@ describe("useVoiceFlowStore", () => {
       triggerHotkeyEvent("hotkey:released");
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
-          text: "整理後的書面語文字",
+          text: "這是一段超過十個字的測試轉錄文字內容。",
           restoreClipboard: false,
         });
       });
@@ -1613,7 +1613,7 @@ describe("useVoiceFlowStore", () => {
         }),
       );
       mockEnhanceText.mockResolvedValueOnce({
-        text: "整理後的書面語文字",
+        text: "這是一段超過十個字的測試轉錄文字內容。",
         usage: null,
       });
 
@@ -1630,7 +1630,7 @@ describe("useVoiceFlowStore", () => {
       triggerHotkeyEvent("hotkey:released");
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
-          text: "整理後的書面語文字",
+          text: "這是一段超過十個字的測試轉錄文字內容。",
           restoreClipboard: false,
         });
       });
@@ -1641,7 +1641,7 @@ describe("useVoiceFlowStore", () => {
 
       const record = mockAddTranscription.mock.calls[0][0];
       expect(record.rawText).toBe(longText);
-      expect(record.processedText).toBe("整理後的書面語文字");
+      expect(record.processedText).toBe("這是一段超過十個字的測試轉錄文字內容。");
       expect(record.wasEnhanced).toBe(true);
       expect(record.enhancementDurationMs).toBeGreaterThanOrEqual(0);
       expect(record.charCount).toBe(longText.length);
@@ -1895,7 +1895,7 @@ describe("useVoiceFlowStore", () => {
         }),
       );
       mockEnhanceText.mockResolvedValueOnce({
-        text: "整理後的書面語文字",
+        text: "這是一段超過十個字的測試轉錄文字內容。",
         usage: {
           promptTokens: 100,
           completionTokens: 50,
@@ -1919,7 +1919,7 @@ describe("useVoiceFlowStore", () => {
       triggerHotkeyEvent("hotkey:released");
       await vi.waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
-          text: "整理後的書面語文字",
+          text: "這是一段超過十個字的測試轉錄文字內容。",
           restoreClipboard: false,
         });
       });

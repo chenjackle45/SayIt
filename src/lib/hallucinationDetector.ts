@@ -86,6 +86,74 @@ export function detectEnhancementAnomaly(
   return { isAnomaly: false, reason: null };
 }
 
+// ── 增強後語意 grounding 偵測（#43）──
+
+/** 語意守衛：正規化後 rawText 至少要這麼長才判定（過短不可靠、交給 prompt） */
+export const SEMANTIC_DRIFT_MIN_RAW_CHARS = 6;
+/** 語意守衛門檻：enhanced 的 bigram 落在 raw 內的比例低於此值 → 判定「內容飄走」。
+ *  刻意設低（保守）：只擋「明顯不相干」，避免把合法的條列化/大幅改寫誤判成 drift。 */
+export const SEMANTIC_DRIFT_MIN_OVERLAP = 0.2;
+
+export interface SemanticDriftResult {
+  isDrift: boolean;
+  /** enhanced 的 bigram 有多少比例 grounded 在 raw（containment，0~1） */
+  overlapRatio: number;
+}
+
+/** 正規化：小寫化、去除空白與標點，只留字母/數字/CJK 等文字字元。 */
+function normalizeForOverlap(text: string): string {
+  return text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function toBigramSet(text: string): Set<string> {
+  const set = new Set<string>();
+  for (let i = 0; i < text.length - 1; i += 1) {
+    set.add(text.slice(i, i + 2));
+  }
+  return set;
+}
+
+/**
+ * 增強後語意偏移偵測（#43 核心守衛）。
+ *
+ * 校對/整理的產出理應與原文高度重疊（同樣的字詞、只是修標點順句）；
+ * 若模型「答非所問」或自由發揮，產出會用完全不同的字詞 → bigram 幾乎不落在原文內。
+ * 用 enhanced→raw 的 bigram containment 當指標：長度差異不懲罰（raw 較長不影響），
+ * 只看「產出有多少 grounded 在原文」。門檻刻意保守、只擋明顯不相干。
+ *
+ * 注意：這是「長度爆炸」偵測之外的第二道、獨立的守衛；短輸入直接豁免。
+ */
+export function detectSemanticDrift(
+  rawText: string,
+  enhancedText: string,
+): SemanticDriftResult {
+  const raw = normalizeForOverlap(rawText);
+  const enhanced = normalizeForOverlap(enhancedText);
+
+  // 極短原文不可靠、或 enhanced 為空 → 不在此判定 drift（交給 prompt / 既有守衛）
+  if (raw.length < SEMANTIC_DRIFT_MIN_RAW_CHARS || enhanced.length === 0) {
+    return { isDrift: false, overlapRatio: 1 };
+  }
+
+  const rawBigrams = toBigramSet(raw);
+  const enhancedBigrams = toBigramSet(enhanced);
+  // 單字元（無 bigram 可比）保護
+  if (rawBigrams.size === 0 || enhancedBigrams.size === 0) {
+    return { isDrift: false, overlapRatio: 1 };
+  }
+
+  let grounded = 0;
+  for (const bigram of enhancedBigrams) {
+    if (rawBigrams.has(bigram)) grounded += 1;
+  }
+  const overlapRatio = grounded / enhancedBigrams.size;
+
+  return {
+    isDrift: overlapRatio < SEMANTIC_DRIFT_MIN_OVERLAP,
+    overlapRatio,
+  };
+}
+
 // ── 轉錄幻覺偵測 ──
 
 export function detectHallucination(

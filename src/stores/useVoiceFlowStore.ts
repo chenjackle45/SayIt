@@ -16,6 +16,7 @@ import { enhanceText, buildSystemPrompt } from "../lib/enhancer";
 import { getEditModePromptForLocale } from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
 import { analyzeCorrections } from "../lib/vocabularyAnalyzer";
+import { convertSimplifiedToTraditional } from "../lib/simplifiedToTraditional";
 import i18n from "../i18n";
 import { useVocabularyStore } from "./useVocabularyStore";
 import { useHistoryStore } from "./useHistoryStore";
@@ -54,6 +55,7 @@ import {
 import {
   detectHallucination,
   detectEnhancementAnomaly,
+  detectSemanticDrift,
 } from "../lib/hallucinationDetector";
 import type { HudStatus, HudTargetPosition } from "../types";
 import type { VoiceFlowStateChangedPayload } from "../types/events";
@@ -80,6 +82,24 @@ function isEmptyTranscription(rawText: string): boolean {
 }
 function t(key: string, params?: Record<string, unknown>): string {
   return i18n.global.t(key, params ?? {});
+}
+
+/**
+ * 轉錄原文落地前的文字轉換。
+ * 目前只做：轉譯語言解析為繁中（zh-TW）時，把 Whisper 的簡體輸出轉成繁體（#39）。
+ * 「auto」模式回退到介面語言；其餘語言原樣返回。
+ */
+function applyTranscriptTextTransforms(rawText: string): string {
+  if (!rawText) return rawText;
+  const settingsStore = useSettingsStore();
+  const transcriptionLocale = settingsStore.selectedTranscriptionLocale;
+  const effectiveLocale =
+    transcriptionLocale === "auto"
+      ? settingsStore.selectedLocale
+      : transcriptionLocale;
+  return effectiveLocale === "zh-TW"
+    ? convertSimplifiedToTraditional(rawText)
+    : rawText;
 }
 
 const MONITOR_POLL_INTERVAL_MS = 250;
@@ -1143,6 +1163,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       });
       if (isAborted.value) return;
 
+      // #39：轉譯語言為繁中時，把 Whisper 的簡體輸出轉成繁體（落地前一次到位）
+      result.rawText = applyTranscriptTextTransforms(result.rawText);
+
       writeInfoLog(`轉錄原文: "${result.rawText}"`);
 
       if (isEmptyTranscription(result.rawText)) {
@@ -1289,14 +1312,19 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             if (isAborted.value) return;
           }
 
-          // 重試後仍異常 → fallback 到 rawText
+          // 重試後仍異常（長度爆炸）或語意飄走（#43）→ fallback 到 rawText
           const finalAnomaly = detectEnhancementAnomaly({
             rawText: result.rawText,
             enhancedText: enhanceResult.text,
           });
-          if (finalAnomaly.isAnomaly) {
+          const drift = detectSemanticDrift(
+            result.rawText,
+            enhanceResult.text,
+          );
+          const shouldFallbackToRaw = finalAnomaly.isAnomaly || drift.isDrift;
+          if (shouldFallbackToRaw) {
             writeErrorLog(
-              `useVoiceFlowStore: enhancement failed after ${MAX_ENHANCEMENT_RETRY_COUNT} retries (reason=${finalAnomaly.reason}), falling back to raw text`,
+              `useVoiceFlowStore: enhancement rejected (anomaly=${finalAnomaly.reason ?? "none"}, drift=${drift.isDrift}, overlap=${drift.overlapRatio.toFixed(2)}), falling back to raw text`,
             );
             enhanceResult = { ...enhanceResult, text: result.rawText };
           }
@@ -1311,7 +1339,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             recordingDurationMs,
             transcriptionDurationMs: result.transcriptionDurationMs,
             enhancementDurationMs,
-            wasEnhanced: !finalAnomaly.isAnomaly,
+            wasEnhanced: !shouldFallbackToRaw,
             audioFilePath,
             status: "success",
           });
@@ -1552,6 +1580,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       );
       if (isAborted.value) return;
 
+      // #39：同主路徑，重送轉錄後也套用簡→繁
+      result.rawText = applyTranscriptTextTransforms(result.rawText);
+
       writeInfoLog(`重送轉錄原文: "${result.rawText}"`);
 
       if (isEmptyTranscription(result.rawText)) {
@@ -1600,7 +1631,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
           const enhancementTermList =
             await vocabularyStore.getTopTermListByWeight(50);
-          const enhanceResult = await enhanceText(result.rawText, llmApiKey, {
+          let enhanceResult = await enhanceText(result.rawText, llmApiKey, {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
@@ -1608,6 +1639,24 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             signal: abortController?.signal,
           });
           if (isAborted.value) return;
+
+          // 重送路徑同樣套用守衛（長度爆炸 / 語意飄走 #43）→ fallback 到 rawText
+          const resendAnomaly = detectEnhancementAnomaly({
+            rawText: result.rawText,
+            enhancedText: enhanceResult.text,
+          });
+          const resendDrift = detectSemanticDrift(
+            result.rawText,
+            enhanceResult.text,
+          );
+          const shouldFallbackToRaw =
+            resendAnomaly.isAnomaly || resendDrift.isDrift;
+          if (shouldFallbackToRaw) {
+            writeErrorLog(
+              `useVoiceFlowStore: resend enhancement rejected (anomaly=${resendAnomaly.reason ?? "none"}, drift=${resendDrift.isDrift}, overlap=${resendDrift.overlapRatio.toFixed(2)}), falling back to raw text`,
+            );
+            enhanceResult = { ...enhanceResult, text: result.rawText };
+          }
 
           const enhancementDurationMs =
             performance.now() - enhancementStartTime;
@@ -1619,7 +1668,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             recordingDurationMs,
             transcriptionDurationMs: result.transcriptionDurationMs,
             enhancementDurationMs,
-            wasEnhanced: true,
+            wasEnhanced: !shouldFallbackToRaw,
             audioFilePath: filePath,
             status: "success",
           });
@@ -1645,7 +1694,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                 result.transcriptionDurationMs,
               ),
               enhancementDurationMs: Math.round(enhancementDurationMs),
-              wasEnhanced: true,
+              wasEnhanced: !shouldFallbackToRaw,
               charCount: result.rawText.length,
             })
             .then(() => {
