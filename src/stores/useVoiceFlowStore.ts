@@ -500,12 +500,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   function startCorrectionDetectionFlow(
     pastedText: string,
     transcriptionId: string,
-    apiKey: string,
   ) {
     void (async () => {
       try {
         const settingsStore = useSettingsStore();
         if (!settingsStore.isSmartDictionaryEnabled) return;
+        if (!settingsStore.hasLlmApiKey) return;
 
         // 清除前一次的 listener，避免重複累積
         cleanupCorrectionMonitorListener();
@@ -613,12 +613,15 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     `[correction] text modified (overlap=${Math.round(overlapRatio * 100)}%) — sending to AI analysis\n  original:  ${pastedText.slice(0, 80)}\n  corrected: ${fieldText.slice(0, 80)}`,
                   );
 
+                  const llmCfg = await settingsStore.getLlmRequestConfig();
                   const analysisResult = await analyzeCorrections(
                     pastedText,
                     fieldText,
-                    apiKey,
+                    llmCfg.apiKey,
                     {
-                      modelId: settingsStore.selectedLlmModelId,
+                      modelId: llmCfg.modelId,
+                      provider: llmCfg.provider,
+                      azure: llmCfg.azure,
                     },
                   );
 
@@ -665,7 +668,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                         id: crypto.randomUUID(),
                         transcriptionId,
                         apiType: "vocabulary_analysis",
-                        model: settingsStore.selectedLlmModelId,
+                        model: settingsStore.getEffectiveChatModel(),
                         promptTokens: analysisResult.usage.promptTokens,
                         completionTokens: analysisResult.usage.completionTokens,
                         totalTokens: analysisResult.usage.totalTokens,
@@ -675,7 +678,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                         audioDurationMs: null,
                         estimatedCostCeiling: calculateChatCostCeiling(
                           analysisResult.usage.totalTokens,
-                          settingsStore.selectedLlmModelId,
+                          settingsStore.getEffectiveChatModel(),
                         ),
                       })
                       .catch((err) =>
@@ -773,11 +776,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const finalText = params.record.processedText ?? params.record.rawText;
       updateVocabularyWeightsAfterPaste(finalText);
 
-      // 修正偵測（fire-and-forget，需 LLM API key）
-      const llmApiKey = settingsStore.getLlmApiKey();
-      if (llmApiKey) {
-        startCorrectionDetectionFlow(params.text, params.record.id, llmApiKey);
-      }
+      // 修正偵測（fire-and-forget；API key / 設定檢查移至 flow 內部）
+      startCorrectionDetectionFlow(params.text, params.record.id);
     } catch (pasteError) {
       isRecording.value = false;
       failRecordingFlow(
@@ -829,7 +829,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         id: crypto.randomUUID(),
         transcriptionId: record.id,
         apiType: "chat",
-        model: settingsStore.selectedLlmModelId,
+        model: settingsStore.getEffectiveChatModel(),
         promptTokens: chatUsage.promptTokens,
         completionTokens: chatUsage.completionTokens,
         totalTokens: chatUsage.totalTokens,
@@ -839,7 +839,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         audioDurationMs: null,
         estimatedCostCeiling: calculateChatCostCeiling(
           chatUsage.totalTokens,
-          settingsStore.selectedLlmModelId,
+          settingsStore.getEffectiveChatModel(),
         ),
       });
     }
@@ -1116,14 +1116,15 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
       transitionTo("transcribing", t("voiceFlow.transcribing"));
       const settingsStore = useSettingsStore();
-      let apiKey = settingsStore.getApiKey();
-
-      if (!apiKey) {
+      if (
+        settingsStore.whisperProviderId === "groq" &&
+        !settingsStore.getApiKey()
+      ) {
         await settingsStore.refreshApiKey();
-        apiKey = settingsStore.getApiKey();
       }
 
-      if (!apiKey) {
+      const whisperCfg = await settingsStore.getWhisperRequestConfig();
+      if (!whisperCfg.apiKey) {
         failRecordingFlow(
           t("errors.apiKeyMissing"),
           "useVoiceFlowStore: missing API key while transcribing",
@@ -1136,10 +1137,14 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const hasVocabulary = whisperTermList.length > 0;
 
       const result = await invoke<TranscriptionResult>("transcribe_audio", {
-        apiKey,
+        apiKey: whisperCfg.apiKey,
         vocabularyTermList: hasVocabulary ? whisperTermList : null,
         modelId: settingsStore.selectedWhisperModelId,
         language: settingsStore.getWhisperLanguageCode(),
+        provider: whisperCfg.provider,
+        endpoint: whisperCfg.endpoint ?? null,
+        deployment: whisperCfg.deployment ?? null,
+        apiVersion: whisperCfg.apiVersion ?? null,
       });
       if (isAborted.value) return;
 
@@ -1246,8 +1251,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
         try {
           await settingsStore.refreshLlmApiKey();
-          const llmApiKey = settingsStore.getLlmApiKey();
-          if (!llmApiKey) {
+          const llmCfg = await settingsStore.getLlmRequestConfig();
+          if (!llmCfg.apiKey) {
             throw new Error(t("errors.apiKeyMissing"));
           }
 
@@ -1257,13 +1262,15 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
-            modelId: settingsStore.selectedLlmModelId,
+            modelId: llmCfg.modelId,
+            provider: llmCfg.provider,
+            azure: llmCfg.azure,
             signal: abortController?.signal,
           };
 
           let enhanceResult = await enhanceText(
             result.rawText,
-            llmApiKey,
+            llmCfg.apiKey,
             enhanceOptions,
           );
           if (isAborted.value) return;
@@ -1283,7 +1290,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             );
             enhanceResult = await enhanceText(
               result.rawText,
-              llmApiKey,
+              llmCfg.apiKey,
               enhanceOptions,
             );
             if (isAborted.value) return;
@@ -1439,8 +1446,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     try {
       const settingsStore = useSettingsStore();
       await settingsStore.refreshLlmApiKey();
-      const llmApiKey = settingsStore.getLlmApiKey();
-      if (!llmApiKey) {
+      const llmCfg = await settingsStore.getLlmRequestConfig();
+      if (!llmCfg.apiKey) {
         throw new Error(t("errors.apiKeyMissing"));
       }
 
@@ -1450,9 +1457,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         `${basePrompt}\n\n<instruction>\n${params.voiceInstruction}\n</instruction>`,
       );
 
-      const editResult = await enhanceText(params.selectedText, llmApiKey, {
+      const editResult = await enhanceText(params.selectedText, llmCfg.apiKey, {
         systemPrompt,
-        modelId: settingsStore.selectedLlmModelId,
+        modelId: llmCfg.modelId,
+        provider: llmCfg.provider,
+        azure: llmCfg.azure,
         signal: abortController?.signal,
         maxTokens: EDIT_MODE_MAX_TOKENS,
       });
@@ -1521,14 +1530,15 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
     try {
       const settingsStore = useSettingsStore();
-      let apiKey = settingsStore.getApiKey();
-
-      if (!apiKey) {
+      if (
+        settingsStore.whisperProviderId === "groq" &&
+        !settingsStore.getApiKey()
+      ) {
         await settingsStore.refreshApiKey();
-        apiKey = settingsStore.getApiKey();
       }
 
-      if (!apiKey) {
+      const whisperCfg = await settingsStore.getWhisperRequestConfig();
+      if (!whisperCfg.apiKey) {
         transitionTo("error", t("errors.apiKeyMissing"));
         playSoundIfEnabled("play_error_sound");
         lastFailedAudioFilePath.value = null;
@@ -1544,11 +1554,15 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         "retranscribe_from_file",
         {
           filePath,
-          apiKey,
+          apiKey: whisperCfg.apiKey,
           vocabularyTermList: hasVocabulary ? whisperTermList : null,
           modelId: settingsStore.selectedWhisperModelId,
           language: settingsStore.getWhisperLanguageCode(),
-        },
+          provider: whisperCfg.provider,
+          endpoint: whisperCfg.endpoint ?? null,
+          deployment: whisperCfg.deployment ?? null,
+          apiVersion: whisperCfg.apiVersion ?? null,
+          },
       );
       if (isAborted.value) return;
 
@@ -1593,18 +1607,20 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
         try {
           await settingsStore.refreshLlmApiKey();
-          const llmApiKey = settingsStore.getLlmApiKey();
-          if (!llmApiKey) {
+          const llmCfg = await settingsStore.getLlmRequestConfig();
+          if (!llmCfg.apiKey) {
             throw new Error(t("errors.apiKeyMissing"));
           }
 
           const enhancementTermList =
             await vocabularyStore.getTopTermListByWeight(50);
-          const enhanceResult = await enhanceText(result.rawText, llmApiKey, {
+          const enhanceResult = await enhanceText(result.rawText, llmCfg.apiKey, {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
-            modelId: settingsStore.selectedLlmModelId,
+            modelId: llmCfg.modelId,
+            provider: llmCfg.provider,
+            azure: llmCfg.azure,
             signal: abortController?.signal,
           });
           if (isAborted.value) return;

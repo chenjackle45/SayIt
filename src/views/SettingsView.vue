@@ -564,6 +564,128 @@ async function handleProviderChange(providerId: LlmProviderId) {
   }
 }
 
+// ── Azure / Microsoft Foundry ───────────────────────────────
+const azureFeedback = useFeedbackMessage();
+const azureEnabledInput = ref(false);
+const azureEndpointInput = ref("");
+const azureApiKeyInput = ref("");
+const azureApiVersionInput = ref("");
+const isAzureApiKeyVisible = ref(false);
+const isSubmittingAzure = ref(false);
+const azureChatDeploymentInput = ref("");
+const azureWhisperDeploymentInput = ref("");
+
+function loadAzureInputsFromStore() {
+  azureEnabledInput.value = settingsStore.azureEnabled;
+  azureEndpointInput.value = settingsStore.azureEndpoint;
+  azureApiKeyInput.value = settingsStore.azureApiKey;
+  azureApiVersionInput.value = settingsStore.azureApiVersion;
+  azureChatDeploymentInput.value = settingsStore.azureChatDeployment;
+  azureWhisperDeploymentInput.value = settingsStore.azureWhisperDeployment;
+}
+
+async function handleSaveAzureConnection() {
+  try {
+    isSubmittingAzure.value = true;
+    await settingsStore.saveAzureConnection({
+      enabled: azureEnabledInput.value,
+      endpoint: azureEndpointInput.value,
+      apiKey: azureApiKeyInput.value,
+      apiVersion: azureApiVersionInput.value,
+    });
+    azureFeedback.show("success", t("settings.azure.saved"));
+  } catch (err) {
+    azureFeedback.show("error", extractErrorMessage(err));
+  } finally {
+    isSubmittingAzure.value = false;
+  }
+}
+
+async function handleToggleAzureEnabled(value: boolean) {
+  azureEnabledInput.value = value;
+  await handleSaveAzureConnection();
+}
+
+async function handleDeleteAzureConnection() {
+  try {
+    isSubmittingAzure.value = true;
+    await settingsStore.deleteAzureConnection();
+    loadAzureInputsFromStore();
+    azureFeedback.show("success", t("settings.azure.deleted"));
+  } catch (err) {
+    azureFeedback.show("error", extractErrorMessage(err));
+  } finally {
+    isSubmittingAzure.value = false;
+  }
+}
+
+async function handleSaveAzureChatDeployment() {
+  try {
+    await settingsStore.saveAzureChatDeployment(azureChatDeploymentInput.value);
+    providerFeedback.show("success", t("settings.azure.deploymentSaved"));
+  } catch (err) {
+    providerFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleSaveAzureWhisperDeployment() {
+  try {
+    await settingsStore.saveAzureWhisperDeployment(
+      azureWhisperDeploymentInput.value,
+    );
+    modelFeedback.show("success", t("settings.azure.deploymentSaved"));
+  } catch (err) {
+    modelFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleWhisperProviderChange(id: "groq" | "azure") {
+  try {
+    await settingsStore.saveWhisperProvider(id);
+    modelFeedback.show("success", t("settings.model.whisperUpdated"));
+  } catch (err) {
+    modelFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function testAzureChatConnection() {
+  try {
+    const cfg = await settingsStore.getLlmRequestConfig();
+    return await testLlmConnection(cfg.modelId, cfg.apiKey, {
+      provider: cfg.provider,
+      azure: cfg.azure,
+    });
+  } catch (err) {
+    return {
+      ok: false as const,
+      durationMs: 0,
+      errorMessage: extractErrorMessage(err),
+    };
+  }
+}
+
+async function testAzureWhisperConnection() {
+  try {
+    const cfg = await settingsStore.getWhisperRequestConfig();
+    return await testWhisperConnection(
+      settingsStore.selectedWhisperModelId,
+      cfg.apiKey,
+      {
+        provider: cfg.provider,
+        endpoint: cfg.endpoint,
+        deployment: cfg.deployment,
+        apiVersion: cfg.apiVersion,
+      },
+    );
+  } catch (err) {
+    return {
+      ok: false as const,
+      durationMs: 0,
+      errorMessage: extractErrorMessage(err),
+    };
+  }
+}
+
 async function handleSaveOpenaiApiKey() {
   try {
     await settingsStore.saveOpenaiApiKey(openaiApiKeyInput.value);
@@ -843,6 +965,7 @@ onMounted(async () => {
   if (settingsStore.hasApiKey) {
     apiKeyInput.value = settingsStore.getApiKey();
   }
+  loadAzureInputsFromStore();
   thresholdEnabled.value = settingsStore.isEnhancementThresholdEnabled;
   thresholdCharCount.value = settingsStore.enhancementThresholdCharCount;
   recordingAutoCleanupEnabled.value =
@@ -874,6 +997,7 @@ onBeforeUnmount(() => {
   smartDictionaryFeedback.clearTimer();
   recordingCleanupFeedback.clearTimer();
   providerFeedback.clearTimer();
+  azureFeedback.clearTimer();
   clearTimeout(deleteConfirmTimeoutId);
   clearTimeout(resetPromptConfirmTimeoutId);
 });
@@ -1175,6 +1299,82 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
+    <!-- Azure / Microsoft Foundry 連線 -->
+    <Card>
+      <CardHeader class="flex-row items-center justify-between border-b border-border">
+        <CardTitle class="text-base">{{ $t("settings.azure.title") }}</CardTitle>
+        <Switch
+          :model-value="azureEnabledInput"
+          @update:model-value="handleToggleAzureEnabled"
+        />
+      </CardHeader>
+      <CardContent v-if="azureEnabledInput" class="space-y-4">
+        <p class="text-sm text-muted-foreground leading-relaxed">
+          {{ $t("settings.azure.description") }}
+        </p>
+
+        <div class="space-y-2">
+          <Label for="azure-endpoint">{{ $t("settings.azure.endpointLabel") }}</Label>
+          <Input
+            id="azure-endpoint"
+            v-model="azureEndpointInput"
+            :placeholder="$t('settings.azure.endpointPlaceholder')"
+            class="font-mono text-xs"
+          />
+        </div>
+
+        <div class="space-y-2">
+          <Label for="azure-api-key">{{ $t("settings.azure.apiKeyLabel") }}</Label>
+          <div class="flex gap-2">
+            <Input
+              id="azure-api-key"
+              v-model="azureApiKeyInput"
+              :type="isAzureApiKeyVisible ? 'text' : 'password'"
+              class="flex-1 font-mono text-xs"
+            />
+            <Button variant="outline" size="sm" @click="isAzureApiKeyVisible = !isAzureApiKeyVisible">
+              {{ isAzureApiKeyVisible ? $t('settings.apiKey.hide') : $t('settings.apiKey.show') }}
+            </Button>
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <Label for="azure-api-version">{{ $t("settings.azure.apiVersionLabel") }}</Label>
+          <Input
+            id="azure-api-version"
+            v-model="azureApiVersionInput"
+            :placeholder="$t('settings.azure.apiVersionPlaceholder')"
+            class="font-mono text-xs"
+          />
+        </div>
+
+        <div class="flex items-center justify-between">
+          <transition name="feedback-fade">
+            <p
+              v-if="azureFeedback.message.value !== ''"
+              class="text-sm"
+              :class="azureFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
+            >
+              {{ azureFeedback.message.value }}
+            </p>
+          </transition>
+          <div class="flex gap-2">
+            <Button
+              variant="outline"
+              class="text-destructive border-destructive hover:bg-destructive/10"
+              :disabled="isSubmittingAzure"
+              @click="handleDeleteAzureConnection"
+            >
+              {{ $t('settings.azure.clear') }}
+            </Button>
+            <Button :disabled="isSubmittingAzure" @click="handleSaveAzureConnection">
+              {{ $t('common.save') }}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
     <!-- 模型選擇 -->
     <Card>
       <CardHeader class="border-b border-border">
@@ -1188,31 +1388,81 @@ onBeforeUnmount(() => {
         <!-- Whisper 模型 -->
         <div class="space-y-2">
           <Label for="whisper-model">{{ $t("settings.model.whisperLabel") }}</Label>
-          <Select
-            :model-value="settingsStore.selectedWhisperModelId"
-            @update:model-value="handleWhisperModelChange($event as WhisperModelId)"
+
+          <!-- 轉錄 provider 切換（僅在 Azure 啟用時顯示） -->
+          <RadioGroup
+            v-if="settingsStore.azureEnabled"
+            :model-value="settingsStore.whisperProviderId"
+            class="grid grid-cols-2 gap-2"
+            @update:model-value="(v: unknown) => handleWhisperProviderChange(v as 'groq' | 'azure')"
           >
-            <SelectTrigger id="whisper-model" class="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="model in WHISPER_MODEL_LIST"
-                :key="model.id"
-                :value="model.id"
-              >
-                {{ model.displayName }}
-                <template v-if="model.isDefault" #extra>
-                  <Badge variant="secondary" class="ml-2 text-xs">{{ $t("settings.model.default") }}</Badge>
-                </template>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <p class="text-xs text-muted-foreground">{{ whisperModelDescription }}</p>
-          <ConnectionTestButton
-            :on-test="() => testWhisperConnection(settingsStore.selectedWhisperModelId, settingsStore.getApiKey())"
-            :disabled="!settingsStore.hasApiKey"
-          />
+            <Label
+              for="whisper-provider-groq"
+              class="flex cursor-pointer items-center gap-2.5 rounded-md border border-border p-3 transition-colors"
+              :class="settingsStore.whisperProviderId === 'groq' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'"
+            >
+              <RadioGroupItem id="whisper-provider-groq" value="groq" class="!size-0 !border-0 !shadow-none overflow-hidden" />
+              <span class="text-sm font-medium">Groq</span>
+            </Label>
+            <Label
+              for="whisper-provider-azure"
+              class="flex cursor-pointer items-center gap-2.5 rounded-md border border-border p-3 transition-colors"
+              :class="settingsStore.whisperProviderId === 'azure' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'"
+            >
+              <RadioGroupItem id="whisper-provider-azure" value="azure" class="!size-0 !border-0 !shadow-none overflow-hidden" />
+              <span class="text-sm font-medium">Azure</span>
+            </Label>
+          </RadioGroup>
+
+          <!-- Groq Whisper 模型下拉 -->
+          <template v-if="settingsStore.whisperProviderId === 'groq'">
+            <Select
+              :model-value="settingsStore.selectedWhisperModelId"
+              @update:model-value="handleWhisperModelChange($event as WhisperModelId)"
+            >
+              <SelectTrigger id="whisper-model" class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="model in WHISPER_MODEL_LIST"
+                  :key="model.id"
+                  :value="model.id"
+                >
+                  {{ model.displayName }}
+                  <template v-if="model.isDefault" #extra>
+                    <Badge variant="secondary" class="ml-2 text-xs">{{ $t("settings.model.default") }}</Badge>
+                  </template>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p class="text-xs text-muted-foreground">{{ whisperModelDescription }}</p>
+            <ConnectionTestButton
+              :on-test="() => testWhisperConnection(settingsStore.selectedWhisperModelId, settingsStore.getApiKey())"
+              :disabled="!settingsStore.hasApiKey"
+            />
+          </template>
+
+          <!-- Azure Whisper 部署 -->
+          <template v-else>
+            <Label for="azure-whisper-deployment">{{ $t("settings.azure.whisperDeploymentLabel") }}</Label>
+            <div class="flex gap-2">
+              <Input
+                id="azure-whisper-deployment"
+                v-model="azureWhisperDeploymentInput"
+                :placeholder="$t('settings.azure.whisperDeploymentPlaceholder')"
+                class="flex-1 font-mono text-xs"
+              />
+              <Button size="sm" :disabled="!azureWhisperDeploymentInput.trim()" @click="handleSaveAzureWhisperDeployment">
+                {{ $t('common.save') }}
+              </Button>
+            </div>
+            <p class="text-xs text-muted-foreground">{{ $t("settings.azure.whisperHint") }}</p>
+            <ConnectionTestButton
+              :on-test="testAzureWhisperConnection"
+              :disabled="!settingsStore.hasWhisperConfig"
+            />
+          </template>
         </div>
 
         <Separator />
@@ -1349,8 +1599,27 @@ onBeforeUnmount(() => {
           </p>
         </div>
 
+        <div v-else-if="settingsStore.selectedLlmProviderId === 'azure'" class="space-y-2">
+          <Label for="azure-chat-deployment">{{ $t("settings.azure.chatDeploymentLabel") }}</Label>
+          <div class="flex gap-2">
+            <Input
+              id="azure-chat-deployment"
+              v-model="azureChatDeploymentInput"
+              :placeholder="$t('settings.azure.chatDeploymentPlaceholder')"
+              class="flex-1 font-mono text-xs"
+            />
+            <Button size="sm" :disabled="!azureChatDeploymentInput.trim()" @click="handleSaveAzureChatDeployment">
+              {{ $t('common.save') }}
+            </Button>
+          </div>
+          <p v-if="!settingsStore.azureEnabled" class="text-xs text-amber-400">
+            {{ $t("settings.azure.notConfiguredHint") }}
+          </p>
+          <p v-else class="text-xs text-muted-foreground">{{ $t("settings.azure.chatHint") }}</p>
+        </div>
+
         <ConnectionTestButton
-          :on-test="() => testLlmConnection(settingsStore.selectedLlmModelId, settingsStore.getLlmApiKey())"
+          :on-test="settingsStore.selectedLlmProviderId === 'azure' ? testAzureChatConnection : () => testLlmConnection(settingsStore.selectedLlmModelId, settingsStore.getLlmApiKey())"
           :disabled="!settingsStore.hasLlmApiKey"
         />
 
@@ -1364,7 +1633,7 @@ onBeforeUnmount(() => {
           </p>
         </transition>
 
-        <template v-if="settingsStore.selectedLlmProviderId === 'groq' || settingsStore.hasLlmApiKey">
+        <template v-if="settingsStore.selectedLlmProviderId !== 'azure' && (settingsStore.selectedLlmProviderId === 'groq' || settingsStore.hasLlmApiKey)">
           <Separator />
 
           <!-- LLM 模型 -->

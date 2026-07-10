@@ -1,5 +1,5 @@
 import { fetch } from "@tauri-apps/plugin-http";
-import { DEFAULT_LLM_MODEL_ID } from "./modelRegistry";
+import { DEFAULT_LLM_MODEL_ID, type LlmProviderId } from "./modelRegistry";
 import {
   buildFetchParams,
   parseProviderResponse,
@@ -7,6 +7,7 @@ import {
   getProviderTimeout,
   type LlmChatRequest,
   type LlmUsageData,
+  type AzureRequestOptions,
 } from "./llmProvider";
 
 const SYSTEM_PROMPT = `你是語音轉錄字典助手。
@@ -105,10 +106,14 @@ export async function analyzeCorrections(
   pastedText: string,
   fieldText: string,
   apiKey: string,
-  options?: { modelId?: string },
+  options?: {
+    modelId?: string;
+    provider?: LlmProviderId;
+    azure?: AzureRequestOptions;
+  },
 ): Promise<VocabularyAnalysisResult> {
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
-  const providerId = getProviderIdForModel(modelId);
+  const providerId = options?.provider ?? getProviderIdForModel(modelId);
 
   const request: LlmChatRequest = {
     model: modelId,
@@ -123,7 +128,12 @@ export async function analyzeCorrections(
     maxTokens: 256,
   };
 
-  const { url, init } = buildFetchParams(providerId, request, apiKey);
+  const { url, init } = buildFetchParams(
+    providerId,
+    request,
+    apiKey,
+    options?.azure,
+  );
 
   const timeoutMs = getProviderTimeout(providerId);
   const controller = new AbortController();

@@ -68,7 +68,8 @@
       "openai": "OpenAI（推荐）",
       "anthropic": "Anthropic",
       "gemini": "Google Gemini（免费额度）",
-      "groqNote": "使用上方 Groq API Key"
+      "groqNote": "使用上方 Groq API Key",
+      "azure": "Azure / Microsoft Foundry"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -187,6 +188,26 @@
       "description": "转录粘贴后自动检测修正，通过 AI 分析学习新词汇",
       "privacyNote": "启用后，系统会读取光标附近的文字用于 AI 分析，不存储原文",
       "analysisModelUpdated": "字典分析模型已更新"
+    },
+    "azure": {
+      "title": "Azure / Microsoft Foundry",
+      "description": "设置一组 Azure 端点与凭证，文字整理与语音转录可共用。",
+      "endpointLabel": "端点 URL",
+      "endpointPlaceholder": "https://your-resource.openai.azure.com",
+      "apiKeyLabel": "API Key",
+      "apiVersionLabel": "API 版本（选填）",
+      "apiVersionPlaceholder": "留空使用默认值",
+      "clear": "清除连接",
+      "saved": "Azure 连接已保存",
+      "deleted": "Azure 连接已清除",
+      "deploymentSaved": "部署名称已保存",
+      "chatDeploymentLabel": "Chat 部署名称",
+      "chatDeploymentPlaceholder": "例如 gpt-4o",
+      "chatHint": "输入你在 Azure 上的 chat 模型部署名称。",
+      "notConfiguredHint": "请先在上方“Azure / Microsoft Foundry”卡片启用并设置连接。",
+      "whisperDeploymentLabel": "Whisper 部署名称",
+      "whisperDeploymentPlaceholder": "例如 whisper",
+      "whisperHint": "输入你在 Azure 上的 Whisper 模型部署名称。"
     }
   },
   "dashboard": {

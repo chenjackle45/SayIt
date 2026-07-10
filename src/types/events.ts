@@ -33,7 +33,11 @@ export type SettingsKey =
   | "soundEffectsEnabled"
   | "promptMode"
   | "audioInputDevice"
-  | "copyTranscriptionToClipboard";
+  | "copyTranscriptionToClipboard"
+  | "azureConnection"
+  | "azureChatDeployment"
+  | "azureWhisperDeployment"
+  | "whisperProvider";
 
 export interface SettingsUpdatedPayload {
   key: SettingsKey;

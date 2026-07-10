@@ -43,37 +43,37 @@ const NETWORK_ERROR_PATTERN =
   /network|connect|dns|resolve|offline|timed?\s*out|ECONNREFUSED|ENOTFOUND|os error/i;
 
 export function getTranscriptionErrorMessage(error: unknown): string {
-  if (error instanceof TypeError) {
+  if (typeof error === "string" && NETWORK_ERROR_PATTERN.test(error)) {
     return t("errors.network");
   }
 
-  if (error instanceof Error) {
-    if (
-      !error.message.includes("Groq API error") &&
-      NETWORK_ERROR_PATTERN.test(error.message)
-    ) {
-      return t("errors.network");
-    }
+  const message = extractErrorMessage(error);
 
-    if (error.message.includes("Audio file too large")) {
-      return t("errors.transcription.fileTooLarge");
-    }
+  if (
+    !message.includes("Transcription API error") &&
+    NETWORK_ERROR_PATTERN.test(message)
+  ) {
+    return t("errors.network");
+  }
 
-    if (error.message.includes("Groq API error")) {
-      const statusMatch = error.message.match(/\((\d+)\)/);
-      if (statusMatch) {
-        const status = parseInt(statusMatch[1], 10);
-        if (status === 400) return t("errors.transcription.invalidAudio");
-        if (status === 401) return t("errors.transcription.invalidApiKey");
-        if (status === 429) return t("errors.transcription.rateLimited");
-        if (status >= 500) return t("errors.transcription.serviceUnavailable");
-      }
-      return t("errors.transcription.failed");
-    }
+  if (message.includes("Audio file too large")) {
+    return t("errors.transcription.fileTooLarge");
+  }
 
-    if (error.message.includes("MediaRecorder")) {
-      return t("errors.transcription.recorderError");
+  if (message.includes("Transcription API error")) {
+    const statusMatch = message.match(/\((\d+)\)/);
+    if (statusMatch) {
+      const status = parseInt(statusMatch[1], 10);
+      if (status === 400) return t("errors.transcription.invalidAudio");
+      if (status === 401) return t("errors.transcription.invalidApiKey");
+      if (status === 429) return t("errors.transcription.rateLimited");
+      if (status >= 500) return t("errors.transcription.serviceUnavailable");
     }
+    return t("errors.transcription.failed");
+  }
+
+  if (message.includes("MediaRecorder")) {
+    return t("errors.transcription.recorderError");
   }
 
   return t("errors.transcription.operationFailed");

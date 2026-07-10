@@ -176,6 +176,17 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
     loadSettings: mockLoadSettings,
     getApiKey: () => mockSettingsState.apiKey,
     getLlmApiKey: () => mockSettingsState.apiKey,
+    getLlmRequestConfig: () =>
+      Promise.resolve({
+        apiKey: mockSettingsState.apiKey,
+        provider: "groq",
+        modelId: mockSettingsState.selectedLlmModelId,
+      }),
+    getWhisperRequestConfig: () =>
+      Promise.resolve({ apiKey: mockSettingsState.apiKey, provider: "groq" }),
+    getEffectiveChatModel: () => mockSettingsState.selectedLlmModelId,
+    whisperProviderId: "groq",
+    hasWhisperConfig: true,
     getAiPrompt: () => mockSettingsState.aiPrompt,
     refreshApiKey: vi.fn().mockResolvedValue(undefined),
     refreshLlmApiKey: vi.fn().mockResolvedValue(undefined),
@@ -449,6 +460,10 @@ describe("useVoiceFlowStore", () => {
       vocabularyTermList: null,
       modelId: "whisper-large-v3",
       language: "zh",
+      provider: "groq",
+      endpoint: null,
+      deployment: null,
+      apiVersion: null,
     });
     expect(store.status).toBe("success");
     expect(store.message).toBe("voiceFlow.pasteSuccess");
@@ -675,7 +690,7 @@ describe("useVoiceFlowStore", () => {
   it("[P0] 轉錄失敗時應回報中文錯誤訊息", async () => {
     mockInvoke.mockImplementation(
       createMockInvokeHandler({
-        transcribeError: new Error("Groq API error (500)"),
+        transcribeError: new Error("Transcription API error (500)"),
       }),
     );
 
@@ -1310,7 +1325,11 @@ describe("useVoiceFlowStore", () => {
         vocabularyTermList: ["TypeScript", "Tauri"],
         modelId: "whisper-large-v3",
         language: "zh",
-      });
+        provider: "groq",
+        endpoint: null,
+        deployment: null,
+        apiVersion: null,
+        });
     });
 
     it("[P0] 空詞彙時應傳 null 給 transcribe_audio", async () => {
@@ -1339,7 +1358,11 @@ describe("useVoiceFlowStore", () => {
         vocabularyTermList: null,
         modelId: "whisper-large-v3",
         language: "zh",
-      });
+        provider: "groq",
+        endpoint: null,
+        deployment: null,
+        apiVersion: null,
+        });
     });
 
     it("[P0] 詞彙清單應同時傳給 transcriber 和 enhancer", async () => {
@@ -1400,7 +1423,11 @@ describe("useVoiceFlowStore", () => {
         vocabularyTermList: ["Pinia", "Vitest"],
         modelId: "whisper-large-v3",
         language: "zh",
-      });
+        provider: "groq",
+        endpoint: null,
+        deployment: null,
+        apiVersion: null,
+        });
 
       // enhancer 也收到詞彙
       expect(mockEnhanceText).toHaveBeenCalledWith(

@@ -68,7 +68,8 @@
       "openai": "OpenAI (추천)",
       "anthropic": "Anthropic",
       "gemini": "Google Gemini (무료 할당량)",
-      "groqNote": "위의 Groq API Key 사용"
+      "groqNote": "위의 Groq API Key 사용",
+      "azure": "Azure / Microsoft Foundry"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -187,6 +188,26 @@
       "description": "붙여넣기 후 수정을 자동 감지하고 AI 분석으로 새 용어 학습",
       "privacyNote": "활성화하면 AI 분석을 위해 커서 주변의 텍스트를 읽습니다. 원문은 저장되지 않습니다",
       "analysisModelUpdated": "사전 분석 모델이 업데이트되었습니다"
+    },
+    "azure": {
+      "title": "Azure / Microsoft Foundry",
+      "description": "Azure 엔드포인트와 자격 증명을 한 세트 설정하면 텍스트 정리와 음성 전사가 공유합니다.",
+      "endpointLabel": "엔드포인트 URL",
+      "endpointPlaceholder": "https://your-resource.openai.azure.com",
+      "apiKeyLabel": "API 키",
+      "apiVersionLabel": "API 버전(선택)",
+      "apiVersionPlaceholder": "비워 두면 기본값",
+      "clear": "연결 지우기",
+      "saved": "Azure 연결이 저장되었습니다",
+      "deleted": "Azure 연결이 지워졌습니다",
+      "deploymentSaved": "배포 이름이 저장되었습니다",
+      "chatDeploymentLabel": "Chat 배포 이름",
+      "chatDeploymentPlaceholder": "예: gpt-4o",
+      "chatHint": "Azure의 chat 모델 배포 이름을 입력하세요.",
+      "notConfiguredHint": "먼저 위의 'Azure / Microsoft Foundry' 카드에서 연결을 활성화하고 설정하세요.",
+      "whisperDeploymentLabel": "Whisper 배포 이름",
+      "whisperDeploymentPlaceholder": "예: whisper",
+      "whisperHint": "Azure의 Whisper 모델 배포 이름을 입력하세요."
     }
   },
   "dashboard": {

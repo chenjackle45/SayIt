@@ -68,7 +68,8 @@
       "openai": "OpenAI (Recommended)",
       "anthropic": "Anthropic",
       "gemini": "Google Gemini (Free Quota)",
-      "groqNote": "Uses Groq API Key above"
+      "groqNote": "Uses Groq API Key above",
+      "azure": "Azure / Microsoft Foundry"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -187,6 +188,26 @@
       "description": "Auto-detect corrections after paste and learn new terms via AI analysis",
       "privacyNote": "When enabled, the system reads text near the cursor for AI analysis. No original text is stored",
       "analysisModelUpdated": "Dictionary analysis model updated"
+    },
+    "azure": {
+      "title": "Azure / Microsoft Foundry",
+      "description": "Configure one Azure endpoint and credential shared by text enhancement and transcription.",
+      "endpointLabel": "Endpoint URL",
+      "endpointPlaceholder": "https://your-resource.openai.azure.com",
+      "apiKeyLabel": "API Key",
+      "apiVersionLabel": "API version (optional)",
+      "apiVersionPlaceholder": "Leave blank for default",
+      "clear": "Clear connection",
+      "saved": "Azure connection saved",
+      "deleted": "Azure connection cleared",
+      "deploymentSaved": "Deployment name saved",
+      "chatDeploymentLabel": "Chat deployment name",
+      "chatDeploymentPlaceholder": "e.g. gpt-4o",
+      "chatHint": "Enter the name of your chat model deployment on Azure.",
+      "notConfiguredHint": "Enable and configure the connection in the Azure / Microsoft Foundry card above first.",
+      "whisperDeploymentLabel": "Whisper deployment name",
+      "whisperDeploymentPlaceholder": "e.g. whisper",
+      "whisperHint": "Enter the name of your Whisper model deployment on Azure."
     }
   },
   "dashboard": {

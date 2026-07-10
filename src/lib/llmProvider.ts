@@ -40,6 +40,14 @@ export const LLM_PROVIDER_LIST: LlmProviderConfig[] = [
     consoleUrl: "https://console.anthropic.com/settings/keys",
     apiKeyPrefix: "sk-ant-",
   },
+  {
+    id: "azure",
+    displayName: "Azure / Microsoft Foundry",
+    // baseUrl 為動態（使用者自訂 endpoint），實際組裝於 buildAzureFetchParams
+    baseUrl: "",
+    consoleUrl: "https://ai.azure.com/",
+    apiKeyPrefix: "",
+  },
 ];
 
 export function findProviderConfig(
@@ -55,6 +63,7 @@ const PROVIDER_TIMEOUT_MS: Record<LlmProviderId, number> = {
   openai: 30_000,
   anthropic: 30_000,
   gemini: 30_000,
+  azure: 30_000,
 };
 
 export function getProviderTimeout(providerId: LlmProviderId): number {
@@ -69,6 +78,7 @@ const PROVIDER_DEFAULT_MAX_TOKENS: Record<LlmProviderId, number> = {
   openai: 16384,
   anthropic: 8192,
   gemini: 16384,
+  azure: 16384,
 };
 
 export function getDefaultMaxTokens(providerId: LlmProviderId): number {
@@ -109,11 +119,25 @@ export function getProviderIdForModel(modelId: string): LlmProviderId {
   return findLlmModelConfig(modelId)?.providerId ?? "groq";
 }
 
+export interface AzureRequestOptions {
+  endpoint: string;
+  apiVersion?: string;
+  apiKey: string;
+}
+
 export function buildFetchParams(
   providerId: LlmProviderId,
   request: LlmChatRequest,
   apiKey: string,
+  azureOptions?: AzureRequestOptions,
 ): { url: string; init: RequestInit } {
+  if (providerId === "azure") {
+    if (!azureOptions) {
+      throw new Error("Azure provider requires azureOptions");
+    }
+    return buildAzureFetchParams(request, azureOptions);
+  }
+
   const providerConfig = findProviderConfig(providerId);
   const url = providerConfig?.baseUrl ?? LLM_PROVIDER_LIST[0].baseUrl;
 
@@ -126,6 +150,52 @@ export function buildFetchParams(
   }
 
   return buildOpenAiCompatibleFetchParams(providerId, url, request, apiKey);
+}
+
+/** 把使用者貼上的 Azure endpoint 正規化成 resource base（只留 protocol+host，丟掉 path/query/hash）。 */
+export function normalizeAzureEndpoint(endpoint: string): string {
+  const trimmed = endpoint.trim();
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    // 缺 scheme 等不完整輸入 → 字串退場：去 path/query/hash 與尾斜線
+    return trimmed.replace(/[/?#].*$/, "").replace(/\/+$/, "");
+  }
+}
+
+function buildAzureFetchParams(
+  request: LlmChatRequest,
+  opts: AzureRequestOptions,
+): { url: string; init: RequestInit } {
+  const base = normalizeAzureEndpoint(opts.endpoint);
+  const query = opts.apiVersion
+    ? `?api-version=${encodeURIComponent(opts.apiVersion)}`
+    : "";
+  const url = `${base}/openai/v1/chat/completions${query}`;
+
+  const body: Record<string, unknown> = {
+    model: request.model, // Azure 的 model = 部署名稱
+    messages: request.messages,
+  };
+  if (request.temperature !== undefined) body.temperature = request.temperature;
+  if (request.maxTokens !== undefined) {
+    // v1 / GPT-5 系列要求 max_completion_tokens
+    body.max_completion_tokens = request.maxTokens;
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "api-key": opts.apiKey,
+  };
+
+  return {
+    url,
+    init: {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    },
+  };
 }
 
 function buildOpenAiCompatibleFetchParams(

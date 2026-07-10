@@ -1,7 +1,10 @@
 {
   "identifier": "default",
   "description": "Default capability for the main window",
-  "windows": ["main", "main-window"],
+  "windows": [
+    "main",
+    "main-window"
+  ],
   "permissions": [
     "core:default",
     "core:window:default",
@@ -34,6 +37,15 @@
         },
         {
           "url": "https://generativelanguage.googleapis.com/*"
+        },
+        {
+          "url": "https://*.openai.azure.com/*"
+        },
+        {
+          "url": "https://*.services.ai.azure.com/*"
+        },
+        {
+          "url": "https://*.cognitiveservices.azure.com/*"
         }
       ]
     },

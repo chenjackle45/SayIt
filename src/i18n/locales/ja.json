@@ -36,12 +36,12 @@
       "comboKey": "コンボキー",
       "keys": {
         "fn": "Fn",
-        "leftOption": "左 Option (\u2325)",
-        "rightOption": "右 Option (\u2325)",
-        "leftControl": "左 Control (\u2303)",
-        "rightControl": "右 Control (\u2303)",
-        "command": "Command (\u2318)",
-        "shift": "Shift (\u21e7)",
+        "leftOption": "左 Option (⌥)",
+        "rightOption": "右 Option (⌥)",
+        "leftControl": "左 Control (⌃)",
+        "rightControl": "右 Control (⌃)",
+        "command": "Command (⌘)",
+        "shift": "Shift (⇧)",
         "rightAlt": "右 Alt",
         "leftAlt": "左 Alt",
         "control": "Control"
@@ -68,7 +68,8 @@
       "openai": "OpenAI（おすすめ）",
       "anthropic": "Anthropic",
       "gemini": "Google Gemini（無料枠あり）",
-      "groqNote": "上記の Groq API Key を使用"
+      "groqNote": "上記の Groq API Key を使用",
+      "azure": "Azure / Microsoft Foundry"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -187,6 +188,26 @@
       "description": "貼り付け後に修正を自動検出し、AI 分析で新語を学習",
       "privacyNote": "有効にすると、AI 分析のためにカーソル付近のテキストを読み取ります。原文は保存されません",
       "analysisModelUpdated": "辞書分析モデルを更新しました"
+    },
+    "azure": {
+      "title": "Azure / Microsoft Foundry",
+      "description": "Azure のエンドポイントと資格情報を 1 組設定し、テキスト整形と文字起こしで共用します。",
+      "endpointLabel": "エンドポイント URL",
+      "endpointPlaceholder": "https://your-resource.openai.azure.com",
+      "apiKeyLabel": "API キー",
+      "apiVersionLabel": "API バージョン（任意）",
+      "apiVersionPlaceholder": "空欄で既定値",
+      "clear": "接続をクリア",
+      "saved": "Azure 接続を保存しました",
+      "deleted": "Azure 接続をクリアしました",
+      "deploymentSaved": "デプロイ名を保存しました",
+      "chatDeploymentLabel": "Chat デプロイ名",
+      "chatDeploymentPlaceholder": "例: gpt-4o",
+      "chatHint": "Azure 上の chat モデルのデプロイ名を入力してください。",
+      "notConfiguredHint": "先に上の「Azure / Microsoft Foundry」カードで接続を有効化・設定してください。",
+      "whisperDeploymentLabel": "Whisper デプロイ名",
+      "whisperDeploymentPlaceholder": "例: whisper",
+      "whisperHint": "Azure 上の Whisper モデルのデプロイ名を入力してください。"
     }
   },
   "dashboard": {
@@ -272,7 +293,7 @@
     "noSpeechDetected": "音声が検出されませんでした",
     "recording": "録音中...",
     "transcribing": "文字起こし中...",
-    "pasteSuccess": "貼り付け完了 \u2713",
+    "pasteSuccess": "貼り付け完了 ✓",
     "pasteSuccessUnenhanced": "貼り付け完了（未整理）",
     "enhancing": "整理中...",
     "pasteFailed": "貼り付け失敗",

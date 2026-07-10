@@ -1,6 +1,6 @@
 // ── LLM Provider ──────────────────────────────────────────
 
-export type LlmProviderId = "groq" | "openai" | "anthropic" | "gemini";
+export type LlmProviderId = "groq" | "openai" | "anthropic" | "gemini" | "azure";
 
 export const DEFAULT_LLM_PROVIDER_ID: LlmProviderId = "groq";
 

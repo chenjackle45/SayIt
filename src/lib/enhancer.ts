@@ -1,6 +1,6 @@
 import { fetch } from "@tauri-apps/plugin-http";
 import type { ChatUsageData, EnhanceResult } from "../types/transcription";
-import { DEFAULT_LLM_MODEL_ID } from "./modelRegistry";
+import { DEFAULT_LLM_MODEL_ID, type LlmProviderId } from "./modelRegistry";
 import {
   buildFetchParams,
   parseProviderResponse,
@@ -8,6 +8,7 @@ import {
   getProviderTimeout,
   getDefaultMaxTokens,
   type LlmChatRequest,
+  type AzureRequestOptions,
 } from "./llmProvider";
 import { getMinimalPromptForLocale } from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
@@ -36,6 +37,9 @@ export interface EnhanceOptions {
   modelId?: string;
   signal?: AbortSignal;
   maxTokens?: number;
+  // azure 時由呼叫端明確指定 provider 與連線設定（不經 model 反查）
+  provider?: LlmProviderId;
+  azure?: AzureRequestOptions;
 }
 
 async function withTimeout<T>(
@@ -110,7 +114,7 @@ export async function enhanceText(
   }
 
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
-  const providerId = getProviderIdForModel(modelId);
+  const providerId = options?.provider ?? getProviderIdForModel(modelId);
 
   const basePrompt = options?.systemPrompt || getDefaultSystemPrompt();
   const fullPrompt = buildSystemPrompt(basePrompt, options?.vocabularyTermList);
@@ -125,7 +129,12 @@ export async function enhanceText(
     maxTokens: options?.maxTokens ?? getDefaultMaxTokens(providerId),
   };
 
-  const { url, init } = buildFetchParams(providerId, request, apiKey);
+  const { url, init } = buildFetchParams(
+    providerId,
+    request,
+    apiKey,
+    options?.azure,
+  );
 
   const response = await withTimeout(
     fetch(url, {
