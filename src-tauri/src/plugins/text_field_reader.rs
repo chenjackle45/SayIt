@@ -22,11 +22,63 @@ pub fn read_focused_text_field() -> Result<Option<String>, String> {
 }
 
 /// 讀取當前聚焦文字欄位中被選取（highlight）的文字。
-/// 用於編輯模式偵測：有選取文字時進入編輯模式，語音變成指令。
-/// 透過模擬 Cmd+C / Ctrl+C 擷取剪貼簿內容，不依賴 Accessibility API。
+/// 編輯模式的「剪貼簿後備」路徑：僅在 `read_selection_state` 回報
+/// unavailable（AX 不可見的 App）時、於錄音停止且按鍵放開後由前端呼叫。
+/// 透過模擬 Cmd+C / Ctrl+C 擷取剪貼簿內容。
 #[tauri::command]
 pub fn read_selected_text() -> Result<Option<String>, String> {
     super::clipboard_paste::capture_selected_text_via_clipboard()
+}
+
+/// 選取狀態偵測結果（#24/#25 編輯模式判定）。
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectionState {
+    /// "selection" | "noSelection" | "unavailable"
+    pub kind: String,
+    pub text: Option<String>,
+}
+
+impl SelectionState {
+    fn selection(text: String) -> Self {
+        Self {
+            kind: "selection".to_string(),
+            text: Some(text),
+        }
+    }
+    fn no_selection() -> Self {
+        Self {
+            kind: "noSelection".to_string(),
+            text: None,
+        }
+    }
+    fn unavailable() -> Self {
+        Self {
+            kind: "unavailable".to_string(),
+            text: None,
+        }
+    }
+}
+
+/// 讀取聚焦文字欄位的選取狀態——編輯模式判定的主路徑。
+/// macOS：AX 被動查詢（零按鍵模擬，#25 的字元污染在此路徑不可能發生）。三態：
+///   selection    — 確定有選取，text 為選取內容 → 前端直接進編輯模式
+///   noSelection  — 確定無選取（AX 可讀且長度 0）→ 一般聽寫，
+///                  CodeMirror 類編輯器的「無選取複製整行」誤判（#24）在此被排除
+///   unavailable  — AX 不可見或讀值失真（Heptabase/LINE 類）→ 前端在錄音停止、
+///                  按鍵放開後改走剪貼簿後備（read_selected_text）
+/// Windows / 其他平台：一律 unavailable（沿用剪貼簿後備；選取讀取待 UIA 版補上）。
+#[tauri::command]
+pub fn read_selection_state() -> SelectionState {
+    #[cfg(target_os = "macos")]
+    {
+        macos::read_selection_state_impl()
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        SelectionState::unavailable()
+    }
 }
 
 // ========== macOS: AXUIElement ==========
@@ -48,10 +100,18 @@ mod macos {
     const K_AX_FOCUSED_UI_ELEMENT_ATTRIBUTE: &str = "AXFocusedUIElement";
     const K_AX_VALUE_ATTRIBUTE: &str = "AXValue";
     const K_AX_SELECTED_TEXT_RANGE_ATTRIBUTE: &str = "AXSelectedTextRange";
+    const K_AX_SELECTED_TEXT_ATTRIBUTE: &str = "AXSelectedText";
     const K_AX_ROLE_ATTRIBUTE: &str = "AXRole";
 
     const CONTEXT_CHARS: usize = 50;
     const FALLBACK_CHARS: usize = 100;
+
+    /// 選取狀態讀取的總 timeout：AX 是同步跨進程呼叫，目標 App 卡死會阻塞
+    /// （對齊 windows_impl 的守衛設計）。上限涵蓋「解析失敗 → 戳醒 Electron →
+    /// 等樹重建 → 重試」的最長路徑。
+    const SELECTION_READ_TIMEOUT_MS: u64 = 600;
+    /// 對 Electron 施加 AXManualAccessibility 後等樹重建的時間。
+    const POKE_SETTLE_MS: u64 = 150;
 
     extern "C" {
         fn AXUIElementCreateSystemWide() -> AXUIElementRef;
@@ -59,6 +119,11 @@ mod macos {
             element: AXUIElementRef,
             attribute: CFTypeRef,
             value: *mut CFTypeRef,
+        ) -> AXError;
+        fn AXUIElementSetAttributeValue(
+            element: AXUIElementRef,
+            attribute: CFTypeRef,
+            value: CFTypeRef,
         ) -> AXError;
     }
 
@@ -97,7 +162,8 @@ mod macos {
         Some(cf_string.to_string())
     }
 
-    fn get_cursor_position(element: AXUIElementRef) -> Option<usize> {
+    /// 讀取 AXSelectedTextRange 並解出 CFRange（游標位置 + 選取長度的共用來源）。
+    fn read_selected_text_range(element: AXUIElementRef) -> Option<CFRange> {
         let value = get_ax_attribute(element, K_AX_SELECTED_TEXT_RANGE_ATTRIBUTE)?;
 
         let mut range = CFRange {
@@ -115,7 +181,16 @@ mod macos {
 
         unsafe { CFRelease(value) };
 
-        if success && range.location >= 0 {
+        if success {
+            Some(range)
+        } else {
+            None
+        }
+    }
+
+    fn get_cursor_position(element: AXUIElementRef) -> Option<usize> {
+        let range = read_selected_text_range(element)?;
+        if range.location >= 0 {
             Some(range.location as usize)
         } else {
             None
@@ -250,6 +325,136 @@ mod macos {
                 }
             }
             _ => Ok(None),
+        }
+    }
+
+    // ========== 選取狀態偵測（#24/#25 編輯模式判定） ==========
+
+    use super::SelectionState;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+    use std::sync::{Mutex, OnceLock};
+    use std::time::Duration;
+
+    type SelectionRespTx = SyncSender<SelectionState>;
+
+    static SELECTION_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+    static SELECTION_WORKER: OnceLock<Option<Mutex<SyncSender<SelectionRespTx>>>> = OnceLock::new();
+
+    /// 讀取聚焦元素的選取長度（AXSelectedTextRange.length）。
+    /// length > 0 = 真的有選取；length == 0 = 只有游標、沒選取
+    /// （編輯器「無選取時 Cmd+C 複製整行」不影響 AX 層的選取範圍，故能分辨）。
+    fn get_selection_length(element: AXUIElementRef) -> Option<i64> {
+        read_selected_text_range(element).map(|range| range.length)
+    }
+
+    /// Electron/Chromium 的無障礙樹是惰性啟用的：對焦點 App 設
+    /// AXManualAccessibility=true 可強制喚醒完整樹（Electron 官方支援的旗標）。
+    /// 對原生 App 設此屬性會失敗，無副作用。
+    fn poke_focused_app_manual_accessibility() {
+        let system_wide = unsafe { AXUIElementCreateSystemWide() };
+        if system_wide.is_null() {
+            return;
+        }
+        if let Some(app) = get_ax_attribute(system_wide, K_AX_FOCUSED_APPLICATION_ATTRIBUTE) {
+            let attr = CFString::new("AXManualAccessibility");
+            let value = core_foundation::boolean::CFBoolean::true_value();
+            unsafe {
+                AXUIElementSetAttributeValue(app, attr.as_CFTypeRef(), value.as_CFTypeRef());
+                CFRelease(app);
+            }
+        }
+        unsafe { CFRelease(system_wide) };
+    }
+
+    /// 依已解析的聚焦文字元素分類選取狀態。消耗 ctx 並負責釋放。
+    fn classify_selection(ctx: FocusedElementContext) -> SelectionState {
+        let state = match get_selection_length(ctx.target_element) {
+            Some(len) if len > 0 => {
+                match get_ax_string_attribute(ctx.target_element, K_AX_SELECTED_TEXT_ATTRIBUTE) {
+                    Some(text) if !text.trim().is_empty() => SelectionState::selection(text),
+                    // 長度 > 0 但文字讀不到/為空 = 橋接失真（Electron 已知失效模式），
+                    // 交給剪貼簿後備嘗試撈回真實選取
+                    _ => SelectionState::unavailable(),
+                }
+            }
+            Some(_) => SelectionState::no_selection(),
+            // 元素是文字輸入類但範圍屬性不支援 → 無法判定
+            None => SelectionState::unavailable(),
+        };
+        ctx.cleanup();
+        state
+    }
+
+    /// 阻塞式選取偵測：第一次解析失敗時戳醒 Electron 樹再試一次。
+    /// 全程只做被動 AX 查詢，不模擬任何按鍵。
+    fn selection_probe_blocking() -> SelectionState {
+        if let Some(ctx) = resolve_focused_text_element() {
+            return classify_selection(ctx);
+        }
+        poke_focused_app_manual_accessibility();
+        std::thread::sleep(Duration::from_millis(POKE_SETTLE_MS));
+        match resolve_focused_text_element() {
+            Some(ctx) => classify_selection(ctx),
+            None => SelectionState::unavailable(),
+        }
+    }
+
+    /// 入口：AX 讀取跑在單一常駐 worker 執行緒上、最多等 SELECTION_READ_TIMEOUT_MS
+    /// （AX 為同步跨進程呼叫，目標 App 卡死不可拖住 command thread——
+    /// 對齊 windows_impl 的守衛模式；常駐而非每次 spawn，卡死時最多損失
+    /// 一條執行緒、不會隨熱鍵次數無上界累積）。逾時 / 忙碌一律回 unavailable，
+    /// 由前端剪貼簿後備接手。
+    pub fn read_selection_state_impl() -> SelectionState {
+        let sender = match selection_worker_sender() {
+            Some(s) => s,
+            None => return SelectionState::unavailable(),
+        };
+
+        // single-flight：熱鍵連按時避免 AX 讀取堆疊。
+        // 旗標由「呼叫端」在所有路徑後無條件清掉，不依賴 worker
+        // （worker 卡死時遲到結果只會送進已 drop 的 receiver 而被丟棄）
+        if SELECTION_IN_FLIGHT.swap(true, Ordering::AcqRel) {
+            return SelectionState::unavailable();
+        }
+
+        let outcome = selection_read_once(&sender);
+        SELECTION_IN_FLIGHT.store(false, Ordering::Release);
+        outcome
+    }
+
+    fn selection_read_once(sender: &SyncSender<SelectionRespTx>) -> SelectionState {
+        let (resp_tx, resp_rx) = sync_channel::<SelectionState>(1);
+        if sender.try_send(resp_tx).is_err() {
+            // worker 還卡在上一個請求（目標 App 的 AX server 無回應）
+            return SelectionState::unavailable();
+        }
+        resp_rx
+            .recv_timeout(Duration::from_millis(SELECTION_READ_TIMEOUT_MS))
+            .unwrap_or_else(|_| SelectionState::unavailable())
+    }
+
+    fn selection_worker_sender() -> Option<SyncSender<SelectionRespTx>> {
+        let cell = SELECTION_WORKER.get_or_init(spawn_selection_worker);
+        let mutex = cell.as_ref()?;
+        let guard = mutex.lock().ok()?;
+        Some(guard.clone())
+    }
+
+    fn spawn_selection_worker() -> Option<Mutex<SyncSender<SelectionRespTx>>> {
+        let (req_tx, req_rx) = sync_channel::<SelectionRespTx>(1);
+        std::thread::Builder::new()
+            .name("ax-selection-reader".into())
+            .spawn(move || selection_worker_loop(req_rx))
+            .ok()?;
+        Some(Mutex::new(req_tx))
+    }
+
+    fn selection_worker_loop(req_rx: Receiver<SelectionRespTx>) {
+        while let Ok(resp_tx) = req_rx.recv() {
+            let result = selection_probe_blocking();
+            // 呼叫端可能已逾時離開（receiver drop）：try_send 失敗直接丟棄
+            let _ = resp_tx.try_send(result);
         }
     }
 

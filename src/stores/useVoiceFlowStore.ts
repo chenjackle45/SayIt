@@ -129,6 +129,20 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   let abortController: AbortController | null = null;
   const editSourceText = ref<string | null>(null);
   const isEditMode = computed<boolean>(() => editSourceText.value !== null);
+  // AX 不可見 App（read_selection_state 回 unavailable）的剪貼簿後備旗標：
+  // 錄音停止、按鍵放開後才執行 read_selected_text
+  let pendingClipboardSelectionCheck = false;
+  let pendingSelectionCapture: Promise<void> | null = null;
+  // 錄音世代編號：AX 判定（最長 600ms）與剪貼簿後備（250ms 計時器）都是
+  // 非同步回呼，可能在「下一輪錄音已開始」後才落地——寫入前必須比對世代，
+  // 過期回呼直接失效（含 ESC 取消 / 雙擊切換後立刻重錄的情境）
+  let recordingEpoch = 0;
+  // 本世代的 AX 判定是否已有結論：停止錄音時若 AX 還沒回覆，
+  // 保守走剪貼簿後備（等同舊行為），避免慢速 AX 讓編輯模式靜默消失
+  let selectionProbeSettledEpoch = -1;
+  // 等按鍵完全放開的緩衝：toggle 模式的「停止」由第二次按下觸發，
+  // 該瞬間按鍵仍壓著，立刻模擬 Cmd+C 會重演 #25 的字元污染
+  const CLIPBOARD_FALLBACK_KEY_RELEASE_DELAY_MS = 250;
   const isRetryAttempt = ref<boolean>(false);
   const canRetry = computed<boolean>(
     () =>
@@ -920,6 +934,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
   function applyDoubleTapModeSwitch() {
     isRecording.value = false;
+    // 世代 +1：這輪錄音被雙擊靜默取消，途中的選取偵測回呼全部失效
+    recordingEpoch += 1;
+    pendingClipboardSelectionCheck = false;
+    pendingSelectionCapture = null;
 
     // Toggle prompt mode: minimal ↔ active
     const settingsStore = useSettingsStore();
@@ -999,6 +1017,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     stopCorrectionSnapshotPolling();
     cleanupCorrectionMonitorListener();
     void restoreSystemAudio();
+    // 世代 +1：讓仍在途的 AX 判定 / 剪貼簿後備回呼全部過期失效
+    recordingEpoch += 1;
+    pendingClipboardSelectionCheck = false;
+    pendingSelectionCapture = null;
 
     // 重置 toggle 模式狀態
     void invoke("reset_hotkey_state").catch(() => {});
@@ -1025,15 +1047,28 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     // 捕獲當前前景視窗（Windows: HUD show 前記住目標，貼上前恢復焦點）
     void invoke("capture_target_window").catch(() => {});
 
-    // 偵測選取文字（非阻塞）：模擬 Cmd+C 讀剪貼簿，~100ms，遠在錄音結束前完成
+    // 偵測選取文字（非阻塞）：AX 被動查詢，零按鍵模擬（#24/#25）。
+    // AX 不可見的 App 標記剪貼簿後備，延後到錄音停止、按鍵放開後執行
     editSourceText.value = null;
-    invoke<string | null>("read_selected_text")
-      .then((selectedText) => {
-        if (selectedText && selectedText.trim().length > 0) {
-          editSourceText.value = selectedText;
+    pendingClipboardSelectionCheck = false;
+    pendingSelectionCapture = null;
+    recordingEpoch += 1;
+    const probeEpoch = recordingEpoch;
+    invoke<{ kind: string; text: string | null }>("read_selection_state")
+      .then((state) => {
+        // 過期回呼（下一輪錄音已開始）直接失效，防止跨錄音狀態污染
+        if (probeEpoch !== recordingEpoch || !state) return;
+        selectionProbeSettledEpoch = probeEpoch;
+        if (state.kind === "selection" && state.text && state.text.trim().length > 0) {
+          editSourceText.value = state.text;
           writeInfoLog(
-            `useVoiceFlowStore: edit mode activated, selectedText length=${selectedText.length}`,
+            `useVoiceFlowStore: edit mode activated (ax), selectedText length=${state.text.length}`,
           );
+        } else if (state.kind === "noSelection") {
+          // AX 的明確否定是權威答案：若慢速後備已誤寫（整行複製），以此為準清掉
+          editSourceText.value = null;
+        } else if (state.kind === "unavailable") {
+          pendingClipboardSelectionCheck = true;
         }
       })
       .catch(() => {});
@@ -1089,6 +1124,38 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     await restoreSystemAudio();
     playSoundIfEnabled("play_stop_sound");
     stopElapsedTimer();
+
+    // AX 不可見 App 的剪貼簿後備：延遲等按鍵完全放開後才模擬 Cmd+C。
+    // 包成 Promise：轉錄若比後備先完成，編輯模式判定前要能 await 它。
+    // AX 到停止時還沒回覆（慢速 App）也保守走後備——等同舊行為，
+    // 避免編輯模式在這種時序下靜默消失
+    if (
+      pendingClipboardSelectionCheck ||
+      selectionProbeSettledEpoch !== recordingEpoch
+    ) {
+      pendingClipboardSelectionCheck = false;
+      const fallbackEpoch = recordingEpoch;
+      pendingSelectionCapture = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          if (fallbackEpoch !== recordingEpoch) {
+            resolve();
+            return;
+          }
+          invoke<string | null>("read_selected_text")
+            .then((selectedText) => {
+              if (fallbackEpoch !== recordingEpoch) return;
+              if (selectedText && selectedText.trim().length > 0 && !editSourceText.value) {
+                editSourceText.value = selectedText;
+                writeInfoLog(
+                  `useVoiceFlowStore: edit mode activated (clipboard fallback), selectedText length=${selectedText.length}`,
+                );
+              }
+            })
+            .catch(() => {})
+            .finally(resolve);
+        }, CLIPBOARD_FALLBACK_KEY_RELEASE_DELAY_MS);
+      });
+    }
 
     // 生成 transcriptionId 貫穿整個流程
     const transcriptionId = crypto.randomUUID();
@@ -1255,6 +1322,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           `useVoiceFlowStore: hallucination intercepted (reason=${hallucinationDetectionResult.reason})`,
         );
         return;
+      }
+
+      // 剪貼簿後備可能還在等按鍵放開（轉錄比後備快時）：判定模式前先等它完成
+      if (pendingSelectionCapture) {
+        await pendingSelectionCapture;
+        pendingSelectionCapture = null;
       }
 
       // 編輯模式：語音是指令，選取文字是待處理內容

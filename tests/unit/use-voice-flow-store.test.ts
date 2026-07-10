@@ -142,6 +142,7 @@ vi.mock("../../src/lib/enhancer", () => {
   }
   return {
     enhanceText: mockEnhanceText,
+    buildSystemPrompt: (basePrompt: string) => basePrompt,
     EnhancerApiError,
   };
 });
@@ -455,6 +456,86 @@ describe("useVoiceFlowStore", () => {
     expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
       status: "success",
       message: "voiceFlow.pasteSuccess",
+    });
+  });
+
+  describe("選取偵測三態（#24/#25 編輯模式判定）", () => {
+    function withSelectionState(
+      state: { kind: string; text: string | null },
+      clipboardText: string | null = null,
+    ) {
+      const base = createMockInvokeHandler();
+      mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+        if (cmd === "read_selection_state") return state;
+        if (cmd === "read_selected_text") return clipboardText;
+        return base(cmd, args);
+      });
+    }
+
+    it("[P0] AX 回報 selection 應直接進編輯模式、不呼叫剪貼簿擷取", async () => {
+      withSelectionState({ kind: "selection", text: "選取的文字" });
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(store.isEditMode).toBe(true);
+      });
+
+      expect(mockInvoke).not.toHaveBeenCalledWith("read_selected_text");
+    });
+
+    it("[P0] AX 回報 noSelection 應走一般聽寫、全程不模擬 Cmd+C", async () => {
+      withSelectionState({ kind: "noSelection", text: null });
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+          deviceName: "",
+        });
+      });
+
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", {
+          text: "測試轉錄",
+          restoreClipboard: false,
+        });
+      });
+
+      expect(store.isEditMode).toBe(false);
+      expect(mockInvoke).not.toHaveBeenCalledWith("read_selected_text");
+    });
+
+    it("[P0] AX 回報 unavailable 應在停止錄音後走剪貼簿後備並進編輯模式", async () => {
+      withSelectionState({ kind: "unavailable", text: null }, "後備選取的文字");
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+          deviceName: "",
+        });
+      });
+      // 錄音開始階段不可有任何按鍵模擬（#25：按鍵還壓著）
+      expect(mockInvoke).not.toHaveBeenCalledWith("read_selected_text");
+
+      triggerHotkeyEvent("hotkey:released");
+      // 後備有 250ms 等按鍵放開的延遲；轉錄先完成時模式判定必須等它
+      await vi.waitFor(
+        () => {
+          expect(mockEnhanceText).toHaveBeenCalledWith(
+            "後備選取的文字",
+            expect.anything(),
+            expect.anything(),
+          );
+        },
+        { timeout: 3000 },
+      );
+      expect(mockInvoke).toHaveBeenCalledWith("read_selected_text");
     });
   });
 
@@ -2273,7 +2354,10 @@ describe("useVoiceFlowStore", () => {
         });
       });
 
-      expect(store.status).toBe("success");
+      // 選取偵測後備（250ms）拉長了貼上→success 的時序，改用 waitFor 斷言終態
+      await vi.waitFor(() => {
+        expect(store.status).toBe("success");
+      });
     });
 
     it("音效停用時不應呼叫 play_start_sound", async () => {
