@@ -116,8 +116,10 @@ describe("enhancer.ts", () => {
       expect(callArgs[1].headers.Authorization).toBe(`Bearer ${TEST_API_KEY}`);
 
       const body = JSON.parse(callArgs[1].body);
-      expect(body.model).toBe("llama-3.3-70b-versatile");
+      expect(body.model).toBe("qwen/qwen3.6-27b");
       expect(body.temperature).toBe(0.1);
+      // Qwen3.x 預設開 <think> 思考模式，必須明確關閉（省時間、保 5 秒 timeout）
+      expect(body.reasoning_effort).toBe("none");
       expect(body.max_tokens).toBe(8192);
       expect(body.messages).toHaveLength(2);
       expect(body.messages[0].role).toBe("system");

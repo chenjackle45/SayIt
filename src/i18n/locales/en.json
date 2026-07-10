@@ -98,7 +98,7 @@
     },
     "modelBadge": {
       "balanced": "Balanced · Default",
-      "stableCostly": "Stable · Costly",
+      "stableCostly": "Stable · Production",
       "fastCheap": "Fastest · Cheapest",
       "smartestSlow": "Smartest · Slower",
       "premium": "Premium"
@@ -212,7 +212,8 @@
     "quotaLlmRequests": "LLM {used}/{limit} req",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "Dictionary Analysis",
-    "vocabularyAnalysisUsage": "Dictionary Analysis: {requests} req / {tokens} tokens"
+    "vocabularyAnalysisUsage": "Dictionary Analysis: {requests} req / {tokens} tokens",
+    "llmUsageNoQuota": "AI enhancement used {requests} times (free quota varies by account — check your provider console)"
   },
   "history": {
     "searchPlaceholder": "Search transcriptions...",

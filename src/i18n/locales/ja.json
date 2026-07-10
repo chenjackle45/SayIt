@@ -98,7 +98,7 @@
     },
     "modelBadge": {
       "balanced": "バランス · デフォルト",
-      "stableCostly": "安定 · 高コスト",
+      "stableCostly": "安定 · 正式版",
       "fastCheap": "最速 · 最安",
       "smartestSlow": "最賢 · 低速",
       "premium": "高品質"
@@ -212,7 +212,8 @@
     "quotaLlmRequests": "LLM {used}/{limit} 回",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "辞書分析",
-    "vocabularyAnalysisUsage": "辞書分析：{requests} 回 / {tokens} tokens"
+    "vocabularyAnalysisUsage": "辞書分析：{requests} 回 / {tokens} tokens",
+    "llmUsageNoQuota": "AI 整形の使用回数：{requests} 回（無料枠はアカウントにより異なります。プロバイダーのコンソールでご確認ください）"
   },
   "history": {
     "searchPlaceholder": "文字起こし履歴を検索...",

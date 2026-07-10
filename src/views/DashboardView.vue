@@ -229,6 +229,13 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             </div>
+            <div v-if="isPaidLlmProvider" class="mt-2 pt-2 border-t border-border">
+              <span class="text-xs text-muted-foreground">
+                {{ $t("dashboard.llmUsageNoQuota", {
+                  requests: historyStore.dashboardStats.dailyQuotaUsage.llmRequestCount,
+                }) }}
+              </span>
+            </div>
             <div
               v-if="historyStore.dashboardStats.dailyQuotaUsage.vocabularyAnalysisRequestCount > 0"
               class="mt-2 pt-2 border-t border-border"

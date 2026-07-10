@@ -98,7 +98,7 @@
     },
     "modelBadge": {
       "balanced": "平衡 · 預設",
-      "stableCostly": "穩定可靠 · 成本高",
+      "stableCostly": "穩定 · 正式版",
       "fastCheap": "最快 · 最便宜",
       "smartestSlow": "最聰明 · 較慢",
       "premium": "高品質"
@@ -212,7 +212,8 @@
     "quotaLlmRequests": "LLM {used}/{limit} 次",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "字典分析",
-    "vocabularyAnalysisUsage": "字典分析：{requests} 次 / {tokens} tokens"
+    "vocabularyAnalysisUsage": "字典分析：{requests} 次 / {tokens} tokens",
+    "llmUsageNoQuota": "AI 整理已使用 {requests} 次（免費額度依帳號而異，請至供應商後台查看）"
   },
   "history": {
     "searchPlaceholder": "搜尋轉錄記錄...",

@@ -98,7 +98,7 @@
     },
     "modelBadge": {
       "balanced": "균형 · 기본",
-      "stableCostly": "안정 · 고비용",
+      "stableCostly": "안정 · 정식 버전",
       "fastCheap": "가장 빠름 · 가장 저렴",
       "smartestSlow": "가장 똑똑 · 느림",
       "premium": "프리미엄"
@@ -212,7 +212,8 @@
     "quotaLlmRequests": "LLM {used}/{limit} 회",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "사전 분석",
-    "vocabularyAnalysisUsage": "사전 분석: {requests} 회 / {tokens} tokens"
+    "vocabularyAnalysisUsage": "사전 분석: {requests} 회 / {tokens} tokens",
+    "llmUsageNoQuota": "AI 다듬기 사용 {requests}회 (무료 할당량은 계정마다 다르므로 공급자 콘솔에서 확인하세요)"
   },
   "history": {
     "searchPlaceholder": "전사 기록 검색...",

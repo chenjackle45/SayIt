@@ -418,7 +418,7 @@ describe("useSettingsStore", () => {
       mockStoreData.set("promptMode", "custom");
       mockStoreData.set("enhancementThresholdEnabled", true);
       mockStoreData.set("enhancementThresholdCharCount", 42);
-      mockStoreData.set("llmModelId", "llama-3.3-70b-versatile");
+      mockStoreData.set("llmModelId", "openai/gpt-oss-120b");
       mockStoreData.set("whisperModelId", "whisper-large-v3-turbo");
       mockStoreData.set("muteOnRecording", false);
 
@@ -439,7 +439,7 @@ describe("useSettingsStore", () => {
       expect(store.getAiPrompt()).toBe("同步後 prompt");
       expect(store.isEnhancementThresholdEnabled).toBe(true);
       expect(store.enhancementThresholdCharCount).toBe(42);
-      expect(store.selectedLlmModelId).toBe("llama-3.3-70b-versatile");
+      expect(store.selectedLlmModelId).toBe("openai/gpt-oss-120b");
       expect(store.selectedWhisperModelId).toBe("whisper-large-v3-turbo");
       expect(store.isMuteOnRecordingEnabled).toBe(false);
     });
