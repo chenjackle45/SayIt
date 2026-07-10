@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import {
   useSettingsStore,
@@ -11,6 +12,20 @@ import {
 import { extractErrorMessage } from "../lib/errorUtils";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
 import { useHistoryStore } from "../stores/useHistoryStore";
+import { useVocabularyStore } from "../stores/useVocabularyStore";
+import {
+  buildBackupFile,
+  buildBackupFilename,
+  serializeBackup,
+  encryptBackup,
+  parseBackup,
+  getBackupPayload,
+  isSupportedDictionaryBlock,
+  sanitizeSettingsPayload,
+  type BackupFile,
+} from "../lib/settingsTransfer";
+import { buildExportFile, parseImportContent } from "../lib/vocabularyTransfer";
+import { captureError } from "../lib/sentry";
 import {
   listenToEvent,
   HOTKEY_RECORDING_CAPTURED,
@@ -57,6 +72,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -84,13 +100,16 @@ import {
 import {
   AtSign,
   CircleAlert,
+  Download,
   Facebook,
   Github,
   Globe,
   Instagram,
+  Lock,
   Mic,
   RefreshCw,
   Trash2,
+  Upload,
 } from "lucide-vue-next";
 import type { AudioInputDeviceInfo } from "../types/audio";
 import { useAudioPreview } from "../composables/useAudioPreview";
@@ -102,7 +121,10 @@ import {
 
 const settingsStore = useSettingsStore();
 const historyStore = useHistoryStore();
+const vocabularyStore = useVocabularyStore();
 const { t } = useI18n();
+
+declare const __APP_VERSION__: string;
 
 // ── 快捷鍵設定 ──────────────────────────────────────────────
 const isMac = navigator.userAgent.includes("Mac");
@@ -831,6 +853,306 @@ async function handleAudioInputDeviceChange(deviceName: string) {
   }
 }
 
+// ── 備份與還原（匯出／匯入完整設定）────────────────────────
+const backupFeedback = useFeedbackMessage();
+
+const exportSettingsSelected = ref(true);
+const exportDictionarySelected = ref(true);
+const excludeKeysSelected = ref(true);
+const encryptEnabled = ref(false);
+const exportPassword = ref("");
+const exportPasswordConfirm = ref("");
+const isExporting = ref(false);
+const isImporting = ref(false);
+const isDictionaryImporting = ref(false);
+const parsedBackup = ref<BackupFile | null>(null);
+const importSettingsSelected = ref(false);
+const importDictionarySelected = ref(false);
+const importPassword = ref("");
+
+const exportPasswordMismatch = computed(
+  () =>
+    encryptEnabled.value &&
+    exportPasswordConfirm.value !== "" &&
+    exportPassword.value !== exportPasswordConfirm.value,
+);
+
+// 明文（未加密）且包含設定金鑰時，顯示外洩警告
+const showPlaintextKeyWarning = computed(
+  () =>
+    exportSettingsSelected.value &&
+    !excludeKeysSelected.value &&
+    !encryptEnabled.value,
+);
+
+const canExport = computed(() => {
+  if (!exportSettingsSelected.value && !exportDictionarySelected.value) {
+    return false;
+  }
+  if (encryptEnabled.value) {
+    if (exportPassword.value === "") return false;
+    if (exportPassword.value !== exportPasswordConfirm.value) return false;
+  }
+  return true;
+});
+
+const importedIsEncrypted = computed(
+  () => parsedBackup.value?.encryption != null,
+);
+const importHasSettings = computed(
+  () => parsedBackup.value?.contents.settings === true,
+);
+const importHasDictionary = computed(
+  () => parsedBackup.value?.contents.dictionary === true,
+);
+
+const canApplyImport = computed(() => {
+  if (!parsedBackup.value) return false;
+  const anySelected =
+    (importHasSettings.value && importSettingsSelected.value) ||
+    (importHasDictionary.value && importDictionarySelected.value);
+  if (!anySelected) return false;
+  if (importedIsEncrypted.value && importPassword.value === "") return false;
+  return true;
+});
+
+function resyncLocalInputsFromStore() {
+  selectedPromptMode.value = settingsStore.promptMode;
+  promptInput.value = settingsStore.getAiPrompt();
+  isPresetDirty.value = false;
+  apiKeyInput.value = settingsStore.hasApiKey
+    ? settingsStore.getApiKey()
+    : "";
+  thresholdEnabled.value = settingsStore.isEnhancementThresholdEnabled;
+  thresholdCharCount.value = settingsStore.enhancementThresholdCharCount;
+  recordingAutoCleanupEnabled.value =
+    settingsStore.isRecordingAutoCleanupEnabled;
+  recordingAutoCleanupDays.value = settingsStore.recordingAutoCleanupDays;
+  const currentKey = settingsStore.hotkeyConfig?.triggerKey;
+  isCustomMode.value = !!(
+    currentKey &&
+    (isCustomTriggerKey(currentKey) || isComboTriggerKey(currentKey))
+  );
+}
+
+function getBackupErrorMessage(
+  code: string,
+  operation: "import" | "export" = "import",
+): string {
+  switch (code) {
+    case "INVALID_JSON":
+    case "INVALID_FORMAT":
+      return t("settings.backup.errorInvalidFile");
+    case "UNSUPPORTED_VERSION":
+      return t("settings.backup.errorUnsupportedVersion");
+    case "CORRUPT_FILE":
+      return t("settings.backup.errorCorruptFile");
+    case "DECRYPT_FAILED":
+      return t("settings.backup.errorDecryptFailed");
+    case "PASSWORD_REQUIRED":
+      return t("settings.backup.errorPasswordRequired");
+    case "CRYPTO_UNAVAILABLE":
+      return t("settings.backup.errorCryptoUnavailable");
+    default:
+      return t(
+        operation === "export"
+          ? "settings.backup.errorExportFailed"
+          : "settings.backup.errorImportFailed",
+      );
+  }
+}
+
+async function handleBackupExport() {
+  if (isExporting.value || !canExport.value) return;
+  try {
+    isExporting.value = true;
+    const settings = exportSettingsSelected.value
+      ? await settingsStore.exportSettings(excludeKeysSelected.value)
+      : null;
+    const iso = new Date().toISOString();
+    const dictionary = exportDictionarySelected.value
+      ? buildExportFile(await vocabularyStore.exportEntries(), iso)
+      : null;
+
+    let file = buildBackupFile({
+      settings,
+      dictionary,
+      appVersion: __APP_VERSION__,
+      exportedAt: iso,
+    });
+    if (encryptEnabled.value) {
+      file = await encryptBackup(file, exportPassword.value);
+    }
+    const path = await save({
+      defaultPath: buildBackupFilename(new Date()),
+      filters: [{ name: "SayIt Backup", extensions: ["json"] }],
+    });
+    if (!path) return;
+    await invoke("save_text_file", { path, content: serializeBackup(file) });
+    backupFeedback.show("success", t("settings.backup.exportSuccess"));
+    exportPassword.value = "";
+    exportPasswordConfirm.value = "";
+  } catch (err) {
+    backupFeedback.show(
+      "error",
+      getBackupErrorMessage(extractErrorMessage(err), "export"),
+    );
+    captureError(err, { source: "settings-backup-export" });
+  } finally {
+    isExporting.value = false;
+  }
+}
+
+async function triggerBackupImport() {
+  try {
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "SayIt Backup", extensions: ["json"] }],
+    });
+    if (typeof path !== "string") return;
+    parsedBackup.value = null;
+    importPassword.value = "";
+    const content = await invoke<string>("read_text_file", { path });
+    const parsed = parseBackup(content);
+    parsedBackup.value = parsed;
+    importSettingsSelected.value = parsed.contents.settings;
+    importDictionarySelected.value = parsed.contents.dictionary;
+  } catch (err) {
+    const code = extractErrorMessage(err);
+    backupFeedback.show(
+      "error",
+      code === "FILE_TOO_LARGE"
+        ? t("settings.backup.errorTooLarge")
+        : getBackupErrorMessage(code),
+    );
+    captureError(err, { source: "settings-backup-parse" });
+  }
+}
+
+async function handleExternalDictionaryImport() {
+  if (isDictionaryImporting.value) return;
+  isDictionaryImporting.value = true;
+  try {
+    const path = await open({
+      multiple: false,
+      filters: [
+        { name: "Dictionary / Wordlist", extensions: ["json", "txt", "csv"] },
+      ],
+    });
+    if (typeof path !== "string") return;
+    const content = await invoke<string>("read_text_file", { path });
+    const entries = parseImportContent(path, content);
+    if (entries.length === 0) {
+      backupFeedback.show("error", t("settings.backup.dictImportEmpty"));
+      return;
+    }
+    const result = await vocabularyStore.importEntries(entries);
+    backupFeedback.show(
+      "success",
+      t("settings.backup.dictImportSuccess", {
+        added: result.added,
+        merged: result.merged,
+        skipped: result.skipped,
+      }),
+    );
+  } catch (err) {
+    const code = extractErrorMessage(err);
+    const msg =
+      code === "FILE_TOO_LARGE"
+        ? t("settings.backup.dictImportTooLarge")
+        : code === "INVALID_JSON" ||
+            code === "INVALID_FORMAT" ||
+            code.includes("Invalid UTF-8")
+          ? t("settings.backup.dictImportInvalid")
+          : t("settings.backup.dictImportFailed");
+    backupFeedback.show("error", msg);
+    captureError(err, { source: "settings-dictionary-import" });
+  } finally {
+    isDictionaryImporting.value = false;
+  }
+}
+
+async function applyBackupImport() {
+  if (
+    isImporting.value ||
+    isRecording.value ||
+    !parsedBackup.value ||
+    !canApplyImport.value
+  )
+    return;
+  try {
+    isImporting.value = true;
+    const payload = await getBackupPayload(
+      parsedBackup.value,
+      importedIsEncrypted.value ? importPassword.value : undefined,
+    );
+
+    // 預檢：在寫入任何設定前，先驗證所有選定的區塊，避免 half-applied 狀態
+    const willImportSettings = importSettingsSelected.value && !!payload.settings;
+    const willImportDictionary =
+      importDictionarySelected.value && !!payload.dictionary;
+    if (willImportDictionary && !isSupportedDictionaryBlock(payload.dictionary)) {
+      throw new Error("UNSUPPORTED_VERSION");
+    }
+    const cleanSettings = willImportSettings
+      ? sanitizeSettingsPayload(payload.settings as Record<string, unknown>)
+      : null;
+
+    const deviceBeforeImport = settingsStore.selectedAudioInputDeviceName;
+    let settingsApplied = false;
+    let dictionaryResult: {
+      added: number;
+      merged: number;
+      skipped: number;
+    } | null = null;
+
+    if (cleanSettings) {
+      await settingsStore.importSettings(cleanSettings);
+      resyncLocalInputsFromStore();
+      settingsApplied = true;
+      // 音訊裝置若有變更，重啟預覽以對齊新裝置
+      if (
+        settingsStore.selectedAudioInputDeviceName !== deviceBeforeImport
+      ) {
+        await stopPreview();
+        void startPreview(settingsStore.selectedAudioInputDeviceName);
+      }
+    }
+    if (willImportDictionary && payload.dictionary) {
+      dictionaryResult = await vocabularyStore.importEntries(
+        payload.dictionary.terms,
+      );
+    }
+
+    const parts: string[] = [];
+    if (settingsApplied) parts.push(t("settings.backup.resultSettings"));
+    if (dictionaryResult) {
+      parts.push(
+        t("settings.backup.resultDictionary", {
+          added: dictionaryResult.added,
+          merged: dictionaryResult.merged,
+          skipped: dictionaryResult.skipped,
+        }),
+      );
+    }
+    backupFeedback.show(
+      "success",
+      t("settings.backup.importSuccess", { detail: parts.join("；") }),
+    );
+    parsedBackup.value = null;
+    importPassword.value = "";
+  } catch (err) {
+    const code = extractErrorMessage(err);
+    backupFeedback.show("error", getBackupErrorMessage(code));
+    // 密碼錯誤／需要密碼屬常態使用者操作，不上報 Sentry 噪音
+    if (code !== "DECRYPT_FAILED" && code !== "PASSWORD_REQUIRED") {
+      captureError(err, { source: "settings-backup-import" });
+    }
+  } finally {
+    isImporting.value = false;
+  }
+}
+
 onMounted(async () => {
   // F5 fix: 先載入裝置列表，完成後再啟動預覽（避免 cpal 並行 host 查詢）
   void loadAudioInputDeviceList().then(() => {
@@ -874,6 +1196,7 @@ onBeforeUnmount(() => {
   smartDictionaryFeedback.clearTimer();
   recordingCleanupFeedback.clearTimer();
   providerFeedback.clearTimer();
+  backupFeedback.clearTimer();
   clearTimeout(deleteConfirmTimeoutId);
   clearTimeout(resetPromptConfirmTimeoutId);
 });
@@ -1962,6 +2285,236 @@ onBeforeUnmount(() => {
             "
           >
             {{ autoStartFeedback.message.value }}
+          </p>
+        </transition>
+      </CardContent>
+    </Card>
+
+    <!-- 備份與還原 -->
+    <Card>
+      <CardHeader>
+        <CardTitle>{{ $t("settings.backup.title") }}</CardTitle>
+        <p class="text-sm text-muted-foreground">
+          {{ $t("settings.backup.description") }}
+        </p>
+      </CardHeader>
+      <CardContent class="space-y-6">
+        <!-- 匯出 -->
+        <div class="space-y-4">
+          <h3 class="text-sm font-medium text-foreground">
+            {{ $t("settings.backup.exportSection") }}
+          </h3>
+
+          <div class="flex items-center gap-2">
+            <Checkbox
+              id="backup-export-settings"
+              :model-value="exportSettingsSelected"
+              @update:model-value="(v) => (exportSettingsSelected = v === true)"
+            />
+            <Label for="backup-export-settings" class="cursor-pointer">
+              {{ $t("settings.backup.includeSettings") }}
+            </Label>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <Checkbox
+              id="backup-export-dictionary"
+              :model-value="exportDictionarySelected"
+              @update:model-value="(v) => (exportDictionarySelected = v === true)"
+            />
+            <Label for="backup-export-dictionary" class="cursor-pointer">
+              {{ $t("settings.backup.includeDictionary") }}
+            </Label>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <Checkbox
+              id="backup-exclude-keys"
+              :model-value="excludeKeysSelected"
+              :disabled="!exportSettingsSelected"
+              @update:model-value="(v) => (excludeKeysSelected = v === true)"
+            />
+            <Label
+              for="backup-exclude-keys"
+              class="cursor-pointer"
+              :class="{ 'opacity-50': !exportSettingsSelected }"
+            >
+              {{ $t("settings.backup.excludeKeys") }}
+            </Label>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Lock class="h-4 w-4 text-muted-foreground" />
+              <Label for="backup-encrypt">{{ $t("settings.backup.encrypt") }}</Label>
+            </div>
+            <Switch
+              id="backup-encrypt"
+              :model-value="encryptEnabled"
+              @update:model-value="(v) => (encryptEnabled = v === true)"
+            />
+          </div>
+
+          <div v-if="encryptEnabled" class="space-y-2">
+            <Label for="backup-password">{{ $t("settings.backup.password") }}</Label>
+            <Input
+              id="backup-password"
+              v-model="exportPassword"
+              type="password"
+              autocomplete="new-password"
+              :placeholder="$t('settings.backup.passwordPlaceholder')"
+            />
+            <Input
+              id="backup-password-confirm"
+              v-model="exportPasswordConfirm"
+              type="password"
+              autocomplete="new-password"
+              :placeholder="$t('settings.backup.passwordConfirmPlaceholder')"
+            />
+            <p v-if="exportPasswordMismatch" class="text-sm text-destructive">
+              {{ $t("settings.backup.passwordMismatch") }}
+            </p>
+          </div>
+
+          <div
+            v-if="showPlaintextKeyWarning"
+            class="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3"
+          >
+            <CircleAlert class="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <p class="text-sm text-destructive">
+              {{ $t("settings.backup.plaintextWarning") }}
+            </p>
+          </div>
+
+          <Button
+            :disabled="!canExport || isExporting"
+            @click="handleBackupExport"
+          >
+            <Download class="mr-1 h-4 w-4" />{{ $t("settings.backup.exportButton") }}
+          </Button>
+        </div>
+
+        <div class="border-t border-border" />
+
+        <!-- 匯入 -->
+        <div class="space-y-4">
+          <h3 class="text-sm font-medium text-foreground">
+            {{ $t("settings.backup.importSection") }}
+          </h3>
+
+          <Button
+            variant="outline"
+            :disabled="isImporting || isRecording"
+            @click="triggerBackupImport"
+          >
+            <Upload class="mr-1 h-4 w-4" />{{ $t("settings.backup.chooseFile") }}
+          </Button>
+
+          <div v-if="parsedBackup" class="space-y-4 rounded-md border border-border p-4">
+            <p class="text-sm text-muted-foreground">
+              {{ $t("settings.backup.fileLoaded") }}
+            </p>
+
+            <div class="flex items-center gap-2">
+              <Checkbox
+                id="backup-import-settings"
+                :model-value="importSettingsSelected"
+                :disabled="!importHasSettings"
+                @update:model-value="(v) => (importSettingsSelected = v === true)"
+              />
+              <Label
+                for="backup-import-settings"
+                class="cursor-pointer"
+                :class="{ 'opacity-50': !importHasSettings }"
+              >
+                {{ $t("settings.backup.restoreSettings") }}
+              </Label>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <Checkbox
+                id="backup-import-dictionary"
+                :model-value="importDictionarySelected"
+                :disabled="!importHasDictionary"
+                @update:model-value="(v) => (importDictionarySelected = v === true)"
+              />
+              <Label
+                for="backup-import-dictionary"
+                class="cursor-pointer"
+                :class="{ 'opacity-50': !importHasDictionary }"
+              >
+                {{ $t("settings.backup.restoreDictionary") }}
+              </Label>
+            </div>
+
+            <div v-if="importedIsEncrypted" class="space-y-2">
+              <Label for="backup-import-password">
+                {{ $t("settings.backup.password") }}
+              </Label>
+              <Input
+                id="backup-import-password"
+                v-model="importPassword"
+                type="password"
+                autocomplete="off"
+                :placeholder="$t('settings.backup.importPasswordPlaceholder')"
+              />
+            </div>
+
+            <AlertDialog>
+              <AlertDialogTrigger as-child>
+                <Button :disabled="!canApplyImport || isImporting || isRecording">
+                  {{ $t("settings.backup.importButton") }}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {{ $t("settings.backup.confirmTitle") }}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {{ $t("settings.backup.confirmDescription") }}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{{ $t("common.cancel") }}</AlertDialogCancel>
+                  <AlertDialogAction @click="applyBackupImport">
+                    {{ $t("settings.backup.importButton") }}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div class="space-y-3">
+          <h3 class="text-sm font-medium text-foreground">
+            {{ $t("settings.backup.dictImportSection") }}
+          </h3>
+          <p class="text-sm text-muted-foreground">
+            {{ $t("settings.backup.dictImportDescription") }}
+          </p>
+          <Button
+            variant="outline"
+            :disabled="isDictionaryImporting || isRecording"
+            @click="handleExternalDictionaryImport"
+          >
+            <Upload class="mr-1 h-4 w-4" />{{ $t("settings.backup.dictImportButton") }}
+          </Button>
+        </div>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="backupFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              backupFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            {{ backupFeedback.message.value }}
           </p>
         </transition>
       </CardContent>

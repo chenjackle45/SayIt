@@ -4,7 +4,13 @@ import { getDatabase } from "../lib/database";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { captureError } from "../lib/sentry";
 import { emitEvent, VOCABULARY_CHANGED } from "../composables/useTauriEvents";
-import type { VocabularyEntry, VocabularySource } from "../types/vocabulary";
+import type {
+  ImportedTerm,
+  ImportResult,
+  VocabularyEntry,
+  VocabularyExportEntry,
+  VocabularySource,
+} from "../types/vocabulary";
 import type { VocabularyChangedPayload } from "../types/events";
 import i18n from "../i18n";
 
@@ -168,6 +174,89 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     }
   }
 
+  /** 取得所有詞條，供匯出使用（不含 id / createdAt） */
+  async function exportEntries(): Promise<VocabularyExportEntry[]> {
+    const db = getDatabase();
+    const rows = await db.select<RawVocabularyRow[]>(
+      "SELECT term, weight, source FROM vocabulary ORDER BY weight DESC, created_at DESC",
+    );
+    return rows.map((row) => ({
+      term: row.term,
+      weight: row.weight,
+      source: row.source as VocabularySource,
+    }));
+  }
+
+  /**
+   * 批次匯入詞條，以單一交易寫入。合併策略（term 以小寫比對）：
+   * - 不存在 → 新增（added）
+   * - 已存在且匯入 weight 較大 → 更新為較大值（merged）
+   * - 已存在且 weight 未較大 → 略過（skipped）
+   */
+  async function importEntries(
+    entries: ImportedTerm[],
+  ): Promise<ImportResult> {
+    const result: ImportResult = { added: 0, merged: 0, skipped: 0 };
+    if (entries.length === 0) return result;
+
+    const db = getDatabase();
+
+    // 建立現有詞條索引（小寫 term → { id, weight }）
+    const existingRows = await db.select<
+      { id: string; term: string; weight: number }[]
+    >("SELECT id, term, weight FROM vocabulary");
+    const existingByTerm = new Map<string, { id: string; weight: number }>();
+    for (const row of existingRows) {
+      existingByTerm.set(row.term.trim().toLowerCase(), {
+        id: row.id,
+        weight: row.weight,
+      });
+    }
+
+    // 不使用顯式交易：tauri-plugin-sql 連線池無連線親和性，跨 execute()
+    // 呼叫的 BEGIN/COMMIT 會落在不同連線而失敗
+    // （cannot commit - no transaction is active）。改為逐筆 autocommit；
+    // 已先 fetchTermList 去重 + term UNIQUE + 新 UUID，部分失敗可重新匯入恢復。
+    try {
+      for (const entry of entries) {
+        const key = entry.term.toLowerCase();
+        const existing = existingByTerm.get(key);
+        if (!existing) {
+          const id = crypto.randomUUID();
+          await db.execute(
+            "INSERT INTO vocabulary (id, term, weight, source) VALUES ($1, $2, $3, $4)",
+            [id, entry.term, entry.weight, entry.source],
+          );
+          // 同次匯入若有重複（理論上已去重）也視為已存在
+          existingByTerm.set(key, { id, weight: entry.weight });
+          result.added += 1;
+        } else if (entry.weight > existing.weight) {
+          await db.execute("UPDATE vocabulary SET weight = $1 WHERE id = $2", [
+            entry.weight,
+            existing.id,
+          ]);
+          existing.weight = entry.weight;
+          result.merged += 1;
+        } else {
+          result.skipped += 1;
+        }
+      }
+    } catch (error) {
+      console.error(
+        `[vocabulary-store] importEntries failed: ${extractErrorMessage(error)}`,
+      );
+      captureError(error, { source: "vocabulary", step: "import" });
+      throw error;
+    }
+
+    await fetchTermList();
+    void emitEvent(VOCABULARY_CHANGED, {
+      action: "added",
+      term: "",
+    } satisfies VocabularyChangedPayload);
+    return result;
+  }
+
   async function getTopTermListByWeight(limit: number): Promise<string[]> {
     try {
       const db = getDatabase();
@@ -198,5 +287,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     batchIncrementWeights,
     getTopTermListByWeight,
     removeTerm,
+    exportEntries,
+    importEntries,
   };
 });

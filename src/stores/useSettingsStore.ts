@@ -58,6 +58,12 @@ import {
   type LlmProviderId,
   type WhisperModelId,
 } from "../lib/modelRegistry";
+import {
+  EXPORTABLE_SETTING_KEYS,
+  stripSensitiveKeys,
+  type ExportableSettingKey,
+  type SettingsPayload,
+} from "../lib/settingsTransfer";
 
 declare const __APP_VERSION__: string;
 
@@ -1368,6 +1374,91 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function applyAutoStartImported(desired: boolean) {
+    try {
+      if (desired === isAutoStartEnabled.value) return;
+      const { enable, disable } = await import("@tauri-apps/plugin-autostart");
+      if (desired) {
+        await enable();
+      } else {
+        await disable();
+      }
+      isAutoStartEnabled.value = desired;
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] applyAutoStartImported failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, { source: "settings", step: "import-autostart" });
+    }
+  }
+
+  /** 合成欄位：autostart 不在 settings.json，匯出/匯入時以此 key 代表。 */
+  const AUTO_START_KEY = "autoStartEnabled";
+  const EXPORTABLE_KEY_SET = new Set<string>(EXPORTABLE_SETTING_KEYS);
+
+  /**
+   * 讀出可匯出的設定（白名單 key + 合成 autoStartEnabled）。
+   * @param excludeSecrets 為 true 時剔除敏感金鑰／密鑰。
+   */
+  async function exportSettings(
+    excludeSecrets: boolean,
+  ): Promise<SettingsPayload> {
+    const store = await load(STORE_NAME);
+    const result: SettingsPayload = {};
+    for (const key of EXPORTABLE_SETTING_KEYS) {
+      const value = await store.get(key);
+      if (value !== undefined && value !== null) {
+        result[key] = value;
+      }
+    }
+    result[AUTO_START_KEY] = isAutoStartEnabled.value;
+    if (!excludeSecrets) return result;
+
+    return stripSensitiveKeys(result);
+  }
+
+  /**
+   * 套用匯入的設定。
+   * ⚠️ 純 store.set 不足以正確生效，因此：
+   * 1) 白名單 key 寫回 store（autoStartEnabled 例外，改走 plugin）。
+   * 2) refreshCrossWindowSettings() 把持久化值讀回 reactive（含 locale i18n + html lang、provider 修正）。
+   * 3) 補 refresh 缺漏的副作用：熱鍵向 Rust 重新註冊、套用 autostart。
+   * 4) emit 單一 SETTINGS_UPDATED 通知其他視窗。
+   */
+  async function importSettings(settings: SettingsPayload): Promise<void> {
+    const store = await load(STORE_NAME);
+    let autoStartDesired: boolean | null = null;
+
+    for (const [key, value] of Object.entries(settings)) {
+      if (key === AUTO_START_KEY) {
+        if (typeof value === "boolean") autoStartDesired = value;
+        continue;
+      }
+      // 防禦：忽略白名單外的未知 key（含內部 migration 旗標）
+      if (!EXPORTABLE_KEY_SET.has(key)) continue;
+      await store.set(key as ExportableSettingKey, value);
+    }
+    await store.save();
+
+    // 將持久化值讀回 reactive 狀態（locale / prompt / provider 等）
+    await refreshCrossWindowSettings();
+
+    // refreshCrossWindowSettings 未涵蓋的副作用：
+    if (hotkeyConfig.value) {
+      await syncHotkeyConfigToRust(
+        hotkeyConfig.value.triggerKey,
+        hotkeyConfig.value.triggerMode,
+      );
+    }
+    if (autoStartDesired !== null) {
+      await applyAutoStartImported(autoStartDesired);
+    }
+
+    const payload: SettingsUpdatedPayload = { key: "imported", value: true };
+    await emitEvent(SETTINGS_UPDATED, payload);
+  }
+
   return {
     hotkeyConfig,
     triggerMode,
@@ -1446,5 +1537,7 @@ export const useSettingsStore = defineStore("settings", () => {
     loadAutoStartStatus,
     toggleAutoStart,
     initializeAutoStart,
+    exportSettings,
+    importSettings,
   };
 });

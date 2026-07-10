@@ -232,4 +232,137 @@ describe("useVocabularyStore", () => {
       expect(sql).toContain("'manual'");
     });
   });
+
+  // ==========================================================================
+  // exportEntries
+  // ==========================================================================
+
+  describe("exportEntries", () => {
+    it("應回傳不含 id/createdAt 的詞條", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        createRawVocabularyRow({ term: "Groq", weight: 30, source: "manual" }),
+        createRawVocabularyRow({ term: "Tauri", weight: 12, source: "ai" }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.exportEntries();
+      expect(result).toEqual([
+        { term: "Groq", weight: 30, source: "manual" },
+        { term: "Tauri", weight: 12, source: "ai" },
+      ]);
+    });
+  });
+
+  // ==========================================================================
+  // importEntries
+  // ==========================================================================
+
+  describe("importEntries", () => {
+    it("空陣列不執行任何 DB 操作", async () => {
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.importEntries([]);
+      expect(result).toEqual({ added: 0, merged: 0, skipped: 0 });
+      expect(mockDbExecute).not.toHaveBeenCalled();
+    });
+
+    it("不存在的詞 → 以 weight/source 新增", async () => {
+      // 第一個 select = 現有詞條（空），後續 fetchTermList 用預設 []
+      mockDbSelect.mockResolvedValueOnce([]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.importEntries([
+        { term: "A", weight: 5, source: "manual" },
+        { term: "B", weight: 1, source: "ai" },
+      ]);
+
+      expect(result).toEqual({ added: 2, merged: 0, skipped: 0 });
+
+      // 連線池無連線親和性：不可再以獨立 execute 發出 BEGIN/COMMIT
+      const sqlCalls = mockDbExecute.mock.calls.map((c) => c[0] as string);
+      expect(sqlCalls).not.toContain("BEGIN TRANSACTION");
+      expect(sqlCalls).not.toContain("COMMIT");
+      const insertCalls = mockDbExecute.mock.calls.filter((c) =>
+        (c[0] as string).includes("INSERT INTO vocabulary"),
+      );
+      expect(insertCalls).toHaveLength(2);
+      // INSERT 帶入 weight 與 source
+      expect(insertCalls[0][1]).toEqual([
+        expect.any(String),
+        "A",
+        5,
+        "manual",
+      ]);
+    });
+
+    it("已存在：weight 較大時更新（merged），否則略過（skipped）", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        { id: "x", term: "A", weight: 2 },
+        { id: "y", term: "B", weight: 10 },
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.importEntries([
+        { term: "A", weight: 5, source: "manual" }, // 5 > 2 → merged
+        { term: "B", weight: 3, source: "manual" }, // 3 < 10 → skipped
+      ]);
+
+      expect(result).toEqual({ added: 0, merged: 1, skipped: 1 });
+      const updateCalls = mockDbExecute.mock.calls.filter((c) =>
+        (c[0] as string).includes("UPDATE vocabulary SET weight"),
+      );
+      expect(updateCalls).toHaveLength(1);
+      expect(updateCalls[0][1]).toEqual([5, "x"]);
+    });
+
+    it("term 比對大小寫不敏感", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        { id: "x", term: "Tauri", weight: 1 },
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.importEntries([
+        { term: "tauri", weight: 9, source: "manual" },
+      ]);
+
+      expect(result).toEqual({ added: 0, merged: 1, skipped: 0 });
+    });
+
+    it("DB 失敗時拋錯（不再依賴 ROLLBACK）", async () => {
+      mockDbSelect.mockResolvedValueOnce([]);
+      // 第一個 execute 即 INSERT（不再有 BEGIN），令其失敗
+      mockDbExecute.mockRejectedValueOnce(new Error("disk full")); // INSERT
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      await expect(
+        store.importEntries([{ term: "A", weight: 1, source: "manual" }]),
+      ).rejects.toThrow();
+
+      const sqlCalls = mockDbExecute.mock.calls.map((c) => c[0] as string);
+      expect(sqlCalls).not.toContain("ROLLBACK");
+    });
+  });
 });

@@ -105,7 +105,9 @@ onBeforeUnmount(() => {
   <div class="p-6">
     <!-- Page header -->
     <div class="flex flex-wrap items-center justify-between gap-4">
-      <Badge variant="secondary">{{ $t("dictionary.termCount", { count: vocabularyStore.termCount }) }}</Badge>
+      <div class="flex items-center gap-2">
+        <Badge variant="secondary">{{ $t("dictionary.termCount", { count: vocabularyStore.termCount }) }}</Badge>
+      </div>
 
       <div class="flex items-center gap-2">
         <div class="flex flex-col">
@@ -136,6 +138,7 @@ onBeforeUnmount(() => {
         <div class="space-y-1 text-sm text-muted-foreground">
           <p>{{ $t("dictionary.description") }}</p>
           <p>{{ $t("dictionary.weightDescription", { limit: 50 }) }}</p>
+          <p>{{ $t("dictionary.importHint") }}</p>
         </div>
       </div>
     </div>
