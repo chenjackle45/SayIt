@@ -40,12 +40,16 @@ pub struct SelectionState {
 }
 
 impl SelectionState {
+    // selection / no_selection 僅 macOS 的 AX 分類器使用；
+    // Windows 端一律 unavailable，cfg 閘避免 dead_code 撞上 clippy -D warnings
+    #[cfg(target_os = "macos")]
     fn selection(text: String) -> Self {
         Self {
             kind: "selection".to_string(),
             text: Some(text),
         }
     }
+    #[cfg(target_os = "macos")]
     fn no_selection() -> Self {
         Self {
             kind: "noSelection".to_string(),
