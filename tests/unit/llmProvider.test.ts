@@ -60,7 +60,7 @@ describe("llmProvider.ts", () => {
       expect(body.max_tokens).toBeUndefined();
       // GPT-5.x 是推理模型：temperature 只接受預設值 1、送其他值回 400
       expect(body.temperature).toBeUndefined();
-      expect(body.reasoning_effort).toBe("minimal");
+      expect(body.reasoning_effort).toBe("none");
     });
 
     it("[P0] Groq gpt-oss：關閉推理回傳、推理強度最低", () => {

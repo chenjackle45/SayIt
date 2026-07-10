@@ -139,9 +139,10 @@ function buildOpenAiCompatibleFetchParams(
     messages: request.messages,
   };
   // OpenAI GPT-5.x 是推理模型：temperature 只接受預設值 1、送其他值回 400，
-  // 一律不送；改用 reasoning_effort 壓低推理量（minimal 為 5.4/5.6 皆支援的最低檔）
+  // 一律不送；改用 reasoning_effort 關閉推理（"none" 經實測 5.4-nano / 5.6-luna
+  // 皆接受；"minimal" 已被 5.6 世代移除、送出即 400）
   if (providerId === "openai") {
-    body.reasoning_effort = "minimal";
+    body.reasoning_effort = "none";
   } else if (request.temperature !== undefined) {
     body.temperature = request.temperature;
   }
