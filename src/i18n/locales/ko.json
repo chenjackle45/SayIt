@@ -200,7 +200,7 @@
     "dailyQuota": "오늘 남은 무료 할당량",
     "dailyQuotaDetail": "오늘 남은 무료 할당량 상세",
     "usageTrend": "일별 사용 추이",
-    "last30Days": "최근 30일",
+    "lastNDays": "최근 {days}일",
     "recentTranscriptions": "최근 전사",
     "viewAll": "전체 보기",
     "emptyState": "음성 입력을 시작하면 통계가 여기에 표시됩니다",
@@ -213,8 +213,12 @@
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "사전 분석",
     "vocabularyAnalysisUsage": "사전 분석: {requests} 회 / {tokens} tokens",
-    "llmUsageNoQuota": "AI 다듬기 사용 {requests}회 (무료 할당량은 계정마다 다르므로 공급자 콘솔에서 확인하세요)"
-  },
+    "geminiQuotaHint": "Gemini 무료 할당량은 계정마다 다릅니다. Google AI Studio에서 실제 한도를 확인하세요",
+    "dailyUsage": "오늘 사용량",
+    "billedPlan": "유료",
+    "billedNoFreeQuota": "유료 요금제 — 무료 할당량 없음",
+    "usageWhisper": "Whisper: {requests}회 · {audio}",
+    "usageLlm": "LLM: {requests}회 · {tokens} tokens"  },
   "history": {
     "searchPlaceholder": "전사 기록 검색...",
     "loading": "로딩 중...",

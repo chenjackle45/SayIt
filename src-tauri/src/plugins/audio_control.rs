@@ -173,7 +173,6 @@ mod macos {
 
 #[cfg(target_os = "windows")]
 mod windows_audio {
-    use windows::core::Interface;
     use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
     use windows::Win32::Media::Audio::{
         eConsole, eRender, IMMDeviceEnumerator, MMDeviceEnumerator,

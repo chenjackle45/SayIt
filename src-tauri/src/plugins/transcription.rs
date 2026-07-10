@@ -23,6 +23,7 @@ pub struct TranscriptionState {
 impl TranscriptionState {
     pub fn new() -> Self {
         let client = reqwest::Client::builder()
+            .use_rustls_tls()
             .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
             .build()
             .expect("Failed to build HTTP client");

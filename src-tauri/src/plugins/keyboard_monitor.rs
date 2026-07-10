@@ -250,8 +250,6 @@ fn run_persistent_hook(
     const VK_BACK: u32 = 0x08;
     const VK_DELETE: u32 = 0x2E;
     const VK_RETURN: u32 = 0x0D;
-    const WM_KEYDOWN: u32 = 0x0100;
-    const WM_SYSKEYDOWN: u32 = 0x0104;
 
     struct HookState {
         is_monitoring: Arc<AtomicBool>,
@@ -286,15 +284,15 @@ fn run_persistent_hook(
 
                 if w == WM_KEYDOWN || w == WM_SYSKEYDOWN {
                     // Quality monitor logic (unchanged)
-                    if state.is_monitoring.load(Ordering::SeqCst) {
-                        if kbd.vkCode == VK_BACK || kbd.vkCode == VK_DELETE {
-                            state.was_modified.store(true, Ordering::SeqCst);
-                            #[cfg(debug_assertions)]
-                            println!(
-                                "[keyboard-monitor] Quality: detected modify key: vkCode=0x{:02X}",
-                                kbd.vkCode
-                            );
-                        }
+                    if state.is_monitoring.load(Ordering::SeqCst)
+                        && (kbd.vkCode == VK_BACK || kbd.vkCode == VK_DELETE)
+                    {
+                        state.was_modified.store(true, Ordering::SeqCst);
+                        #[cfg(debug_assertions)]
+                        println!(
+                            "[keyboard-monitor] Quality: detected modify key: vkCode=0x{:02X}",
+                            kbd.vkCode
+                        );
                     }
 
                     // Correction monitor logic (independent)
@@ -317,7 +315,6 @@ fn run_persistent_hook(
     }
 
     unsafe {
-        use windows::Win32::Foundation::*;
         use windows::Win32::UI::WindowsAndMessaging::*;
 
         match SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), None, 0) {

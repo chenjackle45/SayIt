@@ -200,7 +200,7 @@
     "dailyQuota": "今日剩餘免費額度",
     "dailyQuotaDetail": "今日剩餘免費額度明細",
     "usageTrend": "每日使用趨勢",
-    "last30Days": "最近 30 天",
+    "lastNDays": "最近 {days} 天",
     "recentTranscriptions": "最近轉錄",
     "viewAll": "查看全部",
     "emptyState": "開始使用語音輸入，統計數據將在此顯示",
@@ -213,8 +213,12 @@
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "字典分析",
     "vocabularyAnalysisUsage": "字典分析：{requests} 次 / {tokens} tokens",
-    "llmUsageNoQuota": "AI 整理已使用 {requests} 次（免費額度依帳號而異，請至供應商後台查看）"
-  },
+    "geminiQuotaHint": "Gemini 免費額度依帳號而異，請至 Google AI Studio 查看你的實際上限",
+    "dailyUsage": "今日用量",
+    "billedPlan": "計費",
+    "billedNoFreeQuota": "付費方案 — 無免費額度限制",
+    "usageWhisper": "Whisper：{requests} 次 · {audio}",
+    "usageLlm": "LLM：{requests} 次 · {tokens} tokens"  },
   "history": {
     "searchPlaceholder": "搜尋轉錄記錄...",
     "loading": "載入中...",

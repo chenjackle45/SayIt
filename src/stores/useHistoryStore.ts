@@ -11,6 +11,7 @@ import type { TriggerMode } from "../types";
 import type { TranscriptionCompletedPayload } from "../types/events";
 import { invoke } from "@tauri-apps/api/core";
 import { getDatabase } from "../lib/database";
+import { buildDailyUsageSeries } from "../lib/usageTrend";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { captureError } from "../lib/sentry";
 import {
@@ -19,6 +20,7 @@ import {
 } from "../composables/useTauriEvents";
 
 const PAGE_SIZE = 20;
+const USAGE_TREND_DAYS = 14;
 
 interface RawTranscriptionRow {
   id: string;
@@ -408,18 +410,28 @@ export const useHistoryStore = defineStore("history", () => {
     return result;
   }
 
-  async function fetchDailyUsageTrend(days = 30): Promise<DailyUsageTrend[]> {
+  async function fetchDailyUsageTrend(
+    days = USAGE_TREND_DAYS,
+  ): Promise<DailyUsageTrend[]> {
     const db = getDatabase();
-    const cutoffTimestamp = Date.now() - days * 86_400_000;
+    // SQL 查詢窗口必須與 buildDailyUsageSeries 的補零窗口對齊（同一個本地日曆區間），
+    // 否則落在「滾動 24h cutoff 但日曆區間外」的記錄會被 SQL 撈到卻被補零丟棄。
+    const endDate = new Date();
+    const startDate = new Date(
+      endDate.getFullYear(),
+      endDate.getMonth(),
+      endDate.getDate() - days + 1,
+    );
     const rows = await db.select<DailyUsageTrendRow[]>(DAILY_USAGE_TREND_SQL, [
-      cutoffTimestamp,
+      startDate.getTime(),
       days,
     ]);
-    return rows.map((row) => ({
+    const mapped = rows.map((row) => ({
       date: row.date,
       count: row.count,
       totalChars: row.total_chars,
     }));
+    return buildDailyUsageSeries(mapped, days, endDate);
   }
 
   async function fetchRecentTranscriptionList(
@@ -562,6 +574,7 @@ export const useHistoryStore = defineStore("history", () => {
     dashboardStats,
     recentTranscriptionList,
     dailyUsageTrendList,
+    usageTrendDays: USAGE_TREND_DAYS,
     fetchTranscriptionList,
     searchTranscriptionList,
     resetAndFetch,

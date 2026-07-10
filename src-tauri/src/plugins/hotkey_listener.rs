@@ -910,6 +910,7 @@ pub fn reinitialize_hotkey_listener<R: Runtime>(app: AppHandle<R>) -> Result<(),
 
     #[cfg(not(target_os = "macos"))]
     {
+        let _ = &app;
         Ok(())
     }
 }
@@ -934,16 +935,12 @@ mod windows_hook {
     const VK_LWIN: u32 = 0x5B;
     const VK_RWIN: u32 = 0x5C;
 
-    // Windows message constants
-    const WM_KEYDOWN: u32 = 0x0100;
-    const WM_KEYUP: u32 = 0x0101;
-    const WM_SYSKEYDOWN: u32 = 0x0104;
-    const WM_SYSKEYUP: u32 = 0x0105;
+    type KeyHandler = Box<dyn Fn(bool, &TriggerMode) + Send + Sync>;
 
     struct HookContext {
         shared: Arc<Mutex<HotkeySharedState>>,
         is_pressed: Arc<AtomicBool>,
-        key_handler: Box<dyn Fn(bool, &TriggerMode) + Send + Sync>,
+        key_handler: KeyHandler,
         escape_handler: Box<dyn Fn() + Send + Sync>,
         recording_captured_handler: Box<dyn Fn(RecordingCapturedPayload) + Send + Sync>,
         recording_rejected_handler: Box<dyn Fn(RecordingRejectedPayload) + Send + Sync>,
@@ -1069,7 +1066,6 @@ mod windows_hook {
             .ok();
 
         std::thread::spawn(move || unsafe {
-            use windows::Win32::Foundation::*;
             use windows::Win32::UI::WindowsAndMessaging::*;
 
             match SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), None, 0) {

@@ -200,7 +200,7 @@
     "dailyQuota": "本日の無料残額",
     "dailyQuotaDetail": "本日の無料残額詳細",
     "usageTrend": "日別使用トレンド",
-    "last30Days": "直近 30 日間",
+    "lastNDays": "直近 {days} 日間",
     "recentTranscriptions": "最近の文字起こし",
     "viewAll": "すべて表示",
     "emptyState": "音声入力を始めると、ここに統計データが表示されます",
@@ -213,8 +213,12 @@
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "辞書分析",
     "vocabularyAnalysisUsage": "辞書分析：{requests} 回 / {tokens} tokens",
-    "llmUsageNoQuota": "AI 整形の使用回数：{requests} 回（無料枠はアカウントにより異なります。プロバイダーのコンソールでご確認ください）"
-  },
+    "geminiQuotaHint": "Gemini の無料枠はアカウントにより異なります。Google AI Studio で実際の上限をご確認ください",
+    "dailyUsage": "本日の使用量",
+    "billedPlan": "従量課金",
+    "billedNoFreeQuota": "従量課金 — 無料枠なし",
+    "usageWhisper": "Whisper：{requests} 回 · {audio}",
+    "usageLlm": "LLM：{requests} 回 · {tokens} tokens"  },
   "history": {
     "searchPlaceholder": "文字起こし履歴を検索...",
     "loading": "読み込み中...",

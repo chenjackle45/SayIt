@@ -615,9 +615,16 @@ describe("useHistoryStore", () => {
         createRawRow({ id: "recent-1" }),
         createRawRow({ id: "recent-2" }),
       ]);
-      // fetchDailyUsageTrend
+      // fetchDailyUsageTrend（補零後固定 14 天，命中日對應今天）
+      const todayKey = (() => {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, "0");
+        const d = String(now.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      })();
       mockDbSelect.mockResolvedValueOnce([
-        { date: "2026-03-01", count: 3, total_chars: 100 },
+        { date: todayKey, count: 3, total_chars: 100 },
       ]);
 
       const { useHistoryStore } = await import(
@@ -635,10 +642,12 @@ describe("useHistoryStore", () => {
       );
       expect(store.recentTranscriptionList).toHaveLength(2);
       expect(store.recentTranscriptionList[0].id).toBe("recent-1");
-      expect(store.dailyUsageTrendList).toHaveLength(1);
-      expect(store.dailyUsageTrendList[0].date).toBe("2026-03-01");
-      expect(store.dailyUsageTrendList[0].count).toBe(3);
-      expect(store.dailyUsageTrendList[0].totalChars).toBe(100);
+      expect(store.dailyUsageTrendList).toHaveLength(14);
+      const lastDay =
+        store.dailyUsageTrendList[store.dailyUsageTrendList.length - 1];
+      expect(lastDay.date).toBe(todayKey);
+      expect(lastDay.count).toBe(3);
+      expect(lastDay.totalChars).toBe(100);
     });
 
     it("[P0] dashboardStats 初始值應全為零", async () => {
@@ -987,11 +996,24 @@ describe("useHistoryStore", () => {
   // ==========================================================================
 
   describe("fetchDailyUsageTrend", () => {
-    it("[P0] 應回傳 camelCase 映射後的趨勢陣列", async () => {
+    it("[P0] 應回傳 camelCase 映射並補零成固定區間的趨勢陣列", async () => {
       const { useHistoryStore } = await import(
         "../../src/stores/useHistoryStore"
       );
       const store = useHistoryStore();
+
+      const toLocalKey = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      };
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const todayKey = toLocalKey(today);
+      const yesterdayKey = toLocalKey(yesterday);
+
       // fetchDashboardStats → DASHBOARD_STATS_SQL
       mockDbSelect.mockResolvedValueOnce([
         { total_count: 0, total_characters: 0, total_recording_duration_ms: 0 },
@@ -1000,24 +1022,32 @@ describe("useHistoryStore", () => {
       mockDbSelect.mockResolvedValueOnce([]);
       // fetchRecentTranscriptionList
       mockDbSelect.mockResolvedValueOnce([]);
-      // fetchDailyUsageTrend
+      // fetchDailyUsageTrend（SQL 只回有使用記錄的日期）
       mockDbSelect.mockResolvedValueOnce([
-        { date: "2026-03-01", count: 5, total_chars: 250 },
-        { date: "2026-02-28", count: 3, total_chars: 120 },
+        { date: todayKey, count: 5, total_chars: 250 },
+        { date: yesterdayKey, count: 3, total_chars: 120 },
       ]);
 
       await store.refreshDashboard();
 
-      expect(store.dailyUsageTrendList).toHaveLength(2);
-      expect(store.dailyUsageTrendList[0]).toEqual({
-        date: "2026-03-01",
+      const list = store.dailyUsageTrendList;
+      // 補零後固定 14 天、升冪、今天在最後
+      expect(list).toHaveLength(14);
+      expect(list[list.length - 1]).toEqual({
+        date: todayKey,
         count: 5,
         totalChars: 250,
       });
-      expect(store.dailyUsageTrendList[1]).toEqual({
-        date: "2026-02-28",
+      expect(list[list.length - 2]).toEqual({
+        date: yesterdayKey,
         count: 3,
         totalChars: 120,
+      });
+      // 缺席日補 0
+      expect(list[0]).toEqual({
+        date: list[0].date,
+        count: 0,
+        totalChars: 0,
       });
     });
 
@@ -1047,9 +1077,15 @@ describe("useHistoryStore", () => {
       expect(sql).toContain("GROUP BY date");
       expect(sql).toContain("LIMIT");
       const params = trendCall[1] as number[];
+      // cutoff 必須是「本地午夜」（與補零的日曆窗口對齊），而非滾動 24h
+      const cutoff = new Date(params[0]);
+      expect(cutoff.getHours()).toBe(0);
+      expect(cutoff.getMinutes()).toBe(0);
+      expect(cutoff.getSeconds()).toBe(0);
+      expect(cutoff.getMilliseconds()).toBe(0);
       expect(params[0]).toBeLessThanOrEqual(Date.now());
-      expect(params[0]).toBeGreaterThan(Date.now() - 31 * 86_400_000);
-      expect(params[1]).toBe(30);
+      expect(params[0]).toBeGreaterThan(Date.now() - 15 * 86_400_000);
+      expect(params[1]).toBe(14);
     });
   });
 });

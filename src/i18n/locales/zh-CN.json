@@ -200,7 +200,7 @@
     "dailyQuota": "今日剩余免费额度",
     "dailyQuotaDetail": "今日剩余免费额度明细",
     "usageTrend": "每日使用趋势",
-    "last30Days": "最近 30 天",
+    "lastNDays": "最近 {days} 天",
     "recentTranscriptions": "最近转录",
     "viewAll": "查看全部",
     "emptyState": "开始使用语音输入，统计数据将在此显示",
@@ -213,8 +213,12 @@
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "字典分析",
     "vocabularyAnalysisUsage": "字典分析：{requests} 次 / {tokens} tokens",
-    "llmUsageNoQuota": "AI 整理已使用 {requests} 次（免费额度因账号而异，请至供应商后台查看）"
-  },
+    "geminiQuotaHint": "Gemini 免费额度因账号而异，请至 Google AI Studio 查看你的实际上限",
+    "dailyUsage": "今日用量",
+    "billedPlan": "计费",
+    "billedNoFreeQuota": "付费方案 — 无免费额度限制",
+    "usageWhisper": "Whisper：{requests} 次 · {audio}",
+    "usageLlm": "LLM：{requests} 次 · {tokens} tokens"  },
   "history": {
     "searchPlaceholder": "搜索转录记录...",
     "loading": "加载中...",

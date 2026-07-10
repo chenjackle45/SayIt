@@ -200,7 +200,7 @@
     "dailyQuota": "Daily Free Quota Remaining",
     "dailyQuotaDetail": "Daily Free Quota Details",
     "usageTrend": "Daily Usage Trend",
-    "last30Days": "Last 30 Days",
+    "lastNDays": "Last {days} Days",
     "recentTranscriptions": "Recent Transcriptions",
     "viewAll": "View All",
     "emptyState": "Start using voice input and your stats will appear here",
@@ -213,8 +213,12 @@
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "Dictionary Analysis",
     "vocabularyAnalysisUsage": "Dictionary Analysis: {requests} req / {tokens} tokens",
-    "llmUsageNoQuota": "AI enhancement used {requests} times (free quota varies by account — check your provider console)"
-  },
+    "geminiQuotaHint": "Gemini free quota varies by account — check your actual limits in Google AI Studio",
+    "dailyUsage": "Today's Usage",
+    "billedPlan": "Billed",
+    "billedNoFreeQuota": "Pay-as-you-go — no free quota limit",
+    "usageWhisper": "Whisper: {requests} req · {audio}",
+    "usageLlm": "LLM: {requests} req · {tokens} tokens"  },
   "history": {
     "searchPlaceholder": "Search transcriptions...",
     "loading": "Loading...",
