@@ -294,7 +294,7 @@ async fn send_transcription_request(
 
     let model = model_id.unwrap_or_else(|| DEFAULT_WHISPER_MODEL_ID.to_string());
 
-    println!(
+    log::info!(
         "[transcription] Sending {} bytes WAV to Groq API (model={})",
         wav_data.len(),
         model
@@ -324,7 +324,7 @@ async fn send_transcription_request(
         {
             Ok((raw_text, no_speech_probability)) => {
                 let transcription_duration_ms = start_time.elapsed().as_secs_f64() * 1000.0;
-                println!(
+                log::info!(
                     "[transcription] Response in {transcription_duration_ms:.0}ms (attempt {attempt}): \"{raw_text}\" (noSpeechProb={no_speech_probability:.3})"
                 );
                 return Ok(TranscriptionResult {
@@ -339,7 +339,7 @@ async fn send_transcription_request(
             Err(failure) => {
                 if attempt < MAX_TRANSCRIPTION_ATTEMPTS {
                     if let Some(wait) = retry_wait_secs(&failure.kind, attempt) {
-                        println!(
+                        log::warn!(
                             "[transcription] Attempt {attempt} failed ({}): {}; retrying in {wait}s",
                             failure_kind_label(&failure.kind),
                             failure.error
@@ -348,7 +348,7 @@ async fn send_transcription_request(
                         continue;
                     }
                 }
-                println!(
+                log::error!(
                     "[transcription] Attempt {attempt} failed ({}), giving up: {}",
                     failure_kind_label(&failure.kind),
                     failure.error
@@ -466,7 +466,7 @@ pub async fn retranscribe_from_file(
         TranscriptionError::RequestFailed(format!("Failed to read WAV file: {e}"))
     })?;
 
-    println!(
+    log::info!(
         "[transcription] Retranscribing from file: {} ({} bytes)",
         file_path,
         wav_data.len()

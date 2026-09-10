@@ -265,7 +265,7 @@ fn handle_key_event<R: Runtime>(
                     if check_double_tap(&shared) {
                         shared.double_tap.clear();
                         drop(shared);
-                        println!("[hotkey-listener] double-tap detected, emitting mode-toggle");
+                        log::info!("[hotkey-listener] double-tap detected, emitting mode-toggle");
                         let _ = app_handle.emit("hotkey:mode-toggle", ());
                         return;
                     }
@@ -314,7 +314,7 @@ fn handle_key_event<R: Runtime>(
                         if let Ok(mut shared) = shared_clone.lock() {
                             shared.toggle_long_press_fired = true;
                         }
-                        println!(
+                        log::info!(
                             "[hotkey-listener] toggle long-press detected, emitting mode-toggle"
                         );
                         let _ = app_handle_clone.emit("hotkey:mode-toggle", ());
@@ -379,7 +379,7 @@ fn check_accessibility_permission() -> bool {
         fn AXIsProcessTrusted() -> bool;
     }
     let trusted = unsafe { AXIsProcessTrusted() };
-    println!("[hotkey-listener] AXIsProcessTrusted = {trusted}");
+    log::info!("[hotkey-listener] AXIsProcessTrusted = {trusted}");
     trusted
 }
 
@@ -554,12 +554,12 @@ fn handle_recording_event_macos<R: Runtime>(
                         .accumulated_modifiers
                         .insert(ModifierFlag::Fn);
                     shared.recording.last_modifier_keycode = Some(macos_keycodes::FN);
-                    println!("[hotkey-listener] recording: Fn pressed, accumulated as modifier");
+                    log::info!("[hotkey-listener] recording: Fn pressed, accumulated as modifier");
                 } else {
                     // Fn released (second toggle): no primary key was pressed → single Fn capture
                     shared.recording.reset();
                     drop(shared);
-                    println!("[hotkey-listener] recording: captured Fn (single, toggle release)");
+                    log::info!("[hotkey-listener] recording: captured Fn (single, toggle release)");
                     let _ = app_handle.emit(
                         "hotkey:recording-captured",
                         RecordingCapturedPayload {
@@ -592,7 +592,7 @@ fn handle_recording_event_macos<R: Runtime>(
                 let last_kc = shared.recording.last_modifier_keycode.unwrap();
                 shared.recording.reset();
                 drop(shared);
-                println!(
+                log::info!(
                     "[hotkey-listener] recording: captured single modifier keycode={last_kc}"
                 );
                 let _ = app_handle.emit(
@@ -632,7 +632,7 @@ fn handle_recording_event_macos<R: Runtime>(
                 .collect();
             shared.recording.reset();
             drop(shared);
-            println!(
+            log::info!(
                 "[hotkey-listener] recording: captured keycode={keycode}, modifiers={mods:?}"
             );
             let _ = app_handle.emit(
@@ -651,7 +651,7 @@ fn handle_recording_event_macos<R: Runtime>(
 fn start_event_tap<R: Runtime>(app_handle: AppHandle<R>, state: HotkeyListenerState) {
     let run_loop_ref = state.run_loop_ref.clone();
     std::thread::spawn(move || {
-        println!("[hotkey-listener] Creating CGEventTap on thread...");
+        log::info!("[hotkey-listener] Creating CGEventTap on thread...");
 
         let app_handle_error = app_handle.clone();
 
@@ -813,7 +813,7 @@ fn start_event_tap<R: Runtime>(app_handle: AppHandle<R>, state: HotkeyListenerSt
 
         match tap_result {
             Ok(tap) => {
-                println!("[hotkey-listener] CGEventTap created successfully");
+                log::info!("[hotkey-listener] CGEventTap created successfully");
                 unsafe {
                     let loop_source = tap
                         .mach_port
@@ -825,20 +825,20 @@ fn start_event_tap<R: Runtime>(app_handle: AppHandle<R>, state: HotkeyListenerSt
                     if let Ok(mut guard) = run_loop_ref.lock() {
                         *guard = Some(current_run_loop);
                     }
-                    println!("[hotkey-listener] RunLoop started, listening for hotkey events...");
+                    log::info!("[hotkey-listener] RunLoop started, listening for hotkey events...");
                     CFRunLoop::run_current();
                     if let Ok(mut guard) = run_loop_ref.lock() {
                         *guard = None;
                     }
-                    println!("[hotkey-listener] RunLoop stopped");
+                    log::info!("[hotkey-listener] RunLoop stopped");
                 }
             }
             Err(()) => {
-                eprintln!("[hotkey-listener] ERROR: Failed to create CGEventTap!");
-                eprintln!(
+                log::error!("[hotkey-listener] ERROR: Failed to create CGEventTap!");
+                log::error!(
                     "[hotkey-listener] Go to System Settings > Privacy & Security > Accessibility"
                 );
-                eprintln!("[hotkey-listener] and add this application.");
+                log::error!("[hotkey-listener] and add this application.");
                 let _ = app_handle_error.emit(
                     "hotkey:error",
                     serde_json::json!({
@@ -856,7 +856,7 @@ fn stop_existing_event_tap(run_loop_ref: &Arc<Mutex<Option<core_foundation::runl
     if let Ok(guard) = run_loop_ref.lock() {
         if let Some(ref rl) = *guard {
             rl.stop();
-            println!("[hotkey-listener] Stopped existing CFRunLoop");
+            log::info!("[hotkey-listener] Stopped existing CFRunLoop");
         }
     }
 }
@@ -864,7 +864,7 @@ fn stop_existing_event_tap(run_loop_ref: &Arc<Mutex<Option<core_foundation::runl
 #[tauri::command]
 pub fn reset_hotkey_state(state: tauri::State<'_, HotkeyListenerState>) {
     state.reset_key_states();
-    println!("[hotkey-listener] Key states reset via command");
+    log::info!("[hotkey-listener] Key states reset via command");
 }
 
 #[tauri::command]
@@ -874,7 +874,7 @@ pub fn start_hotkey_recording(state: tauri::State<'_, HotkeyListenerState>) {
         shared.recording.is_active = true;
     }
     state.is_pressed.store(false, Ordering::SeqCst);
-    println!("[hotkey-listener] Recording mode started");
+    log::info!("[hotkey-listener] Recording mode started");
 }
 
 #[tauri::command]
@@ -882,7 +882,7 @@ pub fn cancel_hotkey_recording(state: tauri::State<'_, HotkeyListenerState>) {
     if let Ok(mut shared) = state.shared.lock() {
         shared.recording.reset();
     }
-    println!("[hotkey-listener] Recording mode cancelled");
+    log::info!("[hotkey-listener] Recording mode cancelled");
 }
 
 #[tauri::command]
@@ -904,7 +904,7 @@ pub fn reinitialize_hotkey_listener<R: Runtime>(app: AppHandle<R>) -> Result<(),
         let hook_state = state.inner().clone();
         start_event_tap(app, hook_state);
 
-        println!("[hotkey-listener] Reinitialized hotkey listener");
+        log::info!("[hotkey-listener] Reinitialized hotkey listener");
         Ok(())
     }
 
@@ -1070,7 +1070,7 @@ mod windows_hook {
 
             match SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), None, 0) {
                 Ok(hook) => {
-                    println!("[hotkey-listener] Windows keyboard hook installed");
+                    log::info!("[hotkey-listener] Windows keyboard hook installed");
                     let mut msg = MSG::default();
                     while GetMessageW(&mut msg, None, 0, 0).as_bool() {
                         let _ = TranslateMessage(&msg);
@@ -1079,7 +1079,7 @@ mod windows_hook {
                     let _ = UnhookWindowsHookEx(hook);
                 }
                 Err(e) => {
-                    eprintln!(
+                    log::error!(
                         "[hotkey-listener] ERROR: Failed to install keyboard hook: {}",
                         e
                     );
@@ -1242,12 +1242,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             {
                 let trusted = check_accessibility_permission();
                 if !trusted {
-                    println!("[hotkey-listener] Prompting for Accessibility permission...");
+                    log::info!("[hotkey-listener] Prompting for Accessibility permission...");
                     prompt_accessibility_permission();
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     let trusted_after = check_accessibility_permission();
                     if !trusted_after {
-                        println!("[hotkey-listener] WARNING: Still no Accessibility permission.");
+                        log::info!("[hotkey-listener] WARNING: Still no Accessibility permission.");
                     }
                 }
                 start_event_tap(app.clone(), hook_state);
@@ -1261,7 +1261,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             #[cfg(not(any(target_os = "macos", target_os = "windows")))]
             {
                 let _ = hook_state;
-                println!(
+                log::info!(
                     "[hotkey-listener] Hotkey listener is only supported on macOS and Windows."
                 );
             }

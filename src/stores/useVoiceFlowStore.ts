@@ -12,6 +12,7 @@ import {
   getTranscriptionErrorMessage,
 } from "../lib/errorUtils";
 import { captureError } from "../lib/sentry";
+import { logInfoLine, logErrorLine } from "../lib/logger";
 import { enhanceText, buildSystemPrompt } from "../lib/enhancer";
 import { getEditModePromptForLocale } from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
@@ -166,11 +167,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   }
 
   function writeInfoLog(logMessage: string) {
-    void invoke("debug_log", { level: "info", message: logMessage });
+    logInfoLine(logMessage);
   }
 
   function writeErrorLog(logMessage: string) {
-    void invoke("debug_log", { level: "error", message: logMessage });
+    logErrorLine(logMessage);
   }
 
   function clearAutoHideTimer() {

@@ -25,7 +25,7 @@ impl AudioControlState {
         };
         if let Some(was_muted) = guard.take() {
             let _ = platform_set_system_mute(was_muted);
-            println!("[audio-control] shutdown: restored system audio");
+            log::info!("[audio-control] shutdown: restored system audio");
         }
     }
 }
@@ -93,9 +93,7 @@ mod macos {
         };
 
         if status != 0 {
-            eprintln!(
-                "[audio-control] Failed to get default output device: OSStatus {status}"
-            );
+            log::error!("[audio-control] Failed to get default output device: OSStatus {status}");
             return None;
         }
 
@@ -208,7 +206,7 @@ mod windows_audio {
             } else {
                 let code = hr.0 as u32;
                 if code == 0x80010106 {
-                    println!(
+                    log::info!(
                         "[audio-control] COM already initialized in different mode, continuing"
                     );
                     Ok(ComGuard {
@@ -303,7 +301,7 @@ pub fn mute_system_audio(state: State<AudioControlState>) -> Result<(), String> 
 
     // 冪等：若已有 pending restore，跳過
     if guard.is_some() {
-        println!("[audio-control] mute_system_audio: already muted (pending restore), skipping");
+        log::info!("[audio-control] mute_system_audio: already muted (pending restore), skipping");
         return Ok(());
     }
 
@@ -311,9 +309,7 @@ pub fn mute_system_audio(state: State<AudioControlState>) -> Result<(), String> 
     platform_set_system_mute(true)?;
     *guard = Some(current_mute);
 
-    println!(
-        "[audio-control] mute_system_audio: muted (was_muted_before={current_mute})"
-    );
+    log::info!("[audio-control] mute_system_audio: muted (was_muted_before={current_mute})");
     Ok(())
 }
 
@@ -328,7 +324,7 @@ pub fn restore_system_audio(state: State<AudioControlState>) -> Result<(), Strin
     let was_muted = match *guard {
         Some(v) => v,
         None => {
-            println!("[audio-control] restore_system_audio: no pending restore, skipping");
+            log::info!("[audio-control] restore_system_audio: no pending restore, skipping");
             return Ok(());
         }
     };
@@ -337,15 +333,13 @@ pub fn restore_system_audio(state: State<AudioControlState>) -> Result<(), Strin
     *guard = None;
 
     if let Err(e) = platform_set_system_mute(was_muted) {
-        eprintln!(
+        log::error!(
             "[audio-control] restore_system_audio: failed to restore (was_muted={was_muted}): {e}"
         );
         return Err(e);
     }
 
-    println!(
-        "[audio-control] restore_system_audio: restored (was_muted={was_muted})"
-    );
+    log::info!("[audio-control] restore_system_audio: restored (was_muted={was_muted})");
     Ok(())
 }
 

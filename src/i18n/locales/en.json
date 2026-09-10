@@ -191,6 +191,15 @@
       "deleteConfirmDescription": "This will permanently delete all saved recording files. History records will be preserved, but playback will no longer be available.",
       "deleteSuccess": "Deleted {count} recording files"
     },
+    "debugLog": {
+      "title": "Debug Logging (Advanced)",
+      "description": "When enabled, the app writes runtime logs (frontend and backend) to a log file for diagnostics when reporting issues. The log file includes your transcribed text and AI-processed results. Keep it off during normal use; turning it off deletes the existing log files.",
+      "enable": "Enable logging",
+      "enableDescription": "Write runtime logs to a file",
+      "openFolder": "Open log folder",
+      "enabledMessage": "Debug logging enabled",
+      "disabledMessage": "Debug logging disabled"
+    },
     "smartDictionary": {
       "title": "Smart Dictionary Learning",
       "description": "Auto-detect corrections after paste and learn new terms via AI analysis",

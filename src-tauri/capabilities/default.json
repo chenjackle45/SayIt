@@ -18,6 +18,7 @@
     "core:event:allow-emit",
     "core:event:allow-emit-to",
     "shell:allow-open",
+    "log:default",
     "sql:default",
     "sql:allow-execute",
     "store:default",

@@ -31,6 +31,7 @@ import {
   getHotkeyPresetHint,
 } from "../lib/errorUtils";
 import { captureError } from "../lib/sentry";
+import { openLogFolder, setFileLoggingEnabled } from "../lib/logger";
 import { getDefaultSystemPrompt } from "../lib/enhancer";
 import {
   getMinimalPromptForLocale,
@@ -74,6 +75,7 @@ const DEFAULT_SOUND_EFFECTS_ENABLED = true;
 const DEFAULT_PROMPT_MODE: PromptMode = "minimal";
 const DEFAULT_RECORDING_AUTO_CLEANUP_ENABLED = false;
 const DEFAULT_RECORDING_AUTO_CLEANUP_DAYS = 7;
+const DEFAULT_DEBUG_LOG_ENABLED = false;
 const DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD = true;
 const DEFAULT_HIDE_DOCK_ICON = false;
 const IS_MACOS = navigator.userAgent.includes("Mac");
@@ -151,6 +153,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const recordingAutoCleanupDays = ref<number>(
     DEFAULT_RECORDING_AUTO_CLEANUP_DAYS,
   );
+  // 除錯記錄（Debug Log）— 與錄音清理完全獨立的設定
+  const isDebugLogEnabled = ref<boolean>(DEFAULT_DEBUG_LOG_ENABLED);
   const selectedAudioInputDeviceName = ref<string>("");
   const isCopyTranscriptionToClipboardEnabled = ref<boolean>(
     DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD,
@@ -378,6 +382,9 @@ export const useSettingsStore = defineStore("settings", () => {
       );
       recordingAutoCleanupDays.value =
         savedRecordingAutoCleanupDays ?? DEFAULT_RECORDING_AUTO_CLEANUP_DAYS;
+
+      const savedDebugLogEnabled = await store.get<boolean>("debugLogEnabled");
+      isDebugLogEnabled.value = savedDebugLogEnabled ?? DEFAULT_DEBUG_LOG_ENABLED;
 
       const savedAudioInputDeviceName = await store.get<string>(
         "audioInputDeviceName",
@@ -1237,6 +1244,36 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveDebugLog(enabled: boolean) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("debugLogEnabled", enabled);
+      await store.save();
+
+      isDebugLogEnabled.value = enabled;
+
+      // 即時通知 Rust 切換檔案 Log 開關（關閉時 Rust 會順手清掉記錄檔）
+      await setFileLoggingEnabled(enabled);
+
+      console.log(`[useSettingsStore] Debug log saved: enabled=${enabled}`);
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveDebugLog failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, {
+        source: "settings",
+        step: "save-debug-log",
+      });
+      throw err;
+    }
+  }
+
+  /** 以系統檔案管理員開啟記錄資料夾（view 經 store 呼叫，不直接碰 lib）。 */
+  async function openDebugLogFolder() {
+    await openLogFolder();
+  }
+
   async function saveAudioInputDevice(deviceName: string) {
     try {
       const store = await load(STORE_NAME);
@@ -1417,6 +1454,10 @@ export const useSettingsStore = defineStore("settings", () => {
       recordingAutoCleanupDays.value =
         savedRecCleanupDays ?? DEFAULT_RECORDING_AUTO_CLEANUP_DAYS;
 
+      const savedDebugLogEnabledX = await store.get<boolean>("debugLogEnabled");
+      isDebugLogEnabled.value =
+        savedDebugLogEnabledX ?? DEFAULT_DEBUG_LOG_ENABLED;
+
       const savedAudioDevice = await store.get<string>("audioInputDeviceName");
       selectedAudioInputDeviceName.value = savedAudioDevice ?? "";
 
@@ -1525,6 +1566,9 @@ export const useSettingsStore = defineStore("settings", () => {
     isRecordingAutoCleanupEnabled,
     recordingAutoCleanupDays,
     saveRecordingAutoCleanup,
+    isDebugLogEnabled,
+    saveDebugLog,
+    openDebugLogFolder,
     selectedAudioInputDeviceName,
     saveAudioInputDevice,
     isCopyTranscriptionToClipboardEnabled,

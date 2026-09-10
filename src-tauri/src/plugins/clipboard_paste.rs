@@ -232,7 +232,7 @@ fn restore_target_window(hwnd_value: isize) {
             let _ = SetForegroundWindow(target);
         }
 
-        println!("[clipboard-paste] Restored target window: {:?}", target);
+        log::info!("[clipboard-paste] Restored target window: {:?}", target);
     }
 }
 
@@ -248,7 +248,7 @@ pub fn capture_target_window(state: State<'_, FocusState>) {
             if let Ok(mut guard) = state.target_hwnd.lock() {
                 *guard = hwnd.0 as isize;
             }
-            println!("[clipboard-paste] Captured target window: {:?}", hwnd);
+            log::info!("[clipboard-paste] Captured target window: {:?}", hwnd);
         }
     }
     #[cfg(not(target_os = "windows"))]
@@ -298,14 +298,14 @@ pub fn capture_selected_text_via_clipboard() -> Result<Option<String>, String> {
     // 7. 回傳
     match copied_text {
         Some(text) => {
-            eprintln!(
+            log::error!(
                 "[clipboard-paste] capture_selected_text: got {} chars",
                 text.len()
             );
             Ok(Some(text))
         }
         None => {
-            eprintln!("[clipboard-paste] capture_selected_text: no selection detected");
+            log::error!("[clipboard-paste] capture_selected_text: no selection detected");
             Ok(None)
         }
     }
@@ -314,7 +314,7 @@ pub fn capture_selected_text_via_clipboard() -> Result<Option<String>, String> {
 fn restore_clipboard_text(clipboard: &mut Clipboard, original_text: &Option<String>) {
     if let Some(ref text) = original_text {
         if let Err(e) = clipboard.set_text(text) {
-            eprintln!("[clipboard-paste] failed to restore clipboard: {e}");
+            log::error!("[clipboard-paste] failed to restore clipboard: {e}");
         }
     }
 }
@@ -340,20 +340,20 @@ pub fn paste_text<R: Runtime>(
     use std::sync::atomic::AtomicU32;
     static PASTE_CALL_COUNT: AtomicU32 = AtomicU32::new(0);
     let call_id = PASTE_CALL_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-    println!(
+    log::info!(
         "🔴🔴🔴 [clipboard-paste] paste_text CALLED (#{}) — {} chars (restore={})",
         call_id,
         text.len(),
         restore_clipboard
     );
     #[cfg(debug_assertions)]
-    println!(
+    log::info!(
         "[clipboard-paste] Pasting {} chars: \"{}\"",
         text.len(),
         text
     );
     #[cfg(not(debug_assertions))]
-    println!("[clipboard-paste] Pasting {} chars", text.len());
+    log::info!("[clipboard-paste] Pasting {} chars", text.len());
 
     let mut clipboard =
         Clipboard::new().map_err(|e| ClipboardError::ClipboardAccess(e.to_string()))?;
@@ -362,18 +362,18 @@ pub fn paste_text<R: Runtime>(
     let original_text = if restore_clipboard {
         match clipboard.get_text() {
             Ok(t) if !t.is_empty() => {
-                println!(
+                log::info!(
                     "[clipboard-paste] Snapshot original clipboard ({} chars)",
                     t.len()
                 );
                 Some(t)
             }
             Ok(_) => {
-                println!("[clipboard-paste] Snapshot: clipboard was empty");
+                log::info!("[clipboard-paste] Snapshot: clipboard was empty");
                 None
             }
             Err(e) => {
-                eprintln!(
+                log::error!(
                     "[clipboard-paste] Snapshot: read failed (likely non-text content): {e}"
                 );
                 None
@@ -386,7 +386,7 @@ pub fn paste_text<R: Runtime>(
     clipboard
         .set_text(&text)
         .map_err(|e| ClipboardError::ClipboardAccess(e.to_string()))?;
-    println!("[clipboard-paste] Text copied to clipboard");
+    log::info!("[clipboard-paste] Text copied to clipboard");
 
     thread::sleep(Duration::from_millis(50));
 
@@ -397,9 +397,9 @@ pub fn paste_text<R: Runtime>(
     {
         let _ = &focus_state; // macOS 不需要焦點恢復（CGEvent 是進程級）
         match simulate_paste_via_cgevent() {
-            Ok(()) => println!("[clipboard-paste] Paste triggered via CGEvent (Cmd+V)"),
+            Ok(()) => log::info!("[clipboard-paste] Paste triggered via CGEvent (Cmd+V)"),
             Err(e) => {
-                eprintln!("[clipboard-paste] CGEvent paste failed: {e}");
+                log::error!("[clipboard-paste] CGEvent paste failed: {e}");
                 paste_err = Some(e);
             }
         }
@@ -415,9 +415,9 @@ pub fn paste_text<R: Runtime>(
         }
 
         match simulate_paste_via_keyboard() {
-            Ok(()) => println!("[clipboard-paste] Paste triggered via SendInput (Ctrl+V)"),
+            Ok(()) => log::info!("[clipboard-paste] Paste triggered via SendInput (Ctrl+V)"),
             Err(e) => {
-                eprintln!("[clipboard-paste] SendInput paste failed: {}", e);
+                log::error!("[clipboard-paste] SendInput paste failed: {}", e);
                 paste_err = Some(e);
             }
         }
@@ -438,7 +438,7 @@ pub fn paste_text<R: Runtime>(
         return Err(ClipboardError::KeyboardSimulation(e));
     }
 
-    println!("[clipboard-paste] Done");
+    log::info!("[clipboard-paste] Done");
     Ok(())
 }
 

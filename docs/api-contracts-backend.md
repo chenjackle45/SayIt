@@ -22,14 +22,21 @@
 
 格式：`fn(params) -> ReturnType`，所有 command 由 frontend `invoke('name', { params })` 呼叫。
 
-### 2.1 系統與生命週期（3 個）
+### 2.1 系統與生命週期（5 個）
 
-#### `debug_log`
+#### `set_file_logging_enabled`
 ```ts
-invoke('debug_log', { level: 'info'|'warn'|'error', message: string }) → void
+invoke('set_file_logging_enabled', { enabled: boolean }) → void（關閉時清掉既有記錄檔）
 ```
-- **Rust 位置**：`lib.rs:91`
-- **用途**：webview console.log 統一導向 Rust stdout/stderr（方便 production 用 `Console.app` / Windows ETW 追問題）
+- **Rust 位置**：`plugins/logging.rs`
+- **用途**：切換是否把 log 寫入檔案（即時生效，免重啟）。由 `FILE_LOG_ENABLED` 旗標 + `tauri-plugin-log` 的 `.filter` 控制。前端記錄改用 `@tauri-apps/plugin-log` + `src/lib/logger.ts`（`console.*` 自動轉送），舊的 `debug_log` command 已移除。
+
+#### `open_log_folder`
+```ts
+invoke('open_log_folder') → void
+```
+- **Rust 位置**：`plugins/logging.rs`
+- **用途**：以系統檔案管理員開啟 Log 資料夾（`app_log_dir()`，Windows `explorer`／macOS `open`）。
 
 #### `request_app_restart`
 ```ts

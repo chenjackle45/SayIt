@@ -605,9 +605,9 @@ src/
 #### 日誌格式
 
 - **TypeScript** — `console.log("[ModuleName] message")`
-- **Rust** — `println!("[module-name] message")` / `eprintln!("[module-name] ERROR: message")`
+- **Rust** — `log::info!("[module-name] message")` / `log::error!("[module-name] ERROR: message")`（官方 `tauri-plugin-log`）
 - **Store 日誌** — `[useXxxStore]` 前綴（如 `[useSettingsStore]`）
-- **Rust invoke 日誌** — 使用 `invoke("debug_log", { level, message })` Tauri Command
+- **前端檔案日誌** — 由 `src/lib/logger.ts` 自動轉送 `console.*` 至 `tauri-plugin-log`（或用 `@tauri-apps/plugin-log` 的 `info()`/`error()`）；寫檔由設定頁「除錯記錄」開關控制
 - **所有日誌必須帶模組名前綴**
 
 #### Linter/Formatter

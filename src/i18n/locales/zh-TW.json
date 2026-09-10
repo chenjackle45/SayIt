@@ -191,6 +191,15 @@
       "deleteConfirmDescription": "此操作將刪除所有已儲存的錄音檔案，無法復原。歷史記錄仍會保留，但無法再播放。",
       "deleteSuccess": "已刪除 {count} 個錄音檔"
     },
+    "debugLog": {
+      "title": "除錯記錄（進階）",
+      "description": "開啟後會將應用程式的執行記錄（前端與後端）寫入記錄檔，方便回報問題時提供診斷資訊。記錄檔會包含你的轉錄文字與 AI 整理結果。平時建議保持關閉；關閉時會刪除既有的記錄檔。",
+      "enable": "啟用記錄",
+      "enableDescription": "將執行記錄寫入檔案",
+      "openFolder": "開啟記錄資料夾",
+      "enabledMessage": "已啟用除錯記錄",
+      "disabledMessage": "已停用除錯記錄"
+    },
     "smartDictionary": {
       "title": "智慧字典學習",
       "description": "轉錄貼上後自動偵測修正，透過 AI 分析學習新詞彙",

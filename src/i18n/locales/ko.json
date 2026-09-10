@@ -191,6 +191,15 @@
       "deleteConfirmDescription": "저장된 모든 녹음 파일이 영구적으로 삭제됩니다. 기록은 유지되지만 재생할 수 없게 됩니다.",
       "deleteSuccess": "{count}개의 녹음 파일을 삭제했습니다"
     },
+    "debugLog": {
+      "title": "디버그 로그(고급)",
+      "description": "활성화하면 앱의 실행 로그(프런트엔드 및 백엔드)를 로그 파일에 기록하여 문제 보고 시 진단 정보를 제공할 수 있습니다. 로그 파일에는 받아쓴 텍스트와 AI 정리 결과가 포함됩니다. 평소에는 꺼 두는 것을 권장하며, 끄면 기존 로그 파일이 삭제됩니다.",
+      "enable": "로그 활성화",
+      "enableDescription": "실행 로그를 파일에 기록",
+      "openFolder": "로그 폴더 열기",
+      "enabledMessage": "디버그 로그가 활성화되었습니다",
+      "disabledMessage": "디버그 로그가 비활성화되었습니다"
+    },
     "smartDictionary": {
       "title": "스마트 사전 학습",
       "description": "붙여넣기 후 수정을 자동 감지하고 AI 분석으로 새 용어 학습",

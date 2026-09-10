@@ -44,7 +44,8 @@
 
 | Command | Rust 位置 | 前端呼叫點 | 參數 | 回傳 |
 |---------|-----------|-----------|------|------|
-| `debug_log` | `lib.rs` | stores, main-window.ts | `level: String, message: String` | `()` |
+| `set_file_logging_enabled` | `plugins/logging.rs` | useSettingsStore（logger.ts） | `enabled: bool, app: AppHandle` | `Result<(), String>`（關閉時清掉記錄檔） |
+| `open_log_folder` | `plugins/logging.rs` | useSettingsStore（logger.ts） | `app: AppHandle` | `Result<(), String>` |
 | `request_app_restart` | `lib.rs` | main-window.ts | — | `()` |
 | `update_hotkey_config` | `lib.rs` | useSettingsStore | `trigger_key: TriggerKey, trigger_mode: TriggerMode` | `Result<(), String>` |
 | `get_hud_target_position` | `lib.rs` | — | `app: AppHandle` | `Result<HudTargetPosition, String>` |

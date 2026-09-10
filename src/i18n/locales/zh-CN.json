@@ -191,6 +191,15 @@
       "deleteConfirmDescription": "此操作将删除所有已保存的录音文件，无法恢复。历史记录仍会保留，但无法再播放。",
       "deleteSuccess": "已删除 {count} 个录音文件"
     },
+    "debugLog": {
+      "title": "调试日志（高级）",
+      "description": "开启后会将应用程序的运行日志（前端与后端）写入日志文件，方便反馈问题时提供诊断信息。日志文件会包含你的转录文字与 AI 整理结果。平时建议保持关闭；关闭时会删除现有的日志文件。",
+      "enable": "启用日志",
+      "enableDescription": "将运行日志写入文件",
+      "openFolder": "打开日志文件夹",
+      "enabledMessage": "已启用调试日志",
+      "disabledMessage": "已停用调试日志"
+    },
     "smartDictionary": {
       "title": "智能字典学习",
       "description": "转录粘贴后自动检测修正，通过 AI 分析学习新词汇",

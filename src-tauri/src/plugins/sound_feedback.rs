@@ -23,7 +23,7 @@ mod macos {
         let url = match CFURL::from_path(std::path::Path::new(path), false) {
             Some(url) => url,
             None => {
-                eprintln!("[sound-feedback] Failed to create CFURL for: {path}");
+                log::error!("[sound-feedback] Failed to create CFURL for: {path}");
                 return;
             }
         };
@@ -37,7 +37,7 @@ mod macos {
         };
 
         if status != 0 {
-            eprintln!(
+            log::error!(
                 "[sound-feedback] AudioServicesCreateSystemSoundID failed: OSStatus {status}"
             );
             return;
@@ -76,18 +76,16 @@ mod windows_sound {
     static STOP_SOUND: &[u8] = include_bytes!("../../resources/sounds/stop.wav");
 
     pub fn play_start_sound() {
-        let ok =
-            unsafe { PlaySoundA(PCSTR(START_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
+        let ok = unsafe { PlaySoundA(PCSTR(START_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
         if !ok.as_bool() {
-            eprintln!("[sound-feedback] PlaySoundA(start) failed");
+            log::error!("[sound-feedback] PlaySoundA(start) failed");
         }
     }
 
     pub fn play_stop_sound() {
-        let ok =
-            unsafe { PlaySoundA(PCSTR(STOP_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
+        let ok = unsafe { PlaySoundA(PCSTR(STOP_SOUND.as_ptr()), None, SND_MEMORY | SND_ASYNC) };
         if !ok.as_bool() {
-            eprintln!("[sound-feedback] PlaySoundA(stop) failed");
+            log::error!("[sound-feedback] PlaySoundA(stop) failed");
         }
     }
 
@@ -115,7 +113,7 @@ fn platform_play_start_sound() {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        println!("[sound-feedback] play_start_sound: unsupported platform (no-op)");
+        log::info!("[sound-feedback] play_start_sound: unsupported platform (no-op)");
     }
 }
 
@@ -130,7 +128,7 @@ fn platform_play_stop_sound() {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        println!("[sound-feedback] play_stop_sound: unsupported platform (no-op)");
+        log::info!("[sound-feedback] play_stop_sound: unsupported platform (no-op)");
     }
 }
 
@@ -145,7 +143,7 @@ fn platform_play_error_sound() {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        println!("[sound-feedback] play_error_sound: unsupported platform (no-op)");
+        log::info!("[sound-feedback] play_error_sound: unsupported platform (no-op)");
     }
 }
 
@@ -160,7 +158,7 @@ fn platform_play_learned_sound() {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
-        println!("[sound-feedback] play_learned_sound: unsupported platform (no-op)");
+        log::info!("[sound-feedback] play_learned_sound: unsupported platform (no-op)");
     }
 }
 

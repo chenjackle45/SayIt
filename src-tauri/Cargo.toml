@@ -30,6 +30,8 @@ hound = "3.5"
 rustfft = "6"
 reqwest = { version = "0.12", features = ["multipart", "json", "rustls-tls", "rustls-tls-native-roots"] }
 tokio = { version = "1", features = ["time"] }
+tauri-plugin-log = "2.8.0"
+log = "0.4.33"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.24"

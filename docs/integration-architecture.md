@@ -95,7 +95,8 @@ SayIt 採典型 **Tauri 雙向 IPC 模式**，沒有外部 message broker，所�
 
 | Command                        | 模組          | 主要呼叫點                                            | 用途                              |
 | ------------------------------ | ------------- | ----------------------------------------------------- | --------------------------------- |
-| `debug_log`                    | `lib.rs`      | stores、`main-window.ts`                              | webview 統一 log channel          |
+| `set_file_logging_enabled`     | `plugins/logging.rs` | `useSettingsStore`（`logger.ts`）                    | 切換檔案 Log 開關（即時生效；關閉時清掉記錄檔） |
+| `open_log_folder`              | `plugins/logging.rs` | `useSettingsStore`（`logger.ts`）                    | 開啟 Log 資料夾                   |
 | `request_app_restart`          | `lib.rs`      | `main-window.ts`（自動更新後）                        | 自行 spawn 新 process（見 §6.1） |
 | `get_hud_target_position`      | `lib.rs`      | NotchHud（多螢幕追蹤）                                | 取得 HUD 應定位的 logical 座標    |
 

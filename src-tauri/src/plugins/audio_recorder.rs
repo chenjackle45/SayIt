@@ -129,7 +129,7 @@ fn stop_audio_preview_inner(state: &AudioPreviewState) {
             if let Some(thread) = handle.thread.take() {
                 let _ = thread.join();
             }
-            println!("[audio-preview] Preview stopped and thread joined");
+            log::info!("[audio-preview] Preview stopped and thread joined");
         }
     }
 }
@@ -144,7 +144,7 @@ pub fn start_audio_preview(
     if let Some(recorder_state) = app.try_state::<AudioRecorderState>() {
         if let Ok(guard) = recorder_state.recording.lock() {
             if guard.is_some() {
-                println!("[audio-preview] Recording in progress, skipping preview start");
+                log::info!("[audio-preview] Recording in progress, skipping preview start");
                 return Ok(());
             }
         }
@@ -233,7 +233,7 @@ pub fn list_audio_input_devices() -> Vec<AudioInputDeviceInfo> {
         }
     }
 
-    println!(
+    log::info!(
         "[audio-recorder] Listed {} input device(s)",
         device_list.len()
     );
@@ -248,12 +248,12 @@ pub fn get_default_input_device_name() -> Option<String> {
     let result = host.default_input_device().and_then(|d| {
         d.name()
             .map_err(|e| {
-                eprintln!("[audio-recorder] Failed to get default device name: {e}");
+                log::error!("[audio-recorder] Failed to get default device name: {e}");
                 e
             })
             .ok()
     });
-    println!("[audio-recorder] Default input device: {result:?}");
+    log::info!("[audio-recorder] Default input device: {result:?}");
     result
 }
 
@@ -272,7 +272,7 @@ pub fn start_recording(
         .map_err(|_| AudioRecorderError::LockPoisoned)?;
 
     if guard.is_some() {
-        println!("[audio-recorder] Already recording, ignoring start_recording");
+        log::info!("[audio-recorder] Already recording, ignoring start_recording");
         return Ok(());
     }
 
@@ -369,7 +369,7 @@ pub fn stop_recording(
         (peak, rms)
     };
 
-    println!(
+    log::info!(
         "[audio-recorder] WAV encoded: {} samples, {} bytes, {:.0}ms, peakEnergy={:.4}, rmsEnergy={:.4}",
         samples.len(),
         wav_data.len(),
@@ -409,7 +409,7 @@ fn run_recording_thread(
             return;
         }
     };
-    println!(
+    log::info!(
         "[audio-recorder] Using device: {}",
         device.name().unwrap_or_else(|_| "<unknown>".to_string())
     );
@@ -440,7 +440,7 @@ fn run_recording_thread(
         return;
     }
 
-    println!("[audio-recorder] Recording started ({sample_rate}Hz, {channels}ch)");
+    log::info!("[audio-recorder] Recording started ({sample_rate}Hz, {channels}ch)");
     let _ = ready_tx.send(Ok(sample_rate));
 
     // ── Keep stream alive until told to stop ──
@@ -454,12 +454,12 @@ fn run_recording_thread(
     // 已知限制：非預設裝置仍會因 Arc cycle 洩漏 ~1-2 KB/次（StreamInner + listener）。
     if let Err(e) = stream.pause() {
         // ⚠️ 安全相關：pause 失敗意味著麥克風可能仍在捕獲，且 drop 也無法停止
-        eprintln!(
+        log::error!(
             "[audio-recorder] SECURITY: Failed to pause stream, mic may remain active: {e:?}"
         );
     }
     drop(stream);
-    println!("[audio-recorder] Recording stopped, stream released");
+    log::info!("[audio-recorder] Recording stopped, stream released");
 }
 
 // ========== Preview Thread ==========
@@ -486,7 +486,7 @@ fn run_preview_thread(
         }
     };
 
-    println!(
+    log::info!(
         "[audio-preview] Using device: '{}' (requested: '{}')",
         device.name().unwrap_or_else(|_| "<unknown>".to_string()),
         if device_name.is_empty() {
@@ -561,7 +561,7 @@ fn run_preview_thread(
         return;
     }
 
-    println!("[audio-preview] Preview started");
+    log::info!("[audio-preview] Preview started");
     let _ = ready_tx.send(Ok(()));
 
     // ── 主迴圈：每 30ms 計算 RMS 並 emit ──
@@ -597,10 +597,10 @@ fn run_preview_thread(
 
     // ── 清理（遵循 cpal macOS workaround） ──
     if let Err(e) = stream.pause() {
-        eprintln!("[audio-preview] Failed to pause preview stream: {e:?}");
+        log::error!("[audio-preview] Failed to pause preview stream: {e:?}");
     }
     drop(stream);
-    println!("[audio-preview] Preview stopped, stream released");
+    log::info!("[audio-preview] Preview stopped, stream released");
 }
 
 fn build_preview_stream<T>(
@@ -643,7 +643,7 @@ where
                 }
             },
             move |err| {
-                eprintln!("[audio-preview] Stream error: {err}");
+                log::error!("[audio-preview] Stream error: {err}");
             },
             None,
         )
@@ -665,7 +665,7 @@ fn select_input_device(host: &cpal::Host, device_name: &str, tag: &str) -> Optio
             .is_some_and(|n| n == device_name);
 
         if default_matches {
-            println!(
+            log::info!(
                 "[{tag}] Device '{device_name}' matches system default, using default_input_device"
             );
             default_device
@@ -675,7 +675,7 @@ fn select_input_device(host: &cpal::Host, device_name: &str, tag: &str) -> Optio
                 .ok()
                 .and_then(|mut devices| devices.find(|d| d.name().is_ok_and(|n| n == device_name)));
             if found.is_none() {
-                println!("[{tag}] Device '{device_name}' not found, falling back to default");
+                log::info!("[{tag}] Device '{device_name}' not found, falling back to default");
             }
             found.or(default_device)
         }
@@ -716,7 +716,7 @@ fn determine_input_config(
     let sr = supported_config.sample_rate().0;
     let ch = supported_config.channels();
 
-    println!("[audio-recorder] 16 kHz not supported, using device default: {sr}Hz, {ch}ch");
+    log::info!("[audio-recorder] 16 kHz not supported, using device default: {sr}Hz, {ch}ch");
 
     Ok(InputConfigSelection {
         supported_config,
@@ -851,7 +851,7 @@ where
                 }
             },
             move |err| {
-                eprintln!("[audio-recorder] Stream error: {err}");
+                log::error!("[audio-recorder] Stream error: {err}");
             },
             None,
         )
@@ -912,7 +912,7 @@ pub fn save_recording_file(
     let file_path = recordings_dir.join(format!("{id}.wav"));
     std::fs::write(&file_path, &wav_data).map_err(|e| format!("Failed to write WAV file: {e}"))?;
 
-    println!(
+    log::info!(
         "[audio-recorder] Recording saved: {} ({} bytes)",
         file_path.display(),
         wav_data.len()
@@ -959,7 +959,7 @@ pub fn delete_all_recordings(app: AppHandle) -> Result<u32, String> {
         }
     }
 
-    println!("[audio-recorder] Deleted {count} recording files");
+    log::info!("[audio-recorder] Deleted {count} recording files");
     Ok(count)
 }
 
@@ -1001,7 +1001,7 @@ pub fn cleanup_old_recordings(days: u32, app: AppHandle) -> Result<Vec<String>, 
         }
     }
 
-    println!(
+    log::info!(
         "[audio-recorder] Cleaned up {} old recordings (>{} days)",
         deleted_id_list.len(),
         days
