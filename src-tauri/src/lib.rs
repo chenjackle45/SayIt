@@ -435,6 +435,7 @@ pub fn run() {
             plugins::keyboard_monitor::start_correction_monitor,
             plugins::text_field_reader::read_focused_text_field,
             plugins::text_field_reader::read_selected_text,
+            plugins::text_field_reader::read_selection_state,
             plugins::audio_recorder::get_default_input_device_name,
             plugins::audio_recorder::list_audio_input_devices,
             plugins::audio_recorder::start_audio_preview,
@@ -454,6 +455,21 @@ pub fn run() {
             plugins::sound_feedback::play_learned_sound
         ])
         .setup(|app| {
+            // gh-56：啟動時套用「隱藏 Dock 圖示」設定（讀取失敗一律視為未啟用，不影響啟動）
+            #[cfg(target_os = "macos")]
+            {
+                use tauri_plugin_store::StoreExt;
+                let hide_dock_icon = app
+                    .store("settings.json")
+                    .ok()
+                    .and_then(|store| store.get("hideDockIcon"))
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false);
+                if hide_dock_icon {
+                    let _ = app.handle().set_dock_visibility(false);
+                }
+            }
+
             // 初始化 keyboard monitor 狀態
             app.manage(plugins::keyboard_monitor::KeyboardMonitorState::new());
             // 初始化 audio control 狀態

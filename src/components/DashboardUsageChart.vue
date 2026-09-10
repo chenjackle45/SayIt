@@ -26,10 +26,38 @@ const svgDefs = `
   </linearGradient>
 `;
 
-const xAccessor = (d: DailyUsageTrend) => new Date(d.date);
+// date 為本地時間的 YYYY-MM-DD（與 store 補零、SQL 'localtime' 一致）。
+// 必須用本地建構子解析；new Date("YYYY-MM-DD") 會以 UTC 解讀，
+// 在 UTC- 時區會讓刻度標籤/tooltip 顯示前一天。
+function parseLocalDateKey(key: string): Date {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+const xAccessor = (d: DailyUsageTrend) => parseLocalDateKey(d.date);
 const yAccessor = [(d: DailyUsageTrend) => d.count];
 const fillColor = () => "url(#fillCount)";
 const lineColor = () => chartConfig.value.count.color;
+
+// 在「補零後的完整區間」上均勻挑最多 7 個真實日期當刻度，
+// 確保刻度落在實際資料點上，避免資料稀疏時 D3 在窄 domain 內塞出重複日期標籤。
+const xTickValues = computed<number[]>(() => {
+  const data = props.data;
+  if (data.length === 0) return [];
+  const maxTicks = Math.min(data.length, 7);
+  const indices = new Set<number>();
+  if (maxTicks <= 1) {
+    indices.add(0);
+  } else {
+    const step = (data.length - 1) / (maxTicks - 1);
+    for (let i = 0; i < maxTicks; i++) {
+      indices.add(Math.round(i * step));
+    }
+  }
+  return Array.from(indices).map((i) =>
+    parseLocalDateKey(data[i].date).getTime(),
+  );
+});
 
 function formatDateLabel(d: number): string {
   const date = new Date(d);
@@ -68,7 +96,8 @@ function formatDateLabel(d: number): string {
         :tick-line="false"
         :domain-line="false"
         :grid-line="false"
-        :num-ticks="6"
+        :tick-values="xTickValues"
+        :tick-text-hide-overlapping="true"
         :tick-format="formatDateLabel"
       />
       <VisAxis

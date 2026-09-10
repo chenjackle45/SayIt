@@ -652,6 +652,32 @@ async function handleToggleSoundFeedback(newValue: boolean) {
   }
 }
 
+// ── 隱藏 Dock 圖示 (gh-56，僅 macOS) ──────────────────────────
+const hideDockIconFeedback = useFeedbackMessage();
+// macOS 對「Dock 顯示後 1 秒內的隱藏請求」會靜默忽略（Tao 防重複圖示守衛），
+// 切換後短暫鎖住開關，避免快速連按造成 UI 與實際 Dock 狀態脫節
+const isHideDockIconPending = ref(false);
+let hideDockIconPendingTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
+async function handleToggleHideDockIcon(newValue: boolean) {
+  isHideDockIconPending.value = true;
+  try {
+    await settingsStore.saveHideDockIcon(newValue);
+    hideDockIconFeedback.show(
+      "success",
+      newValue
+        ? t("settings.app.hideDockIconEnabled")
+        : t("settings.app.hideDockIconDisabled"),
+    );
+  } catch (err) {
+    hideDockIconFeedback.show("error", extractErrorMessage(err));
+  } finally {
+    hideDockIconPendingTimeoutId = setTimeout(() => {
+      isHideDockIconPending.value = false;
+    }, 1200);
+  }
+}
+
 // ── 轉錄文字是否複製到剪貼簿 (gh-35) ──────────────────────────
 const copyTranscriptionToClipboardFeedback = useFeedbackMessage();
 
@@ -867,6 +893,7 @@ onBeforeUnmount(() => {
   modelFeedback.clearTimer();
   muteOnRecordingFeedback.clearTimer();
   soundFeedbackFeedback.clearTimer();
+  hideDockIconFeedback.clearTimer();
   copyTranscriptionToClipboardFeedback.clearTimer();
   localeFeedback.clearTimer();
   transcriptionLocaleFeedback.clearTimer();
@@ -876,6 +903,7 @@ onBeforeUnmount(() => {
   providerFeedback.clearTimer();
   clearTimeout(deleteConfirmTimeoutId);
   clearTimeout(resetPromptConfirmTimeoutId);
+  clearTimeout(hideDockIconPendingTimeoutId);
 });
 </script>
 
@@ -1559,8 +1587,8 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
-    <!-- 智慧字典學習（macOS only — Windows 尚未支援 text field 讀取） -->
-    <Card v-if="isMac">
+    <!-- 智慧字典學習（macOS: AXUIElement；Windows: UI Automation） -->
+    <Card>
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.smartDictionary.title") }}</CardTitle>
       </CardHeader>
@@ -1935,6 +1963,37 @@ onBeforeUnmount(() => {
             {{ soundFeedbackFeedback.message.value }}
           </p>
         </transition>
+
+        <template v-if="isMac">
+          <div class="border-t border-border" />
+
+          <div class="flex items-center justify-between">
+            <div>
+              <Label for="hide-dock-icon">{{ $t("settings.app.hideDockIcon") }}</Label>
+              <p class="text-sm text-muted-foreground">{{ $t("settings.app.hideDockIconDescription") }}</p>
+            </div>
+            <Switch
+              id="hide-dock-icon"
+              :model-value="settingsStore.isHideDockIconEnabled"
+              :disabled="isHideDockIconPending"
+              @update:model-value="handleToggleHideDockIcon"
+            />
+          </div>
+
+          <transition name="feedback-fade">
+            <p
+              v-if="hideDockIconFeedback.message.value !== ''"
+              class="text-sm"
+              :class="
+                hideDockIconFeedback.type.value === 'success'
+                  ? 'text-green-400'
+                  : 'text-red-400'
+              "
+            >
+              {{ hideDockIconFeedback.message.value }}
+            </p>
+          </transition>
+        </template>
 
         <div class="border-t border-border" />
 

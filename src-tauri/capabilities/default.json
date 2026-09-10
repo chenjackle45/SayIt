@@ -4,6 +4,7 @@
   "windows": ["main", "main-window"],
   "permissions": [
     "core:default",
+    "core:app:allow-set-dock-visibility",
     "core:window:default",
     "core:window:allow-show",
     "core:window:allow-hide",

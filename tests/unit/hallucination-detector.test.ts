@@ -9,6 +9,8 @@ import {
   SILENCE_NSP_THRESHOLD,
   LAYER2B_PEAK_ENERGY_CEILING,
   ENHANCEMENT_LENGTH_EXPLOSION_RATIO,
+  detectSemanticDrift,
+  SEMANTIC_DRIFT_MIN_OVERLAP,
 } from "../../src/lib/hallucinationDetector";
 
 /** 正常語音的預設參數（Layer 1/2 都不觸發） */
@@ -388,6 +390,45 @@ describe("hallucinationDetector.ts", () => {
 
       // 都返回 "no-speech-detected"，不需要區分子原因
       expect(result.reason).toBe("no-speech-detected");
+    });
+  });
+
+  describe("detectSemanticDrift（#43 語意守衛）", () => {
+    it("[P0] 正常校對（同內容加標點）不應判定 drift", () => {
+      const r = detectSemanticDrift(
+        "我明天要去公司開會然後下午回家",
+        "我明天要去公司開會，然後下午回家。",
+      );
+      expect(r.isDrift).toBe(false);
+      expect(r.overlapRatio).toBeGreaterThan(0.8);
+    });
+
+    it("[P0] 去口語贅字的校對不應判定 drift", () => {
+      const r = detectSemanticDrift(
+        "呃我想說我們明天要不要約個時間開會討論一下",
+        "我想我們明天要約時間開會討論一下",
+      );
+      expect(r.isDrift).toBe(false);
+    });
+
+    it("[P0] 答非所問／內容不相干應判定 drift", () => {
+      const r = detectSemanticDrift(
+        "今天天氣真好想出去走走曬曬太陽",
+        "好的請問有什麼可以幫您的嗎",
+      );
+      expect(r.isDrift).toBe(true);
+      expect(r.overlapRatio).toBeLessThan(SEMANTIC_DRIFT_MIN_OVERLAP);
+    });
+
+    it("[P0] 極短原文（< 6 字）豁免、不判定 drift", () => {
+      const r = detectSemanticDrift("現在幾點", "現在是下午三點整");
+      expect(r.isDrift).toBe(false);
+    });
+
+    it("[P1] enhanced 為空不判定 drift", () => {
+      expect(detectSemanticDrift("我要去開會討論專案進度", "").isDrift).toBe(
+        false,
+      );
     });
   });
 });

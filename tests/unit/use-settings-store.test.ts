@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -32,6 +32,11 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: mockEmit,
 }));
 
+const mockSetDockVisibility = vi.fn().mockResolvedValue(undefined);
+vi.mock("@tauri-apps/api/app", () => ({
+  setDockVisibility: mockSetDockVisibility,
+}));
+
 describe("useSettingsStore", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -42,6 +47,7 @@ describe("useSettingsStore", () => {
     mockStoreSave.mockClear();
     mockInvoke.mockClear().mockResolvedValue(undefined);
     mockEmit.mockClear().mockResolvedValue(undefined);
+    mockSetDockVisibility.mockClear().mockResolvedValue(undefined);
     vi.resetModules();
   });
 
@@ -407,6 +413,82 @@ describe("useSettingsStore", () => {
   // refreshCrossWindowSettings
   // ==========================================================================
 
+  describe("saveHideDockIcon (gh-56)", () => {
+    let uaSpy: ReturnType<typeof vi.spyOn> | null = null;
+
+    function stubMacUserAgent() {
+      uaSpy = vi
+        .spyOn(window.navigator, "userAgent", "get")
+        .mockReturnValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
+    }
+
+    afterEach(() => {
+      uaSpy?.mockRestore();
+      uaSpy = null;
+    });
+
+    it("[P1] 應持久化 hideDockIcon 並 emit settings:updated", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+
+      await store.saveHideDockIcon(true);
+
+      expect(mockStoreSet).toHaveBeenCalledWith("hideDockIcon", true);
+      expect(mockStoreSave).toHaveBeenCalled();
+      expect(store.isHideDockIconEnabled).toBe(true);
+      expect(mockEmit).toHaveBeenCalledWith("settings:updated", {
+        key: "hideDockIcon",
+        value: true,
+      });
+    });
+
+    it("[P1] macOS 上啟用隱藏應呼叫 setDockVisibility(false)", async () => {
+      stubMacUserAgent();
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+
+      await store.saveHideDockIcon(true);
+
+      expect(mockSetDockVisibility).toHaveBeenCalledWith(false);
+    });
+
+    it("[P2] setDockVisibility 失敗不應讓儲存失敗", async () => {
+      stubMacUserAgent();
+      mockSetDockVisibility.mockRejectedValueOnce(new Error("boom"));
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+
+      await expect(store.saveHideDockIcon(true)).resolves.toBeUndefined();
+      expect(store.isHideDockIconEnabled).toBe(true);
+      expect(mockStoreSet).toHaveBeenCalledWith("hideDockIcon", true);
+    });
+
+    it("[P2] loadSettings 應載入已儲存的 hideDockIcon", async () => {
+      mockStoreData.set("hideDockIcon", true);
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.loadSettings();
+      expect(store.isHideDockIconEnabled).toBe(true);
+    });
+
+    it("[P2] loadSettings 未存過 hideDockIcon 時預設 false", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.loadSettings();
+      expect(store.isHideDockIconEnabled).toBe(false);
+    });
+  });
+
   describe("refreshCrossWindowSettings", () => {
     it("[P0] 應整包重新讀取跨視窗會用到的設定", async () => {
       mockStoreData.set("hotkeyTriggerKey", "command");
@@ -418,7 +500,7 @@ describe("useSettingsStore", () => {
       mockStoreData.set("promptMode", "custom");
       mockStoreData.set("enhancementThresholdEnabled", true);
       mockStoreData.set("enhancementThresholdCharCount", 42);
-      mockStoreData.set("llmModelId", "llama-3.3-70b-versatile");
+      mockStoreData.set("llmModelId", "openai/gpt-oss-120b");
       mockStoreData.set("whisperModelId", "whisper-large-v3-turbo");
       mockStoreData.set("muteOnRecording", false);
 
@@ -439,7 +521,7 @@ describe("useSettingsStore", () => {
       expect(store.getAiPrompt()).toBe("同步後 prompt");
       expect(store.isEnhancementThresholdEnabled).toBe(true);
       expect(store.enhancementThresholdCharCount).toBe(42);
-      expect(store.selectedLlmModelId).toBe("llama-3.3-70b-versatile");
+      expect(store.selectedLlmModelId).toBe("openai/gpt-oss-120b");
       expect(store.selectedWhisperModelId).toBe("whisper-large-v3-turbo");
       expect(store.isMuteOnRecordingEnabled).toBe(false);
     });

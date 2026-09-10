@@ -138,7 +138,25 @@ function buildOpenAiCompatibleFetchParams(
     model: request.model,
     messages: request.messages,
   };
-  if (request.temperature !== undefined) body.temperature = request.temperature;
+  // OpenAI GPT-5.x 是推理模型：temperature 只接受預設值 1、送其他值回 400，
+  // 一律不送；改用 reasoning_effort 關閉推理（"none" 經實測 5.4-nano / 5.6-luna
+  // 皆接受；"minimal" 已被 5.6 世代移除、送出即 400）
+  if (providerId === "openai") {
+    body.reasoning_effort = "none";
+  } else if (request.temperature !== undefined) {
+    body.temperature = request.temperature;
+  }
+  if (providerId === "groq") {
+    if (request.model.startsWith("openai/gpt-oss")) {
+      // gpt-oss 預設產生推理內容：不回傳推理、推理強度最低（文字整理不需要）
+      body.include_reasoning = false;
+      body.reasoning_effort = "low";
+    } else if (request.model.startsWith("qwen/")) {
+      // Qwen3.x 預設開啟 <think> 思考模式；"none" 完全關閉（省時間與 token，
+      // 對 5 秒 timeout 至關重要）。content 端仍保留 stripReasoningTags 兜底
+      body.reasoning_effort = "none";
+    }
+  }
   if (request.maxTokens !== undefined) {
     // OpenAI GPT-5.x 系列要求 max_completion_tokens；Groq 仍用 max_tokens
     if (providerId === "openai") {
@@ -238,6 +256,11 @@ function buildGeminiFetchParams(
     generationConfig.temperature = request.temperature;
   if (request.maxTokens !== undefined)
     generationConfig.maxOutputTokens = request.maxTokens;
+  // Gemini 3.x 預設就會思考（medium）：文字整理不需要，壓到最低省延遲與 token。
+  // 欄位路徑與 enum 值出自 generateContent API 參考（ThinkingConfig.thinkingLevel）
+  if (request.model.startsWith("gemini-3")) {
+    generationConfig.thinkingConfig = { thinkingLevel: "MINIMAL" };
+  }
   if (Object.keys(generationConfig).length > 0)
     body.generationConfig = generationConfig;
 

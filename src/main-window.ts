@@ -5,6 +5,12 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import MainApp from "./MainApp.vue";
 import router from "./router";
 import { initializeDatabase, setDatabaseInitError } from "./lib/database";
+import {
+  emitEvent,
+  listenToEvent,
+  DATABASE_READY,
+  DATABASE_READY_PING,
+} from "./composables/useTauriEvents";
 import { extractErrorMessage } from "./lib/errorUtils";
 import { initSentryForDashboard, captureError } from "./lib/sentry";
 import { useSettingsStore } from "./stores/useSettingsStore";
@@ -34,6 +40,11 @@ async function bootstrap() {
   // DB 必須在 mount 之前初始化，否則 View 的 onMounted 會因 getDatabase() 拋錯而全部失敗
   try {
     await initializeDatabase();
+    // migration 完成：先註冊 ping 回應再廣播，通知 HUD 可安全存取連線池
+    await listenToEvent(DATABASE_READY_PING, () => {
+      void emitEvent(DATABASE_READY);
+    });
+    await emitEvent(DATABASE_READY);
   } catch (err) {
     const message = extractErrorMessage(err);
     console.error("[main-window] Database init failed:", message);

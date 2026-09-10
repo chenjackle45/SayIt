@@ -58,6 +58,56 @@ describe("llmProvider.ts", () => {
       expect(body.messages).toHaveLength(2);
       expect(body.max_completion_tokens).toBe(2048);
       expect(body.max_tokens).toBeUndefined();
+      // GPT-5.x 是推理模型：temperature 只接受預設值 1、送其他值回 400
+      expect(body.temperature).toBeUndefined();
+      expect(body.reasoning_effort).toBe("none");
+    });
+
+    it("[P0] Groq gpt-oss：關閉推理回傳、推理強度最低", () => {
+      const gptOssRequest: LlmChatRequest = {
+        ...BASE_REQUEST,
+        model: "openai/gpt-oss-120b",
+      };
+      const { init } = buildFetchParams("groq", gptOssRequest, TEST_API_KEY);
+      const body = JSON.parse(init.body as string);
+
+      expect(body.include_reasoning).toBe(false);
+      expect(body.reasoning_effort).toBe("low");
+      expect(body.temperature).toBe(0.1);
+    });
+
+    it("[P0] Groq qwen：reasoning_effort none 關閉思考模式", () => {
+      const qwenRequest: LlmChatRequest = {
+        ...BASE_REQUEST,
+        model: "qwen/qwen3.6-27b",
+      };
+      const { init } = buildFetchParams("groq", qwenRequest, TEST_API_KEY);
+      const body = JSON.parse(init.body as string);
+
+      expect(body.reasoning_effort).toBe("none");
+      expect(body.include_reasoning).toBeUndefined();
+      expect(body.temperature).toBe(0.1);
+    });
+
+    it("[P0] Gemini 3.x：thinkingConfig 壓到 MINIMAL；非 3.x 不帶", () => {
+      const gemini3Request: LlmChatRequest = {
+        ...BASE_REQUEST,
+        model: "gemini-3.5-flash",
+      };
+      const { init } = buildFetchParams("gemini", gemini3Request, TEST_API_KEY);
+      const body = JSON.parse(init.body as string);
+      expect(body.generationConfig.thinkingConfig).toEqual({
+        thinkingLevel: "MINIMAL",
+      });
+
+      // 非 gemini-3 開頭（如 BASE_REQUEST 的 test-model）不應帶 thinkingConfig
+      const { init: plainInit } = buildFetchParams(
+        "gemini",
+        BASE_REQUEST,
+        TEST_API_KEY,
+      );
+      const plainBody = JSON.parse(plainInit.body as string);
+      expect(plainBody.generationConfig.thinkingConfig).toBeUndefined();
     });
 
     it("[P0] Anthropic：正確 URL、x-api-key header、anthropic-version header", () => {
@@ -298,10 +348,10 @@ describe("llmProvider.ts", () => {
     });
 
     it("[P0] getProviderIdForModel 根據 modelId 回傳 providerId", () => {
-      expect(getProviderIdForModel("llama-3.3-70b-versatile")).toBe("groq");
-      expect(getProviderIdForModel("gpt-5.4-mini")).toBe("openai");
+      expect(getProviderIdForModel("qwen/qwen3.6-27b")).toBe("groq");
+      expect(getProviderIdForModel("gpt-5.6-luna")).toBe("openai");
       expect(getProviderIdForModel("claude-haiku-4-5-20251001")).toBe("anthropic");
-      expect(getProviderIdForModel("gemini-2.5-flash")).toBe("gemini");
+      expect(getProviderIdForModel("gemini-3.5-flash")).toBe("gemini");
     });
 
     it("[P1] getProviderIdForModel 未知模型 fallback 到 groq", () => {

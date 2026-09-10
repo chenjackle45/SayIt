@@ -98,7 +98,7 @@
     },
     "modelBadge": {
       "balanced": "Balanced · Default",
-      "stableCostly": "Stable · Costly",
+      "stableCostly": "Stable · Production",
       "fastCheap": "Fastest · Cheapest",
       "smartestSlow": "Smartest · Slower",
       "premium": "Premium"
@@ -147,6 +147,10 @@
       "soundFeedbackDescription": "Play sound effects when recording starts, stops, or encounters an error",
       "soundFeedbackEnabled": "Sound feedback enabled",
       "soundFeedbackDisabled": "Sound feedback disabled",
+      "hideDockIcon": "Hide Dock Icon",
+      "hideDockIconDescription": "Remove SayIt from the Dock and use the menu bar icon only",
+      "hideDockIconEnabled": "Dock icon hidden",
+      "hideDockIconDisabled": "Dock icon shown",
       "autoStart": "Launch at Login",
       "autoStartDescription": "Automatically start SayIt when you log in",
       "autoStartEnabled": "Launch at login enabled",
@@ -200,7 +204,7 @@
     "dailyQuota": "Daily Free Quota Remaining",
     "dailyQuotaDetail": "Daily Free Quota Details",
     "usageTrend": "Daily Usage Trend",
-    "last30Days": "Last 30 Days",
+    "lastNDays": "Last {days} Days",
     "recentTranscriptions": "Recent Transcriptions",
     "viewAll": "View All",
     "emptyState": "Start using voice input and your stats will appear here",
@@ -212,7 +216,13 @@
     "quotaLlmRequests": "LLM {used}/{limit} req",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "Dictionary Analysis",
-    "vocabularyAnalysisUsage": "Dictionary Analysis: {requests} req / {tokens} tokens"
+    "vocabularyAnalysisUsage": "Dictionary Analysis: {requests} req / {tokens} tokens",
+    "geminiQuotaHint": "Gemini free quota varies by account — check your actual limits in Google AI Studio",
+    "dailyUsage": "Today's Usage",
+    "billedPlan": "Billed",
+    "billedNoFreeQuota": "Pay-as-you-go — no free quota limit",
+    "usageWhisper": "Whisper: {requests} req · {audio}",
+    "usageLlm": "LLM: {requests} req · {tokens} tokens"
   },
   "history": {
     "searchPlaceholder": "Search transcriptions...",
@@ -255,6 +265,7 @@
     "description": "Dictionary terms are provided to the AI during speech recognition to improve accuracy for proper nouns and technical terms.",
     "weightDescription": "During each speech recognition, the top {limit} terms by weight are included in the AI recognition prompt. When the AI detects you repeatedly correcting the same term, its weight increases automatically.",
     "noAiSuggestions": "No AI suggestions yet. Enable Smart Dictionary Learning to auto-learn new terms",
+    "noAiSuggestionsEnabled": "Smart Dictionary Learning is on. New terms are learned automatically when you correct a transcription",
     "aiTermCount": "{count} terms",
     "export": "Export",
     "import": "Import",
@@ -386,10 +397,12 @@
       "startUpdate": "Start Update"
     },
     "upgradeNotice": {
-      "title": "SayIt Update Summary",
-      "item1": "Test Connection button: tap it in Settings to instantly verify whether your LLM and Whisper API keys actually work — no more wondering why nothing's happening after you've configured everything",
-      "item2": "Gemini long-text truncation fixed: long passages enhanced with Gemini sometimes got cut off mid-sentence. This release identifies the root cause (thinking tokens consuming the output budget) and resolves it — your full text now comes through intact",
-      "item3": "Clipboard isn't overwritten anymore: turn off \"Copy transcription to clipboard\" in Settings, and SayIt will restore whatever you had on the clipboard right after pasting — no need to re-copy what you had before just to use SayIt",
+      "title": "What's New in SayIt",
+      "item1": "AI model refresh: all four providers now use the latest models — your previous choice migrates automatically, no reconfiguration needed (older Groq models are being retired, please stay updated)",
+      "item2": "Edit mode rebuilt: rewriting selected text is now reliable — no more false triggers or stray \"c\" characters",
+      "item3": "Transcription now retries automatically on failure; error messages clearly state whether it's quota, a busy service, or a network issue",
+      "item4": "Traditional Chinese output no longer falls back to Simplified; added a guard against AI producing text you never said",
+      "item5": "New \"Hide Dock Icon\" option (macOS); the dashboard now shows today's actual usage",
       "dismiss": "Got it"
     }
   },

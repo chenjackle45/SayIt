@@ -98,7 +98,7 @@
     },
     "modelBadge": {
       "balanced": "균형 · 기본",
-      "stableCostly": "안정 · 고비용",
+      "stableCostly": "안정 · 정식 버전",
       "fastCheap": "가장 빠름 · 가장 저렴",
       "smartestSlow": "가장 똑똑 · 느림",
       "premium": "프리미엄"
@@ -147,6 +147,10 @@
       "soundFeedbackDescription": "녹음 시작, 종료 및 오류 시 효과음을 재생합니다",
       "soundFeedbackEnabled": "사운드 피드백이 활성화되었습니다",
       "soundFeedbackDisabled": "사운드 피드백이 비활성화되었습니다",
+      "hideDockIcon": "Dock 아이콘 숨기기",
+      "hideDockIconDescription": "Dock에서 SayIt을 제거하고 메뉴 막대 아이콘으로만 사용합니다",
+      "hideDockIconEnabled": "Dock 아이콘을 숨겼습니다",
+      "hideDockIconDisabled": "Dock 아이콘을 표시합니다",
       "autoStart": "부팅 시 자동 시작",
       "autoStartDescription": "시스템 로그인 후 SayIt을 자동으로 시작합니다",
       "autoStartEnabled": "부팅 시 자동 시작이 활성화되었습니다",
@@ -200,7 +204,7 @@
     "dailyQuota": "오늘 남은 무료 할당량",
     "dailyQuotaDetail": "오늘 남은 무료 할당량 상세",
     "usageTrend": "일별 사용 추이",
-    "last30Days": "최근 30일",
+    "lastNDays": "최근 {days}일",
     "recentTranscriptions": "최근 전사",
     "viewAll": "전체 보기",
     "emptyState": "음성 입력을 시작하면 통계가 여기에 표시됩니다",
@@ -212,7 +216,13 @@
     "quotaLlmRequests": "LLM {used}/{limit} 회",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "사전 분석",
-    "vocabularyAnalysisUsage": "사전 분석: {requests} 회 / {tokens} tokens"
+    "vocabularyAnalysisUsage": "사전 분석: {requests} 회 / {tokens} tokens",
+    "geminiQuotaHint": "Gemini 무료 할당량은 계정마다 다릅니다. Google AI Studio에서 실제 한도를 확인하세요",
+    "dailyUsage": "오늘 사용량",
+    "billedPlan": "유료",
+    "billedNoFreeQuota": "유료 요금제 — 무료 할당량 없음",
+    "usageWhisper": "Whisper: {requests}회 · {audio}",
+    "usageLlm": "LLM: {requests}회 · {tokens} tokens"
   },
   "history": {
     "searchPlaceholder": "전사 기록 검색...",
@@ -255,6 +265,7 @@
     "description": "사전 용어는 음성 인식 시 AI에 제공되어 고유명사와 기술 용어의 인식 정확도를 높입니다.",
     "weightDescription": "음성 인식 시 가중치가 가장 높은 상위 {limit}개 용어가 AI 인식 프롬프트에 포함됩니다. 동일한 수정이 반복 감지되면 해당 용어의 가중치가 자동으로 증가합니다.",
     "noAiSuggestions": "아직 AI 추천 용어가 없습니다. 스마트 사전 학습을 활성화하면 자동으로 학습됩니다",
+    "noAiSuggestionsEnabled": "스마트 사전 학습이 켜져 있습니다. 전사를 수정하면 새 용어가 자동으로 학습됩니다",
     "aiTermCount": "{count}개 용어",
     "export": "내보내기",
     "import": "가져오기",
@@ -386,10 +397,12 @@
       "startUpdate": "업데이트 시작"
     },
     "upgradeNotice": {
-      "title": "SayIt 업데이트 요약",
-      "item1": "연결 테스트 버튼: 설정 화면에서 한 번 누르면 LLM과 음성 인식 API 키가 실제로 작동하는지 즉시 확인할 수 있습니다. 설정 후 어디서 막혔는지 모르고 헤매는 일을 줄여줍니다",
-      "item2": "Gemini 긴 텍스트 잘림 수정: 이전에는 Gemini로 긴 문장을 정리할 때 중간에 잘리는 경우가 있었습니다. 이번 버전에서 근본 원인(사고용 토큰이 출력 한도를 차지)을 찾아 수정해, 문장이 끝까지 온전히 출력됩니다",
-      "item3": "클립보드를 더 이상 덮어쓰지 않습니다: 설정에서 '전사 텍스트를 클립보드에 복사'를 끄면 SayIt이 붙여넣기 후 원래 클립보드 내용을 자동으로 복원합니다. SayIt을 사용하기 위해 다시 복사할 필요가 없습니다",
+      "title": "SayIt 업데이트 안내",
+      "item1": "AI 모델 전면 업데이트: 4개 공급업체 모두 최신 모델로 교체되며, 기존 선택은 자동으로 이전되어 재설정이 필요 없습니다 (Groq 구형 모델은 곧 종료되니 최신 버전을 유지해 주세요)",
+      "item2": "편집 모드 재구축: 선택한 텍스트 수정이 더 안정적으로 작동하며, 오작동이나 불필요한 \"c\" 문자 입력이 사라졌습니다",
+      "item3": "음성 변환 실패 시 자동 재시도; 오류 메시지가 할당량 소진·서비스 혼잡·네트워크 문제를 명확히 알려줍니다",
+      "item4": "번체 중국어 설정에서 간체가 출력되던 문제 수정; AI가 말하지 않은 내용을 출력하지 않도록 보호 장치 추가",
+      "item5": "\"Dock 아이콘 숨기기\" 옵션 추가 (macOS); 대시보드가 오늘의 실제 사용량을 표시합니다",
       "dismiss": "확인"
     }
   },

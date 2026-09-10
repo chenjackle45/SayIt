@@ -2,7 +2,31 @@
 
 SayIt 版本更新紀錄。
 
-## [0.10.0] - 2026-05-08
+## [0.11.0] - 2026-07-12
+
+### Added
+
+- 「隱藏 Dock 圖示」設定（macOS）（#56）：啟用後 App 只留選單列圖示；切換即時生效（內建 `setDockVisibility` + capability），啟動時由 Rust 端讀取設定套用，全程 non-fatal
+- Azure 之外四家供應商模型清單全面遷移（#68）：因應 Groq 2026-07-17 起下架舊模型與 claude-3-5-haiku retired，換上八個最新經濟型模型（Groq 預設 qwen3.6-27b、Gemini 預設 3.5-flash、OpenAI 預設 gpt-5.6-luna、Anthropic haiku-4-5）；`DECOMMISSIONED_MODEL_MAP` 鏈式解析讓舊設定自動遷移、不需重新設定
+- 語意守衛 `hallucinationDetector`（#43）：偵測 AI 整理輸出與逐字稿語意脫鉤時自動改貼原始逐字稿，不再憑空輸出
+- 轉譯結果簡→繁確定性轉換 `simplifiedToTraditional`（#39）
+- 語音轉文字自動重試（#10）：429 尊重 `Retry-After`（上限 10 秒）、5xx／連線失敗走 1s/2s backoff、最多 3 次嘗試；timeout 與 4xx 不重試；連線測試不受影響
+- 儀表板顯示付費 LLM 供應商今日用量（#62，@lettucebo）；用量趨勢圖零值補齊 + 稀疏資料座標軸修正（#59，@lettucebo）
+- Windows UIA text-field reader + fail-closed guard，智慧字典基礎建設（#64，@lettucebo）
+- 每次更新後首次開啟 Dashboard 彈出「更新摘要」，列出本版重點（沿用升級提示機制、五語系）
+
+### Fixed
+
+- 編輯模式選取偵測全面重寫（#24、#25、#36）：以 macOS Accessibility 被動查詢（`read_selection_state` 三態）取代「錄音開始就模擬 Cmd+C」，根治無選取誤觸發編輯模式與按住觸發鍵冒出「c」字的問題；AX 不可用的 App（如 Heptabase）自動退到「停止錄音後 250ms 剪貼簿後備」；錄音世代編號防跨錄音狀態污染
+- 轉譯錯誤全被標成「操作失敗」的問題（#37、#38）：錯誤分類改能處理字串型錯誤並比對真實訊息，429／5xx／網路問題現在分級顯示
+- OpenAI GPT-5.x 整理必定失敗的問題：停送 `temperature`、改送 `reasoning_effort: "none"`（5.6 世代已移除 `minimal`）；Gemini 3.x 以 `thinkingConfig.thinkingLevel: "MINIMAL"` 壓制思考輸出
+- DB 遷移在 connection pool 下的競態（#65，@lettucebo）：connection-pool-safe migrations + `DATABASE_READY` handshake
+- 轉譯 HTTP client 改用 rustls（#63，@lettucebo）：解決部分環境 TLS 連線問題
+- Windows 端既有 clippy lint 錯誤清理（#57，@lettucebo）
+
+### Improved
+
+- API 用量 fallback 單價更新為 gemini-3.5-flash 天花板；Gemini 免費額度顯示改為「已使用 N 次」純用量（不再顯示誤導的剩餘進度條）
 
 ### Added
 

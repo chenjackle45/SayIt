@@ -7,15 +7,14 @@ export const DEFAULT_LLM_PROVIDER_ID: LlmProviderId = "groq";
 // ── LLM 模型（文字整理用）────────────────────────────────
 
 export type LlmModelId =
-  | "llama-3.3-70b-versatile"
-  | "meta-llama/llama-4-scout-17b-16e-instruct"
-  | "qwen/qwen3-32b"
-  | "gpt-5.4-mini"
+  | "qwen/qwen3.6-27b"
+  | "openai/gpt-oss-120b"
+  | "openai/gpt-oss-20b"
+  | "gpt-5.6-luna"
   | "gpt-5.4-nano"
   | "claude-haiku-4-5-20251001"
-  | "claude-3-5-haiku-20241022"
-  | "gemini-2.5-flash"
-  | "gemini-2.5-flash-lite";
+  | "gemini-3.5-flash"
+  | "gemini-3.1-flash-lite";
 
 // ── Whisper 模型（語音轉錄用）─────────────────────────────
 
@@ -48,22 +47,33 @@ export interface WhisperModelConfig {
 
 // ── 預設值 ────────────────────────────────────────────────
 
-export const DEFAULT_LLM_MODEL_ID: LlmModelId = "llama-3.3-70b-versatile";
+export const DEFAULT_LLM_MODEL_ID: LlmModelId = "qwen/qwen3.6-27b";
 export const DEFAULT_WHISPER_MODEL_ID: WhisperModelId = "whisper-large-v3";
 
 // ── 已下架模型 ID 映射（舊 → 新，用於自動遷移）──────────
+// 每個 value 必須是「當前 registry 內存活的 id」或「map 內另一個 key」
+// （getEffectiveLlmModelId 會迴圈解析、並保證回傳值存在於 registry）。
+// 映射原則：同 provider 內遷移，避免觸發 useSettingsStore 的 provider 交叉驗證。
 
-export const DECOMMISSIONED_MODEL_MAP: Record<string, LlmModelId> = {
-  "moonshotai/kimi-k2-instruct": "llama-3.3-70b-versatile",
-  "qwen-qwq-32b": "llama-3.3-70b-versatile",
-  "gpt-oss-120b": "llama-3.3-70b-versatile",
-  "openai/gpt-oss-120b": "llama-3.3-70b-versatile",
-  "openai/gpt-oss-20b": "llama-3.3-70b-versatile",
-  "llama-3.1-8b-instant": "qwen/qwen3-32b",
-  "llama-4-scout-17b-16e-instruct":
-    "meta-llama/llama-4-scout-17b-16e-instruct",
-  "llama-4-maverick-17b-128e-instruct": "qwen/qwen3-32b",
-  "meta-llama/llama-4-maverick-17b-128e-instruct": "qwen/qwen3-32b",
+export const DECOMMISSIONED_MODEL_MAP: Record<string, string> = {
+  // Groq — 2026-07-17 / 2026-08-16 下架潮
+  "llama-3.3-70b-versatile": "qwen/qwen3.6-27b",
+  "qwen/qwen3-32b": "qwen/qwen3.6-27b",
+  "qwen-qwq-32b": "qwen/qwen3.6-27b",
+  "moonshotai/kimi-k2-instruct": "qwen/qwen3.6-27b",
+  "meta-llama/llama-4-scout-17b-16e-instruct": "openai/gpt-oss-20b",
+  "llama-4-scout-17b-16e-instruct": "openai/gpt-oss-20b",
+  "llama-4-maverick-17b-128e-instruct": "qwen/qwen3.6-27b",
+  "meta-llama/llama-4-maverick-17b-128e-instruct": "qwen/qwen3.6-27b",
+  "llama-3.1-8b-instant": "openai/gpt-oss-20b",
+  "gpt-oss-120b": "openai/gpt-oss-120b",
+  // Gemini — 2.5 世代汰換
+  "gemini-2.5-flash": "gemini-3.5-flash",
+  "gemini-2.5-flash-lite": "gemini-3.1-flash-lite",
+  // OpenAI
+  "gpt-5.4-mini": "gpt-5.6-luna",
+  // Anthropic — 3.5 Haiku 已於 2026-02-19 退役
+  "claude-3-5-haiku-20241022": "claude-haiku-4-5-20251001",
 };
 
 // ── 模型清單 ──────────────────────────────────────────────
@@ -71,75 +81,76 @@ export const DECOMMISSIONED_MODEL_MAP: Record<string, LlmModelId> = {
 export const LLM_MODEL_LIST: LlmModelConfig[] = [
   // ── Groq（免費）──
   {
-    id: "llama-3.3-70b-versatile",
+    // Preview 模型：Groq 可無預警下架，顯示名稱標明讓使用者知情
+    id: "qwen/qwen3.6-27b",
     providerId: "groq",
-    displayName: "Llama 3.3 70B Versatile",
-    badgeKey: "settings.modelBadge.stableCostly",
-    speedTps: 280,
-    inputCostPerMillion: 0.59,
-    outputCostPerMillion: 0.79,
+    displayName: "Qwen3.6 27B (Preview)",
+    badgeKey: "settings.modelBadge.balanced",
+    speedTps: 500,
+    inputCostPerMillion: 0.6,
+    outputCostPerMillion: 3.0,
     freeQuotaRpd: 1_000,
-    freeQuotaTpd: 100_000,
+    freeQuotaTpd: 200_000,
     isDefault: true,
   },
   {
-    id: "qwen/qwen3-32b",
+    id: "openai/gpt-oss-120b",
     providerId: "groq",
-    displayName: "Qwen3 32B",
-    badgeKey: "settings.modelBadge.balanced",
-    speedTps: 400,
-    inputCostPerMillion: 0.29,
-    outputCostPerMillion: 0.59,
-    freeQuotaRpd: 1_000,
-    freeQuotaTpd: 500_000,
-    isDefault: false,
-  },
-  {
-    id: "meta-llama/llama-4-scout-17b-16e-instruct",
-    providerId: "groq",
-    displayName: "Llama 4 Scout 17B",
-    badgeKey: "settings.modelBadge.fastCheap",
-    speedTps: 750,
-    inputCostPerMillion: 0.11,
-    outputCostPerMillion: 0.34,
-    freeQuotaRpd: 1_000,
-    freeQuotaTpd: 500_000,
-    isDefault: false,
-  },
-  // ── Google Gemini（免費額度）──
-  {
-    id: "gemini-2.5-flash",
-    providerId: "gemini",
-    displayName: "Gemini 2.5 Flash",
-    badgeKey: "settings.modelBadge.balanced",
-    speedTps: 0,
+    displayName: "GPT OSS 120B",
+    badgeKey: "settings.modelBadge.stableCostly",
+    speedTps: 500,
     inputCostPerMillion: 0.15,
     outputCostPerMillion: 0.6,
-    freeQuotaRpd: 250,
+    freeQuotaRpd: 1_000,
+    freeQuotaTpd: 200_000,
+    isDefault: false,
+  },
+  {
+    id: "openai/gpt-oss-20b",
+    providerId: "groq",
+    displayName: "GPT OSS 20B",
+    badgeKey: "settings.modelBadge.fastCheap",
+    speedTps: 1_000,
+    inputCostPerMillion: 0.075,
+    outputCostPerMillion: 0.3,
+    freeQuotaRpd: 1_000,
+    freeQuotaTpd: 200_000,
+    isDefault: false,
+  },
+  // ── Google Gemini（免費額度依帳號而異，不在此顯示）──
+  {
+    id: "gemini-3.5-flash",
+    providerId: "gemini",
+    displayName: "Gemini 3.5 Flash",
+    badgeKey: "settings.modelBadge.premium",
+    speedTps: 0,
+    inputCostPerMillion: 1.5,
+    outputCostPerMillion: 9.0,
+    freeQuotaRpd: 0,
     freeQuotaTpd: 0,
     isDefault: true,
   },
   {
-    id: "gemini-2.5-flash-lite",
+    id: "gemini-3.1-flash-lite",
     providerId: "gemini",
-    displayName: "Gemini 2.5 Flash-Lite",
+    displayName: "Gemini 3.1 Flash-Lite",
     badgeKey: "settings.modelBadge.fastCheap",
     speedTps: 0,
-    inputCostPerMillion: 0.075,
-    outputCostPerMillion: 0.3,
-    freeQuotaRpd: 1_000,
+    inputCostPerMillion: 0.25,
+    outputCostPerMillion: 1.5,
+    freeQuotaRpd: 0,
     freeQuotaTpd: 0,
     isDefault: false,
   },
   // ── OpenAI（付費）──
   {
-    id: "gpt-5.4-mini",
+    id: "gpt-5.6-luna",
     providerId: "openai",
-    displayName: "GPT-5.4 Mini",
+    displayName: "GPT-5.6 Luna",
     badgeKey: "settings.modelBadge.premium",
     speedTps: 0,
-    inputCostPerMillion: 0.75,
-    outputCostPerMillion: 4.5,
+    inputCostPerMillion: 1.0,
+    outputCostPerMillion: 6.0,
     freeQuotaRpd: 0,
     freeQuotaTpd: 0,
     isDefault: true,
@@ -168,18 +179,6 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
     freeQuotaRpd: 0,
     freeQuotaTpd: 0,
     isDefault: true,
-  },
-  {
-    id: "claude-3-5-haiku-20241022",
-    providerId: "anthropic",
-    displayName: "Claude 3.5 Haiku",
-    badgeKey: "settings.modelBadge.fastCheap",
-    speedTps: 0,
-    inputCostPerMillion: 0.8,
-    outputCostPerMillion: 4.0,
-    freeQuotaRpd: 0,
-    freeQuotaTpd: 0,
-    isDefault: false,
   },
 ];
 
@@ -228,17 +227,26 @@ export function getDefaultModelIdForProvider(
   return defaultModel?.id ?? providerModelList[0]?.id ?? DEFAULT_LLM_MODEL_ID;
 }
 
+// 遷移鏈解析上限：防止 map 內互指造成無窮迴圈
+const MAX_MIGRATION_HOPS = 5;
+
 /**
- * 安全取得 LLM 模型 ID：若 savedId 不在 registry 則嘗試自動遷移，
- * 遷移失敗則 fallback 到預設。處理舊版升級（null）和模型下架的情境。
+ * 安全取得 LLM 模型 ID：若 savedId 不在 registry 則沿遷移表迴圈解析，
+ * 解析失敗則 fallback 到預設。處理舊版升級（null）和模型下架的情境。
+ *
+ * 迴圈解析（而非單跳查找）是刻意的：歷次下架累積的舊 entry 可能指向
+ * 「後來也被下架」的模型，單跳會回傳 registry 查不到的死值，且下游
+ * provider 交叉驗證對 undefined config 短路、救不回來。此函式保證
+ * 回傳值必存在於當前 registry。
  */
 export function getEffectiveLlmModelId(savedId: string | null): LlmModelId {
-  if (savedId && findLlmModelConfig(savedId)) return savedId as LlmModelId;
-
-  if (savedId && savedId in DECOMMISSIONED_MODEL_MAP) {
-    return DECOMMISSIONED_MODEL_MAP[savedId];
+  let candidate = savedId;
+  for (let hop = 0; candidate && hop < MAX_MIGRATION_HOPS; hop += 1) {
+    if (findLlmModelConfig(candidate)) return candidate as LlmModelId;
+    const next: string | undefined = DECOMMISSIONED_MODEL_MAP[candidate];
+    if (!next) break;
+    candidate = next;
   }
-
   return DEFAULT_LLM_MODEL_ID;
 }
 

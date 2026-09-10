@@ -16,6 +16,7 @@ import { enhanceText, buildSystemPrompt } from "../lib/enhancer";
 import { getEditModePromptForLocale } from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
 import { analyzeCorrections } from "../lib/vocabularyAnalyzer";
+import { convertSimplifiedToTraditional } from "../lib/simplifiedToTraditional";
 import i18n from "../i18n";
 import { useVocabularyStore } from "./useVocabularyStore";
 import { useHistoryStore } from "./useHistoryStore";
@@ -54,6 +55,7 @@ import {
 import {
   detectHallucination,
   detectEnhancementAnomaly,
+  detectSemanticDrift,
 } from "../lib/hallucinationDetector";
 import type { HudStatus, HudTargetPosition } from "../types";
 import type { VoiceFlowStateChangedPayload } from "../types/events";
@@ -80,6 +82,24 @@ function isEmptyTranscription(rawText: string): boolean {
 }
 function t(key: string, params?: Record<string, unknown>): string {
   return i18n.global.t(key, params ?? {});
+}
+
+/**
+ * 轉錄原文落地前的文字轉換。
+ * 目前只做：轉譯語言解析為繁中（zh-TW）時，把 Whisper 的簡體輸出轉成繁體（#39）。
+ * 「auto」模式回退到介面語言；其餘語言原樣返回。
+ */
+function applyTranscriptTextTransforms(rawText: string): string {
+  if (!rawText) return rawText;
+  const settingsStore = useSettingsStore();
+  const transcriptionLocale = settingsStore.selectedTranscriptionLocale;
+  const effectiveLocale =
+    transcriptionLocale === "auto"
+      ? settingsStore.selectedLocale
+      : transcriptionLocale;
+  return effectiveLocale === "zh-TW"
+    ? convertSimplifiedToTraditional(rawText)
+    : rawText;
 }
 
 const MONITOR_POLL_INTERVAL_MS = 250;
@@ -109,6 +129,20 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   let abortController: AbortController | null = null;
   const editSourceText = ref<string | null>(null);
   const isEditMode = computed<boolean>(() => editSourceText.value !== null);
+  // AX 不可見 App（read_selection_state 回 unavailable）的剪貼簿後備旗標：
+  // 錄音停止、按鍵放開後才執行 read_selected_text
+  let pendingClipboardSelectionCheck = false;
+  let pendingSelectionCapture: Promise<void> | null = null;
+  // 錄音世代編號：AX 判定（最長 600ms）與剪貼簿後備（250ms 計時器）都是
+  // 非同步回呼，可能在「下一輪錄音已開始」後才落地——寫入前必須比對世代，
+  // 過期回呼直接失效（含 ESC 取消 / 雙擊切換後立刻重錄的情境）
+  let recordingEpoch = 0;
+  // 本世代的 AX 判定是否已有結論：停止錄音時若 AX 還沒回覆，
+  // 保守走剪貼簿後備（等同舊行為），避免慢速 AX 讓編輯模式靜默消失
+  let selectionProbeSettledEpoch = -1;
+  // 等按鍵完全放開的緩衝：toggle 模式的「停止」由第二次按下觸發，
+  // 該瞬間按鍵仍壓著，立刻模擬 Cmd+C 會重演 #25 的字元污染
+  const CLIPBOARD_FALLBACK_KEY_RELEASE_DELAY_MS = 250;
   const isRetryAttempt = ref<boolean>(false);
   const canRetry = computed<boolean>(
     () =>
@@ -590,18 +624,28 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     );
                     return;
                   }
-                  if (fieldText.includes(pastedText)) {
+                  // fieldText 為游標附近的「excerpt」（非整欄文字），故需雙向比對：
+                  // 整欄仍含 pasted（短輸入）→ includes；或 excerpt 是 pasted 的子字串（長輸入未改）→ 反向 includes。
+                  const trimmedField = fieldText.trim();
+                  if (
+                    fieldText.includes(pastedText) ||
+                    pastedText.includes(trimmedField)
+                  ) {
                     writeInfoLog(
                       "[correction] text unchanged — skipping analysis",
                     );
                     return;
                   }
 
-                  // 相似度檢查：如果 corrected 跟 original 完全無關（AX 讀到錯的東西），跳過
-                  const overlapCharCount = [...pastedText].filter((ch) =>
-                    fieldText.includes(ch),
+                  // 相似度檢查：以 excerpt 為基準（excerpt 多數字元應來自 pasted 區域）。
+                  // 若 excerpt 與 pasted 幾乎無關（AX/UIA 讀到錯的欄位），跳過。
+                  const overlapCharCount = [...trimmedField].filter((ch) =>
+                    pastedText.includes(ch),
                   ).length;
-                  const overlapRatio = overlapCharCount / pastedText.length;
+                  const overlapRatio =
+                    trimmedField.length > 0
+                      ? overlapCharCount / trimmedField.length
+                      : 0;
                   if (overlapRatio < 0.3) {
                     writeInfoLog(
                       `[correction] field text unrelated to original (overlap=${Math.round(overlapRatio * 100)}%) — skipping analysis`,
@@ -890,6 +934,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
   function applyDoubleTapModeSwitch() {
     isRecording.value = false;
+    // 世代 +1：這輪錄音被雙擊靜默取消，途中的選取偵測回呼全部失效
+    recordingEpoch += 1;
+    pendingClipboardSelectionCheck = false;
+    pendingSelectionCapture = null;
 
     // Toggle prompt mode: minimal ↔ active
     const settingsStore = useSettingsStore();
@@ -969,6 +1017,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     stopCorrectionSnapshotPolling();
     cleanupCorrectionMonitorListener();
     void restoreSystemAudio();
+    // 世代 +1：讓仍在途的 AX 判定 / 剪貼簿後備回呼全部過期失效
+    recordingEpoch += 1;
+    pendingClipboardSelectionCheck = false;
+    pendingSelectionCapture = null;
 
     // 重置 toggle 模式狀態
     void invoke("reset_hotkey_state").catch(() => {});
@@ -995,15 +1047,28 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     // 捕獲當前前景視窗（Windows: HUD show 前記住目標，貼上前恢復焦點）
     void invoke("capture_target_window").catch(() => {});
 
-    // 偵測選取文字（非阻塞）：模擬 Cmd+C 讀剪貼簿，~100ms，遠在錄音結束前完成
+    // 偵測選取文字（非阻塞）：AX 被動查詢，零按鍵模擬（#24/#25）。
+    // AX 不可見的 App 標記剪貼簿後備，延後到錄音停止、按鍵放開後執行
     editSourceText.value = null;
-    invoke<string | null>("read_selected_text")
-      .then((selectedText) => {
-        if (selectedText && selectedText.trim().length > 0) {
-          editSourceText.value = selectedText;
+    pendingClipboardSelectionCheck = false;
+    pendingSelectionCapture = null;
+    recordingEpoch += 1;
+    const probeEpoch = recordingEpoch;
+    invoke<{ kind: string; text: string | null }>("read_selection_state")
+      .then((state) => {
+        // 過期回呼（下一輪錄音已開始）直接失效，防止跨錄音狀態污染
+        if (probeEpoch !== recordingEpoch || !state) return;
+        selectionProbeSettledEpoch = probeEpoch;
+        if (state.kind === "selection" && state.text && state.text.trim().length > 0) {
+          editSourceText.value = state.text;
           writeInfoLog(
-            `useVoiceFlowStore: edit mode activated, selectedText length=${selectedText.length}`,
+            `useVoiceFlowStore: edit mode activated (ax), selectedText length=${state.text.length}`,
           );
+        } else if (state.kind === "noSelection") {
+          // AX 的明確否定是權威答案：若慢速後備已誤寫（整行複製），以此為準清掉
+          editSourceText.value = null;
+        } else if (state.kind === "unavailable") {
+          pendingClipboardSelectionCheck = true;
         }
       })
       .catch(() => {});
@@ -1059,6 +1124,38 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     await restoreSystemAudio();
     playSoundIfEnabled("play_stop_sound");
     stopElapsedTimer();
+
+    // AX 不可見 App 的剪貼簿後備：延遲等按鍵完全放開後才模擬 Cmd+C。
+    // 包成 Promise：轉錄若比後備先完成，編輯模式判定前要能 await 它。
+    // AX 到停止時還沒回覆（慢速 App）也保守走後備——等同舊行為，
+    // 避免編輯模式在這種時序下靜默消失
+    if (
+      pendingClipboardSelectionCheck ||
+      selectionProbeSettledEpoch !== recordingEpoch
+    ) {
+      pendingClipboardSelectionCheck = false;
+      const fallbackEpoch = recordingEpoch;
+      pendingSelectionCapture = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          if (fallbackEpoch !== recordingEpoch) {
+            resolve();
+            return;
+          }
+          invoke<string | null>("read_selected_text")
+            .then((selectedText) => {
+              if (fallbackEpoch !== recordingEpoch) return;
+              if (selectedText && selectedText.trim().length > 0 && !editSourceText.value) {
+                editSourceText.value = selectedText;
+                writeInfoLog(
+                  `useVoiceFlowStore: edit mode activated (clipboard fallback), selectedText length=${selectedText.length}`,
+                );
+              }
+            })
+            .catch(() => {})
+            .finally(resolve);
+        }, CLIPBOARD_FALLBACK_KEY_RELEASE_DELAY_MS);
+      });
+    }
 
     // 生成 transcriptionId 貫穿整個流程
     const transcriptionId = crypto.randomUUID();
@@ -1143,6 +1240,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       });
       if (isAborted.value) return;
 
+      // #39：轉譯語言為繁中時，把 Whisper 的簡體輸出轉成繁體（落地前一次到位）
+      result.rawText = applyTranscriptTextTransforms(result.rawText);
+
       writeInfoLog(`轉錄原文: "${result.rawText}"`);
 
       if (isEmptyTranscription(result.rawText)) {
@@ -1224,6 +1324,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         return;
       }
 
+      // 剪貼簿後備可能還在等按鍵放開（轉錄比後備快時）：判定模式前先等它完成
+      if (pendingSelectionCapture) {
+        await pendingSelectionCapture;
+        pendingSelectionCapture = null;
+      }
+
       // 編輯模式：語音是指令，選取文字是待處理內容
       if (isEditMode.value && editSourceText.value) {
         await handleEditModeFlow({
@@ -1289,14 +1395,19 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             if (isAborted.value) return;
           }
 
-          // 重試後仍異常 → fallback 到 rawText
+          // 重試後仍異常（長度爆炸）或語意飄走（#43）→ fallback 到 rawText
           const finalAnomaly = detectEnhancementAnomaly({
             rawText: result.rawText,
             enhancedText: enhanceResult.text,
           });
-          if (finalAnomaly.isAnomaly) {
+          const drift = detectSemanticDrift(
+            result.rawText,
+            enhanceResult.text,
+          );
+          const shouldFallbackToRaw = finalAnomaly.isAnomaly || drift.isDrift;
+          if (shouldFallbackToRaw) {
             writeErrorLog(
-              `useVoiceFlowStore: enhancement failed after ${MAX_ENHANCEMENT_RETRY_COUNT} retries (reason=${finalAnomaly.reason}), falling back to raw text`,
+              `useVoiceFlowStore: enhancement rejected (anomaly=${finalAnomaly.reason ?? "none"}, drift=${drift.isDrift}, overlap=${drift.overlapRatio.toFixed(2)}), falling back to raw text`,
             );
             enhanceResult = { ...enhanceResult, text: result.rawText };
           }
@@ -1311,7 +1422,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             recordingDurationMs,
             transcriptionDurationMs: result.transcriptionDurationMs,
             enhancementDurationMs,
-            wasEnhanced: !finalAnomaly.isAnomaly,
+            wasEnhanced: !shouldFallbackToRaw,
             audioFilePath,
             status: "success",
           });
@@ -1552,6 +1663,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       );
       if (isAborted.value) return;
 
+      // #39：同主路徑，重送轉錄後也套用簡→繁
+      result.rawText = applyTranscriptTextTransforms(result.rawText);
+
       writeInfoLog(`重送轉錄原文: "${result.rawText}"`);
 
       if (isEmptyTranscription(result.rawText)) {
@@ -1600,7 +1714,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
           const enhancementTermList =
             await vocabularyStore.getTopTermListByWeight(50);
-          const enhanceResult = await enhanceText(result.rawText, llmApiKey, {
+          let enhanceResult = await enhanceText(result.rawText, llmApiKey, {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
@@ -1608,6 +1722,24 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             signal: abortController?.signal,
           });
           if (isAborted.value) return;
+
+          // 重送路徑同樣套用守衛（長度爆炸 / 語意飄走 #43）→ fallback 到 rawText
+          const resendAnomaly = detectEnhancementAnomaly({
+            rawText: result.rawText,
+            enhancedText: enhanceResult.text,
+          });
+          const resendDrift = detectSemanticDrift(
+            result.rawText,
+            enhanceResult.text,
+          );
+          const shouldFallbackToRaw =
+            resendAnomaly.isAnomaly || resendDrift.isDrift;
+          if (shouldFallbackToRaw) {
+            writeErrorLog(
+              `useVoiceFlowStore: resend enhancement rejected (anomaly=${resendAnomaly.reason ?? "none"}, drift=${resendDrift.isDrift}, overlap=${resendDrift.overlapRatio.toFixed(2)}), falling back to raw text`,
+            );
+            enhanceResult = { ...enhanceResult, text: result.rawText };
+          }
 
           const enhancementDurationMs =
             performance.now() - enhancementStartTime;
@@ -1619,7 +1751,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             recordingDurationMs,
             transcriptionDurationMs: result.transcriptionDurationMs,
             enhancementDurationMs,
-            wasEnhanced: true,
+            wasEnhanced: !shouldFallbackToRaw,
             audioFilePath: filePath,
             status: "success",
           });
@@ -1645,7 +1777,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                 result.transcriptionDurationMs,
               ),
               enhancementDurationMs: Math.round(enhancementDurationMs),
-              wasEnhanced: true,
+              wasEnhanced: !shouldFallbackToRaw,
               charCount: result.rawText.length,
             })
             .then(() => {

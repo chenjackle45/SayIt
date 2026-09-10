@@ -47,33 +47,42 @@ export function getTranscriptionErrorMessage(error: unknown): string {
     return t("errors.network");
   }
 
-  if (error instanceof Error) {
-    if (
-      !error.message.includes("Groq API error") &&
-      NETWORK_ERROR_PATTERN.test(error.message)
-    ) {
-      return t("errors.network");
-    }
+  // Rust TranscriptionError 透過 Tauri invoke 以「字串」reject（serialize_str），
+  // 不能依賴 error instanceof Error；一律用 extractErrorMessage 取訊息字串比對。
+  const message = extractErrorMessage(error);
 
-    if (error.message.includes("Audio file too large")) {
-      return t("errors.transcription.fileTooLarge");
-    }
+  // ApiError 的 Display 為 "Groq API returned error ({status}): {body}"
+  //（同時相容舊字串 "Groq API error"）
+  const isApiStatusError = /Groq API (?:returned )?error/i.test(message);
 
-    if (error.message.includes("Groq API error")) {
-      const statusMatch = error.message.match(/\((\d+)\)/);
-      if (statusMatch) {
-        const status = parseInt(statusMatch[1], 10);
-        if (status === 400) return t("errors.transcription.invalidAudio");
-        if (status === 401) return t("errors.transcription.invalidApiKey");
-        if (status === 429) return t("errors.transcription.rateLimited");
-        if (status >= 500) return t("errors.transcription.serviceUnavailable");
-      }
-      return t("errors.transcription.failed");
-    }
+  if (message.includes("Audio file too large")) {
+    return t("errors.transcription.fileTooLarge");
+  }
 
-    if (error.message.includes("MediaRecorder")) {
-      return t("errors.transcription.recorderError");
+  // 先判 API 狀態碼（避免 body 含 network 字眼被誤判為網路錯誤）
+  if (isApiStatusError) {
+    const statusMatch = message.match(/\((\d+)\)/);
+    if (statusMatch) {
+      const status = parseInt(statusMatch[1], 10);
+      if (status === 400) return t("errors.transcription.invalidAudio");
+      if (status === 401) return t("errors.transcription.invalidApiKey");
+      if (status === 429) return t("errors.transcription.rateLimited");
+      if (status >= 500) return t("errors.transcription.serviceUnavailable");
     }
+    return t("errors.transcription.failed");
+  }
+
+  // 網路/傳輸層失敗：RequestFailed 的 Display 為 "Groq API request failed: ..."，
+  // 或含一般網路關鍵字（connect/dns/timeout/os error…）
+  if (
+    message.includes("Groq API request failed") ||
+    NETWORK_ERROR_PATTERN.test(message)
+  ) {
+    return t("errors.network");
+  }
+
+  if (message.includes("MediaRecorder")) {
+    return t("errors.transcription.recorderError");
   }
 
   return t("errors.transcription.operationFailed");

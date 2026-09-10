@@ -43,55 +43,107 @@ const historyStore = useHistoryStore();
 const settingsStore = useSettingsStore();
 const router = useRouter();
 
+// 付費偵測依 LLM provider id：openai / anthropic 為計費方案（無免費額度）；
+// groq / gemini 提供免費額度。Whisper 目前僅 Groq，一律視為免費額度。
+const isPaidWhisperProvider = computed(() => false);
+
 const isPaidLlmProvider = computed(() => {
+  const providerId = settingsStore.selectedLlmProviderId;
+  // groq / gemini 提供免費額度；openai / anthropic 為計費方案
+  return providerId !== "groq" && providerId !== "gemini";
+});
+
+const hasAnyPaidProvider = computed(
+  () => isPaidWhisperProvider.value || isPaidLlmProvider.value,
+);
+
+// Gemini 免費額度已不公開（依帳號浮動、僅能在 AI Studio 查詢）：
+// registry 將其 freeQuotaRpd 設 0 → 額度條自動略過，改以「今日用量」呈現
+const isQuotaHiddenLlmProvider = computed(() => {
+  if (isPaidLlmProvider.value) return false;
   const lConfig = findLlmModelConfig(settingsStore.selectedLlmModelId);
   return (lConfig?.freeQuotaRpd ?? 0) === 0;
 });
 
 const quotaDimensionList = computed(() => {
   const usage = historyStore.dashboardStats.dailyQuotaUsage;
-  const wConfig = findWhisperModelConfig(settingsStore.selectedWhisperModelId);
-  const lConfig = findLlmModelConfig(settingsStore.selectedLlmModelId);
+  const dimensionList: { remaining: number; label: string }[] = [];
 
-  const wRpdLimit = wConfig?.freeQuotaRpd ?? 2000;
-  const wAudioLimitMs = (wConfig?.freeQuotaAudioSecondsPerDay ?? 28800) * 1000;
+  // 免費 Whisper（Groq）才顯示額度維度；limit 為 0 的維度略過避免誤導
+  if (!isPaidWhisperProvider.value) {
+    const wConfig = findWhisperModelConfig(settingsStore.selectedWhisperModelId);
+    const wRpdLimit = wConfig?.freeQuotaRpd ?? 2000;
+    const wAudioLimitMs =
+      (wConfig?.freeQuotaAudioSecondsPerDay ?? 28800) * 1000;
+    if (wRpdLimit > 0) {
+      dimensionList.push({
+        remaining: 1 - usage.whisperRequestCount / wRpdLimit,
+        label: t("dashboard.quotaWhisperRequests", { used: usage.whisperRequestCount, limit: formatNumber(wRpdLimit) }),
+      });
+    }
+    if (wAudioLimitMs > 0) {
+      dimensionList.push({
+        remaining: 1 - usage.whisperBilledAudioMs / wAudioLimitMs,
+        label: t("dashboard.quotaAudio", { used: formatDurationFromMs(usage.whisperBilledAudioMs), limit: formatDurationFromMs(wAudioLimitMs) }),
+      });
+    }
+  }
 
-  const dimensionList = [
-    {
-      remaining: wRpdLimit > 0 ? 1 - usage.whisperRequestCount / wRpdLimit : 0,
-      label: t("dashboard.quotaWhisperRequests", { used: usage.whisperRequestCount, limit: formatNumber(wRpdLimit) }),
-    },
-    {
-      remaining: wAudioLimitMs > 0 ? 1 - usage.whisperBilledAudioMs / wAudioLimitMs : 0,
-      label: t("dashboard.quotaAudio", { used: formatDurationFromMs(usage.whisperBilledAudioMs), limit: formatDurationFromMs(wAudioLimitMs) }),
-    },
-  ];
-
-  // 付費 provider 無免費額度，不顯示 LLM 額度進度條
+  // 免費 LLM（Groq/Gemini）才顯示額度維度
   if (!isPaidLlmProvider.value) {
+    const lConfig = findLlmModelConfig(settingsStore.selectedLlmModelId);
     const lRpdLimit = lConfig?.freeQuotaRpd ?? 1000;
     const lTpdLimit = lConfig?.freeQuotaTpd ?? 100_000;
-    dimensionList.push(
-      {
-        remaining: lRpdLimit > 0 ? 1 - usage.llmRequestCount / lRpdLimit : 0,
+    if (lRpdLimit > 0) {
+      dimensionList.push({
+        remaining: 1 - usage.llmRequestCount / lRpdLimit,
         label: t("dashboard.quotaLlmRequests", { used: usage.llmRequestCount, limit: formatNumber(lRpdLimit) }),
-      },
-      {
-        remaining: lTpdLimit > 0 ? 1 - usage.llmTotalTokens / lTpdLimit : 0,
+      });
+    }
+    if (lTpdLimit > 0) {
+      dimensionList.push({
+        remaining: 1 - usage.llmTotalTokens / lTpdLimit,
         label: t("dashboard.quotaLlmTokens", { used: formatNumber(usage.llmTotalTokens), limit: formatNumber(lTpdLimit) }),
-      },
-    );
+      });
+    }
   }
 
   return dimensionList;
 });
 
+const hasFreeQuota = computed(() => quotaDimensionList.value.length > 0);
+
+// 計費方案（OpenAI/Anthropic）無免費額度，改顯示今日實際用量
+const paidUsageList = computed(() => {
+  const usage = historyStore.dashboardStats.dailyQuotaUsage;
+  const list: { label: string }[] = [];
+  if (isPaidWhisperProvider.value) {
+    list.push({
+      label: t("dashboard.usageWhisper", {
+        requests: formatNumber(usage.whisperRequestCount),
+        audio: formatDurationFromMs(usage.whisperBilledAudioMs),
+      }),
+    });
+  }
+  if (isPaidLlmProvider.value || isQuotaHiddenLlmProvider.value) {
+    list.push({
+      label: t("dashboard.usageLlm", {
+        requests: formatNumber(usage.llmRequestCount),
+        tokens: formatNumber(usage.llmTotalTokens),
+      }),
+    });
+  }
+  return list;
+});
+
 const quotaRemainingPercent = computed(() => {
+  if (quotaDimensionList.value.length === 0) return 0;
   const minRemaining = Math.min(...quotaDimensionList.value.map((d) => d.remaining));
   return Math.max(0, minRemaining);
 });
 
 const quotaBottleneckLabel = computed(() => {
+  if (quotaDimensionList.value.length === 0) return "";
   const sorted = [...quotaDimensionList.value].sort((a, b) => a.remaining - b.remaining);
   return sorted[0].label;
 });
@@ -193,28 +245,57 @@ onBeforeUnmount(() => {
           <TooltipTrigger as-child>
             <Card class="cursor-default">
               <CardHeader class="pb-2">
-                <CardDescription>{{ $t("dashboard.dailyQuota") }}</CardDescription>
+                <div class="flex items-center justify-between gap-2">
+                  <CardDescription>{{ hasFreeQuota ? $t("dashboard.dailyQuota") : $t("dashboard.dailyUsage") }}</CardDescription>
+                  <Badge v-if="hasAnyPaidProvider" variant="secondary">{{ $t("dashboard.billedPlan") }}</Badge>
+                </div>
               </CardHeader>
               <CardContent>
-                <p class="text-2xl font-bold text-foreground">
-                  {{ Math.round(quotaRemainingPercent * 100) }}%
-                </p>
-                <div class="mt-2 h-1.5 w-full rounded-full bg-muted">
-                  <div
-                    class="h-full rounded-full transition-all"
-                    :class="quotaBarColorClass"
-                    :style="{ width: `${Math.round(quotaRemainingPercent * 100)}%` }"
-                  />
+                <!-- 免費額度（免費服務）-->
+                <template v-if="hasFreeQuota">
+                  <p class="text-2xl font-bold text-foreground">
+                    {{ Math.round(quotaRemainingPercent * 100) }}%
+                  </p>
+                  <div class="mt-2 h-1.5 w-full rounded-full bg-muted">
+                    <div
+                      class="h-full rounded-full transition-all"
+                      :class="quotaBarColorClass"
+                      :style="{ width: `${Math.round(quotaRemainingPercent * 100)}%` }"
+                    />
+                  </div>
+                  <p class="text-xs text-muted-foreground mt-1.5 truncate">
+                    {{ quotaBottleneckLabel }}
+                  </p>
+                </template>
+
+                <!-- 付費服務今日用量（混用與全付費共用同一段；混用為次要樣式 + 分隔線）-->
+                <div
+                  v-if="paidUsageList.length > 0"
+                  class="space-y-1"
+                  :class="hasFreeQuota ? 'mt-1.5 pt-1.5 border-t border-border' : ''"
+                >
+                  <p
+                    v-for="(item, idx) in paidUsageList"
+                    :key="idx"
+                    :class="hasFreeQuota ? 'text-xs text-muted-foreground' : 'text-sm font-medium text-foreground'"
+                  >
+                    {{ item.label }}
+                  </p>
                 </div>
-                <p class="text-xs text-muted-foreground mt-1.5 truncate">
-                  {{ quotaBottleneckLabel }}
+
+                <!-- 全付費提示（混用不顯示，避免與免費額度 % 矛盾）-->
+                <p
+                  v-if="!hasFreeQuota && paidUsageList.length > 0"
+                  class="text-xs text-muted-foreground mt-1.5"
+                >
+                  {{ $t("dashboard.billedNoFreeQuota") }}
                 </p>
               </CardContent>
             </Card>
           </TooltipTrigger>
           <TooltipContent class="w-72 p-3 bg-card text-card-foreground border border-border" side="bottom" :side-offset="6" hide-arrow>
-            <p class="text-xs font-medium mb-2">{{ $t("dashboard.dailyQuotaDetail") }}</p>
-            <div class="space-y-2">
+            <p class="text-xs font-medium mb-2">{{ hasFreeQuota ? $t("dashboard.dailyQuotaDetail") : $t("dashboard.dailyUsage") }}</p>
+            <div v-if="hasFreeQuota" class="space-y-2">
               <div v-for="(dim, idx) in quotaDimensionList" :key="idx">
                 <div class="flex items-center justify-between text-xs">
                   <span class="text-muted-foreground">{{ dim.label }}</span>
@@ -228,6 +309,28 @@ onBeforeUnmount(() => {
                   />
                 </div>
               </div>
+            </div>
+            <div
+              v-if="isQuotaHiddenLlmProvider"
+              class="mt-2 pt-2 border-t border-border"
+            >
+              <span class="text-xs text-muted-foreground">
+                {{ $t("dashboard.geminiQuotaHint") }}
+              </span>
+            </div>
+            <div
+              v-if="paidUsageList.length > 0"
+              class="space-y-1"
+              :class="{ 'mt-2 pt-2 border-t border-border': hasFreeQuota }"
+            >
+              <div
+                v-for="(item, idx) in paidUsageList"
+                :key="`paid-${idx}`"
+                class="text-xs text-muted-foreground"
+              >
+                {{ item.label }}
+              </div>
+              <p class="text-xs text-muted-foreground">{{ $t("dashboard.billedNoFreeQuota") }}</p>
             </div>
             <div
               v-if="historyStore.dashboardStats.dailyQuotaUsage.vocabularyAnalysisRequestCount > 0"
@@ -249,7 +352,7 @@ onBeforeUnmount(() => {
     <Card class="mt-6">
       <CardHeader>
         <CardTitle class="text-base">{{ $t("dashboard.usageTrend") }}</CardTitle>
-        <CardDescription>{{ $t("dashboard.last30Days") }}</CardDescription>
+        <CardDescription>{{ $t("dashboard.lastNDays", { days: historyStore.usageTrendDays }) }}</CardDescription>
       </CardHeader>
       <CardContent>
         <DashboardUsageChart :data="historyStore.dailyUsageTrendList" />

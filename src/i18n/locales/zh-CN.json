@@ -98,7 +98,7 @@
     },
     "modelBadge": {
       "balanced": "平衡 · 默认",
-      "stableCostly": "稳定可靠 · 成本高",
+      "stableCostly": "稳定 · 正式版",
       "fastCheap": "最快 · 最便宜",
       "smartestSlow": "最聪明 · 较慢",
       "premium": "高品质"
@@ -147,6 +147,10 @@
       "soundFeedbackDescription": "录音开始、结束及错误时播放提示音效",
       "soundFeedbackEnabled": "已启用音效反馈",
       "soundFeedbackDisabled": "已停用音效反馈",
+      "hideDockIcon": "隐藏 Dock 图标",
+      "hideDockIconDescription": "从 Dock 移除 SayIt 图标，仅通过菜单栏图标操作",
+      "hideDockIconEnabled": "已隐藏 Dock 图标",
+      "hideDockIconDisabled": "已显示 Dock 图标",
       "autoStart": "开机自动启动",
       "autoStartDescription": "登录系统后自动启动 SayIt",
       "autoStartEnabled": "已启用开机自启动",
@@ -200,7 +204,7 @@
     "dailyQuota": "今日剩余免费额度",
     "dailyQuotaDetail": "今日剩余免费额度明细",
     "usageTrend": "每日使用趋势",
-    "last30Days": "最近 30 天",
+    "lastNDays": "最近 {days} 天",
     "recentTranscriptions": "最近转录",
     "viewAll": "查看全部",
     "emptyState": "开始使用语音输入，统计数据将在此显示",
@@ -212,7 +216,13 @@
     "quotaLlmRequests": "LLM {used}/{limit} 次",
     "quotaLlmTokens": "LLM {used}/{limit} tokens",
     "vocabularyAnalysis": "字典分析",
-    "vocabularyAnalysisUsage": "字典分析：{requests} 次 / {tokens} tokens"
+    "vocabularyAnalysisUsage": "字典分析：{requests} 次 / {tokens} tokens",
+    "geminiQuotaHint": "Gemini 免费额度因账号而异，请至 Google AI Studio 查看你的实际上限",
+    "dailyUsage": "今日用量",
+    "billedPlan": "计费",
+    "billedNoFreeQuota": "付费方案 — 无免费额度限制",
+    "usageWhisper": "Whisper：{requests} 次 · {audio}",
+    "usageLlm": "LLM：{requests} 次 · {tokens} tokens"
   },
   "history": {
     "searchPlaceholder": "搜索转录记录...",
@@ -255,6 +265,7 @@
     "description": "字典词汇会在语音识别时提供给 AI，提升专有名词与术语的识别准确度。",
     "weightDescription": "每次语音识别时，系统会将权重最高的前 {limit} 个词汇加入 AI 识别提示。当 AI 检测到你重复修正同一个词时，该词的权重会自动提升。",
     "noAiSuggestions": "暂无 AI 推荐词汇，启用智能字典学习后系统会自动学习",
+    "noAiSuggestionsEnabled": "智能字典学习已启用，当你修正转录文字时系统会自动学习新词",
     "aiTermCount": "{count} 个词",
     "export": "导出",
     "import": "导入",
@@ -387,9 +398,11 @@
     },
     "upgradeNotice": {
       "title": "SayIt 更新摘要",
-      "item1": "测试连接按钮：在设置页面按一下，立刻知道 LLM 和语音转录的 API key 是不是真的通了，省去设置半天却不知道哪里卡住的麻烦",
-      "item2": "Gemini 整理长文字不再被截断：以前用 Gemini 整理长段话有时会切到一半，这版找到根因（思考用的 token 占了输出空间）并修好，整段话会完整出现",
-      "item3": "剪贴板不再被覆盖：可在设置关掉「将转录文字复制到剪贴板」，这样 SayIt 粘贴后会自动还原你原本复制的内容，不用再为了用 SayIt 重新复制一次",
+      "item1": "AI 模型全面更新：四家供应商都换上最新模型，你原本选的会自动迁移、不用重新设置（Groq 旧模型即将下架，请保持更新）",
+      "item2": "编辑模式重做：选字改写更可靠，不再误触发、也不会冒出多余的“c”字",
+      "item3": "语音转文字失败会自动重试；错误信息会讲清楚是额度用完、服务繁忙还是网络问题",
+      "item4": "界面设置繁体中文时不再输出简体字；并加上防护，避免 AI 凭空输出没讲过的内容",
+      "item5": "新增“隐藏 Dock 图标”选项（macOS）；仪表板改为显示今日实际用量",
       "dismiss": "了解"
     }
   },

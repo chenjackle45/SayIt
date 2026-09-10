@@ -113,6 +113,47 @@ describe("getTranscriptionErrorMessage", () => {
       ),
     ).toBe("轉錄服務暫時無法使用");
   });
+
+  // ── Rust 端實際透過 Tauri invoke reject 的「純字串」形式（#37/#38 真實情境）──
+  it("[P0] 純字串 Groq API returned error (429) 應映射為請求過於頻繁", () => {
+    expect(
+      getTranscriptionErrorMessage(
+        "Groq API returned error (429): Rate limit reached",
+      ),
+    ).toBe("請求過於頻繁，稍後再試");
+  });
+
+  it("[P0] 純字串 Groq API returned error (503) 應映射為服務暫時無法使用", () => {
+    expect(
+      getTranscriptionErrorMessage(
+        "Groq API returned error (503): Service Unavailable",
+      ),
+    ).toBe("轉錄服務暫時無法使用");
+  });
+
+  it("[P0] 純字串 Groq API returned error (401) 應映射為 API Key 無效", () => {
+    expect(
+      getTranscriptionErrorMessage(
+        "Groq API returned error (401): Invalid API Key",
+      ),
+    ).toBe("API Key 無效或已過期");
+  });
+
+  it("[P0] 純字串 Groq API request failed 應映射為網路連線中斷", () => {
+    expect(
+      getTranscriptionErrorMessage(
+        "Groq API request failed: error sending request for url",
+      ),
+    ).toBe("網路連線中斷");
+  });
+
+  it("[P0] 純字串 Groq API returned error 含 network 字眼時仍判服務暫時無法使用", () => {
+    expect(
+      getTranscriptionErrorMessage(
+        "Groq API returned error (500): upstream connect timeout",
+      ),
+    ).toBe("轉錄服務暫時無法使用");
+  });
 });
 
 describe("getEnhancementErrorMessage - 網路錯誤", () => {

@@ -7,7 +7,12 @@ import { useVoiceFlowStore } from "./stores/useVoiceFlowStore";
 import { useSettingsStore } from "./stores/useSettingsStore";
 import { useVocabularyStore } from "./stores/useVocabularyStore";
 import { connectToDatabase } from "./lib/database";
-import { listenToEvent, SETTINGS_UPDATED, VOCABULARY_CHANGED } from "./composables/useTauriEvents";
+import {
+  listenToEvent,
+  SETTINGS_UPDATED,
+  VOCABULARY_CHANGED,
+  waitForDatabaseReady,
+} from "./composables/useTauriEvents";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
@@ -37,6 +42,13 @@ onMounted(async () => {
   // 初始化 DB（供 vocabularyStore 使用）
   let isDatabaseReady = false;
   try {
+    // 等 Dashboard 完成 migration 再存取連線池，避免併發破壞 migration。
+    // 逾時（Dashboard 缺席或 migration 過久）才 fallback 直接連線；
+    // connectToDatabase() 自帶 retry，HUD 的 DB 讀取亦各有錯誤處理。
+    const databaseReady = await waitForDatabaseReady();
+    if (!databaseReady) {
+      console.warn("[App] DATABASE_READY 逾時，改用 connectToDatabase fallback");
+    }
     await connectToDatabase();
     isDatabaseReady = true;
   } catch (err) {

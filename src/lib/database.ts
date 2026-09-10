@@ -200,8 +200,7 @@ async function doInitializeDatabase(): Promise<Database> {
   const v3CurrentVersion = v3VersionRows[0]?.version ?? 1;
 
   if (v3CurrentVersion < 3) {
-    // DDL（ALTER TABLE ADD COLUMN）必須在 transaction 外執行
-    // tauri-plugin-sql 驅動下，DDL 在顯式 transaction 內對後續語句不可見
+    // 先補上 weight/source 欄位，後續建立 idx_vocabulary_weight 才看得到 weight
     await addColumnIfNotExists(
       connection,
       "vocabulary",
@@ -213,59 +212,61 @@ async function doInitializeDatabase(): Promise<Database> {
       "source TEXT NOT NULL DEFAULT 'manual'",
     );
 
-    await connection.execute("BEGIN TRANSACTION;");
-    try {
-      await connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_vocabulary_weight ON vocabulary(weight DESC);",
-      );
+    // 不使用顯式交易：tauri-plugin-sql 連線池無連線親和性，
+    // 跨 execute() 呼叫的 BEGIN/COMMIT 會落在不同連線而失敗
+    // （cannot commit - no transaction is active）。改為依賴冪等語句 +
+    // 下方關鍵表恢復邏輯確保可重複執行。
+    await connection.execute(
+      "CREATE INDEX IF NOT EXISTS idx_vocabulary_weight ON vocabulary(weight DESC);",
+    );
 
-      // api_usage 表重建（擴展 CHECK constraint 加入 'vocabulary_analysis'）
-      // SQLite 不支援 ALTER CONSTRAINT，必須重建
-      // 清除上次失敗可能殘留的暫存表
-      await connection.execute("DROP TABLE IF EXISTS api_usage_new;");
-      await connection.execute(`
-        CREATE TABLE api_usage_new (
-          id TEXT PRIMARY KEY,
-          transcription_id TEXT NOT NULL,
-          api_type TEXT NOT NULL CHECK(api_type IN ('whisper', 'chat', 'vocabulary_analysis')),
-          model TEXT NOT NULL,
-          prompt_tokens INTEGER,
-          completion_tokens INTEGER,
-          total_tokens INTEGER,
-          prompt_time_ms REAL,
-          completion_time_ms REAL,
-          total_time_ms REAL,
-          audio_duration_ms INTEGER,
-          estimated_cost_ceiling REAL,
-          created_at TEXT NOT NULL DEFAULT (datetime('now')),
-          FOREIGN KEY (transcription_id) REFERENCES transcriptions(id)
-        );
-      `);
-      // api_usage 可能在先前失敗的 migration 中被 DROP 而未 RENAME 回來
-      const hasApiUsage = await tableExists(connection, "api_usage");
-      if (hasApiUsage) {
-        await connection.execute(
-          "INSERT INTO api_usage_new SELECT * FROM api_usage;",
-        );
-        await connection.execute("DROP TABLE api_usage;");
-      }
-      await connection.execute(
-        "ALTER TABLE api_usage_new RENAME TO api_usage;",
-      );
-      await connection.execute(`
-        CREATE INDEX IF NOT EXISTS idx_api_usage_transcription_id
-        ON api_usage(transcription_id);
-      `);
-
-      await connection.execute(
-        "INSERT OR REPLACE INTO schema_version (version) VALUES (3);",
-      );
-
-      await connection.execute("COMMIT;");
-    } catch (migrationError) {
-      await connection.execute("ROLLBACK;");
-      throw migrationError;
+    // api_usage 表重建（擴展 CHECK constraint 加入 'vocabulary_analysis'）
+    // SQLite 不支援 ALTER CONSTRAINT，必須重建
+    // 若上次 rebuild 在 DROP api_usage 後、RENAME 前崩潰，api_usage_new 會是
+    // 唯一資料副本，先還原成 api_usage，避免被下方 DROP 清掉造成資料遺失
+    if (
+      !(await tableExists(connection, "api_usage")) &&
+      (await tableExists(connection, "api_usage_new"))
+    ) {
+      await connection.execute("ALTER TABLE api_usage_new RENAME TO api_usage;");
     }
+    // 清除上次失敗可能殘留的暫存表（此時 api_usage 必為資料來源，drop 安全）
+    await connection.execute("DROP TABLE IF EXISTS api_usage_new;");
+    await connection.execute(`
+      CREATE TABLE api_usage_new (
+        id TEXT PRIMARY KEY,
+        transcription_id TEXT NOT NULL,
+        api_type TEXT NOT NULL CHECK(api_type IN ('whisper', 'chat', 'vocabulary_analysis')),
+        model TEXT NOT NULL,
+        prompt_tokens INTEGER,
+        completion_tokens INTEGER,
+        total_tokens INTEGER,
+        prompt_time_ms REAL,
+        completion_time_ms REAL,
+        total_time_ms REAL,
+        audio_duration_ms INTEGER,
+        estimated_cost_ceiling REAL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (transcription_id) REFERENCES transcriptions(id)
+      );
+    `);
+    // api_usage 可能在先前失敗的 migration 中被 DROP 而未 RENAME 回來
+    const hasApiUsage = await tableExists(connection, "api_usage");
+    if (hasApiUsage) {
+      await connection.execute(
+        "INSERT INTO api_usage_new SELECT * FROM api_usage;",
+      );
+      await connection.execute("DROP TABLE api_usage;");
+    }
+    await connection.execute("ALTER TABLE api_usage_new RENAME TO api_usage;");
+    await connection.execute(`
+      CREATE INDEX IF NOT EXISTS idx_api_usage_transcription_id
+      ON api_usage(transcription_id);
+    `);
+
+    await connection.execute(
+      "INSERT OR REPLACE INTO schema_version (version) VALUES (3);",
+    );
 
     console.log(
       "[database] Migration v2 → v3: vocabulary weight/source + api_usage CHECK expansion",
@@ -279,7 +280,7 @@ async function doInitializeDatabase(): Promise<Database> {
   const v4CurrentVersion = v4VersionRows[0]?.version ?? 1;
 
   if (v4CurrentVersion < 4) {
-    // DDL（ALTER TABLE ADD COLUMN）必須在 transaction 外執行
+    // 先補上 audio_file_path/status 欄位，後續建立 idx_transcriptions_status 才看得到 status
     await addColumnIfNotExists(
       connection,
       "transcriptions",
@@ -291,19 +292,12 @@ async function doInitializeDatabase(): Promise<Database> {
       "status TEXT NOT NULL DEFAULT 'success'",
     );
 
-    await connection.execute("BEGIN TRANSACTION;");
-    try {
-      await connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);",
-      );
-      await connection.execute(
-        "INSERT OR REPLACE INTO schema_version (version) VALUES (4);",
-      );
-      await connection.execute("COMMIT;");
-    } catch (migrationError) {
-      await connection.execute("ROLLBACK;");
-      throw migrationError;
-    }
+    await connection.execute(
+      "CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);",
+    );
+    await connection.execute(
+      "INSERT OR REPLACE INTO schema_version (version) VALUES (4);",
+    );
     console.log(
       "[database] Migration v3 → v4: recording storage + status columns",
     );
@@ -316,29 +310,22 @@ async function doInitializeDatabase(): Promise<Database> {
   const v5CurrentVersion = v5VersionRows[0]?.version ?? 1;
 
   if (v5CurrentVersion < 5) {
-    await connection.execute("BEGIN TRANSACTION;");
-    try {
-      await connection.execute(`
-        CREATE TABLE IF NOT EXISTS hallucination_terms (
-          id TEXT PRIMARY KEY,
-          term TEXT NOT NULL UNIQUE,
-          source TEXT NOT NULL CHECK(source IN ('builtin', 'auto', 'manual')),
-          locale TEXT NOT NULL,
-          created_at TEXT NOT NULL DEFAULT (datetime('now'))
-        );
-      `);
-      await connection.execute(`
-        CREATE INDEX IF NOT EXISTS idx_hallucination_terms_locale
-        ON hallucination_terms(locale);
-      `);
-      await connection.execute(
-        "INSERT OR REPLACE INTO schema_version (version) VALUES (5);",
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS hallucination_terms (
+        id TEXT PRIMARY KEY,
+        term TEXT NOT NULL UNIQUE,
+        source TEXT NOT NULL CHECK(source IN ('builtin', 'auto', 'manual')),
+        locale TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
-      await connection.execute("COMMIT;");
-    } catch (migrationError) {
-      await connection.execute("ROLLBACK;");
-      throw migrationError;
-    }
+    `);
+    await connection.execute(`
+      CREATE INDEX IF NOT EXISTS idx_hallucination_terms_locale
+      ON hallucination_terms(locale);
+    `);
+    await connection.execute(
+      "INSERT OR REPLACE INTO schema_version (version) VALUES (5);",
+    );
     console.log("[database] Migration v4 → v5: hallucination_terms table");
   }
 
@@ -349,22 +336,15 @@ async function doInitializeDatabase(): Promise<Database> {
   const v6CurrentVersion = v6VersionRows[0]?.version ?? 1;
 
   if (v6CurrentVersion < 6) {
-    await connection.execute("BEGIN TRANSACTION;");
-    try {
-      await connection.execute(`
-        UPDATE transcriptions
-        SET char_count = LENGTH(raw_text)
-        WHERE processed_text IS NOT NULL
-          AND char_count != LENGTH(raw_text);
-      `);
-      await connection.execute(
-        "INSERT OR REPLACE INTO schema_version (version) VALUES (6);",
-      );
-      await connection.execute("COMMIT;");
-    } catch (migrationError) {
-      await connection.execute("ROLLBACK;");
-      throw migrationError;
-    }
+    await connection.execute(`
+      UPDATE transcriptions
+      SET char_count = LENGTH(raw_text)
+      WHERE processed_text IS NOT NULL
+        AND char_count != LENGTH(raw_text);
+    `);
+    await connection.execute(
+      "INSERT OR REPLACE INTO schema_version (version) VALUES (6);",
+    );
     console.log(
       "[database] Migration v5 → v6: recalculate char_count from raw_text",
     );
@@ -377,17 +357,10 @@ async function doInitializeDatabase(): Promise<Database> {
   const v7CurrentVersion = v7VersionRows[0]?.version ?? 1;
 
   if (v7CurrentVersion < 7) {
-    await connection.execute("BEGIN TRANSACTION;");
-    try {
-      await connection.execute("DROP TABLE IF EXISTS hallucination_terms;");
-      await connection.execute(
-        "INSERT OR REPLACE INTO schema_version (version) VALUES (7);",
-      );
-      await connection.execute("COMMIT;");
-    } catch (migrationError) {
-      await connection.execute("ROLLBACK;");
-      throw migrationError;
-    }
+    await connection.execute("DROP TABLE IF EXISTS hallucination_terms;");
+    await connection.execute(
+      "INSERT OR REPLACE INTO schema_version (version) VALUES (7);",
+    );
     console.log(
       "[database] Migration v6 → v7: removed hallucination_terms table",
     );
