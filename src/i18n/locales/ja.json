@@ -287,7 +287,18 @@
     "weightDescription": "音声認識のたびに、重みが最も高い上位 {limit} 語が AI 認識プロンプトに含まれます。同じ修正が繰り返し検出されると、その用語の重みが自動的に増加します。",
     "noAiSuggestions": "AI 推奨の用語はまだありません。スマート辞書学習を有効にすると自動学習されます",
     "noAiSuggestionsEnabled": "スマート辞書学習は有効です。文字起こしを修正すると、新しい用語が自動的に学習されます",
-    "aiTermCount": "{count} 語"
+    "aiTermCount": "{count} 語",
+    "export": "エクスポート",
+    "import": "インポート",
+    "exportSuccess": "{count} 語をエクスポートしました。{filename} はダウンロードフォルダに保存されました",
+    "exportEmpty": "エクスポートする語がありません",
+    "importSuccess": "インポート完了：追加 {added}、統合 {merged}、スキップ {skipped}",
+    "importEmpty": "ファイルにインポート可能な語がありません",
+    "importTooLarge": "ファイルが大きすぎてインポートできません",
+    "importTooManyEntries": "語数が上限 {limit} 語を超えています。ファイルを分割してからインポートしてください",
+    "importInvalidFile": "認識できないファイル形式です",
+    "importFailed": "インポートに失敗しました：{error}",
+    "transferHint": "辞書を単一ファイルにエクスポートし、別のデバイスでインポートできます。インポートはプレーンテキスト .txt（1行1語）と .csv（各行の最初のカンマより前だけを使用。引用符内のカンマには対応していないため、カンマを含む語は .txt をご利用ください）にも対応しており、Typeless などからの移行に便利です。"
   },
   "accessibility": {
     "title": "アクセシビリティ権限が必要です",

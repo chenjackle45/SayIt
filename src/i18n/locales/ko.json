@@ -287,7 +287,18 @@
     "weightDescription": "음성 인식 시 가중치가 가장 높은 상위 {limit}개 용어가 AI 인식 프롬프트에 포함됩니다. 동일한 수정이 반복 감지되면 해당 용어의 가중치가 자동으로 증가합니다.",
     "noAiSuggestions": "아직 AI 추천 용어가 없습니다. 스마트 사전 학습을 활성화하면 자동으로 학습됩니다",
     "noAiSuggestionsEnabled": "스마트 사전 학습이 켜져 있습니다. 전사를 수정하면 새 용어가 자동으로 학습됩니다",
-    "aiTermCount": "{count}개 용어"
+    "aiTermCount": "{count}개 용어",
+    "export": "내보내기",
+    "import": "가져오기",
+    "exportSuccess": "{count}개 용어를 내보냈습니다. {filename} 파일이 다운로드 폴더에 저장되었습니다",
+    "exportEmpty": "내보낼 용어가 없습니다",
+    "importSuccess": "가져오기 완료: 추가 {added}, 병합 {merged}, 건너뜀 {skipped}",
+    "importEmpty": "파일에 가져올 용어가 없습니다",
+    "importTooLarge": "파일이 너무 커서 가져올 수 없습니다",
+    "importTooManyEntries": "용어 수가 상한 {limit}개를 초과했습니다. 파일을 나누어 다시 가져오세요",
+    "importInvalidFile": "인식할 수 없는 파일 형식입니다",
+    "importFailed": "가져오기 실패: {error}",
+    "transferHint": "사전을 단일 파일로 내보내 다른 기기에서 가져올 수 있습니다. 가져오기는 일반 텍스트 .txt(한 줄에 한 단어)와 .csv(각 줄의 첫 번째 쉼표 앞부분만 사용하며 따옴표 안의 쉼표는 지원하지 않으므로 쉼표가 포함된 단어는 .txt 를 사용하세요)도 지원하여 Typeless 등에서 이전할 때 편리합니다."
   },
   "accessibility": {
     "title": "손쉬운 사용 권한 필요",

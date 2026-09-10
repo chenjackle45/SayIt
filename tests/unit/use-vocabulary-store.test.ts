@@ -232,4 +232,261 @@ describe("useVocabularyStore", () => {
       expect(sql).toContain("'manual'");
     });
   });
+
+  // ==========================================================================
+  // exportEntries
+  // ==========================================================================
+
+  describe("exportEntries", () => {
+    it("應回傳不含 id/createdAt 的詞條", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        createRawVocabularyRow({ term: "Groq", weight: 30, source: "manual" }),
+        createRawVocabularyRow({ term: "Tauri", weight: 12, source: "ai" }),
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.exportEntries();
+      expect(result).toEqual([
+        { term: "Groq", weight: 30, source: "manual" },
+        { term: "Tauri", weight: 12, source: "ai" },
+      ]);
+    });
+  });
+
+  // ==========================================================================
+  // importEntries
+  // ==========================================================================
+
+  describe("importEntries", () => {
+    it("空陣列不執行任何 DB 操作", async () => {
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.importEntries([]);
+      expect(result).toEqual({ added: 0, merged: 0, skipped: 0 });
+      expect(mockDbExecute).not.toHaveBeenCalled();
+    });
+
+    it("不存在的詞 → 以單一 multi-row upsert 新增（不使用交易）", async () => {
+      // 第一個 select = 現有詞條（空），後續 fetchTermList 用預設 []
+      mockDbSelect.mockResolvedValueOnce([]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.importEntries([
+        { term: "A", weight: 5, source: "manual" },
+        { term: "B", weight: 1, source: "ai" },
+      ]);
+
+      expect(result).toEqual({ added: 2, merged: 0, skipped: 0 });
+
+      // 兩筆合併成一個語句，沒有 BEGIN/COMMIT
+      expect(mockDbExecute).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockDbExecute.mock.calls[0] as [
+        string,
+        unknown[],
+      ];
+      expect(sql).toContain("INSERT INTO vocabulary (id, term, weight, source)");
+      expect(sql).toContain("ON CONFLICT(term) DO UPDATE");
+      expect(sql).toContain("($1, $2, $3, $4), ($5, $6, $7, $8)");
+      expect(params).toEqual([
+        expect.any(String),
+        "A",
+        5,
+        "manual",
+        expect.any(String),
+        "B",
+        1,
+        "ai",
+      ]);
+    });
+
+    it("已存在：weight 較大時 upsert 更新（merged），否則略過不寫入（skipped）", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        { id: "x", term: "A", weight: 2 },
+        { id: "y", term: "B", weight: 10 },
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.importEntries([
+        { term: "A", weight: 5, source: "manual" }, // 5 > 2 → merged
+        { term: "B", weight: 3, source: "manual" }, // 3 < 10 → skipped
+      ]);
+
+      expect(result).toEqual({ added: 0, merged: 1, skipped: 1 });
+      expect(mockDbExecute).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockDbExecute.mock.calls[0] as [
+        string,
+        unknown[],
+      ];
+      // 只有 A 進入 upsert；B 完全不寫入
+      expect(sql).toContain("($1, $2, $3, $4)");
+      expect(sql).not.toContain("$5");
+      expect(params).toEqual([expect.any(String), "A", 5, "manual"]);
+    });
+
+    it("term 比對大小寫不敏感，合併時沿用 DB 既有的 term 字串", async () => {
+      mockDbSelect.mockResolvedValueOnce([
+        { id: "x", term: "Tauri", weight: 1 },
+      ]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.importEntries([
+        { term: "tauri", weight: 9, source: "manual" },
+      ]);
+
+      expect(result).toEqual({ added: 0, merged: 1, skipped: 0 });
+      // UNIQUE(term) 大小寫敏感 → 用 "Tauri" 才會命中 ON CONFLICT
+      const params = mockDbExecute.mock.calls[0][1] as unknown[];
+      expect(params[1]).toBe("Tauri");
+    });
+
+    it("全部略過時不執行任何寫入", async () => {
+      mockDbSelect.mockResolvedValueOnce([{ id: "x", term: "A", weight: 5 }]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const result = await store.importEntries([
+        { term: "A", weight: 5, source: "manual" },
+      ]);
+
+      expect(result).toEqual({ added: 0, merged: 0, skipped: 1 });
+      expect(mockDbExecute).not.toHaveBeenCalled();
+    });
+
+    it("超過 500 筆時分批，每批一個語句", async () => {
+      mockDbSelect.mockResolvedValueOnce([]);
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const entries = Array.from({ length: 1201 }, (_, i) => ({
+        term: `t${i}`,
+        weight: 1,
+        source: "manual" as const,
+      }));
+      const result = await store.importEntries(entries);
+
+      expect(result.added).toBe(1201);
+      expect(mockDbExecute).toHaveBeenCalledTimes(3); // 500 + 500 + 201
+      const lastParams = mockDbExecute.mock.calls[2][1] as unknown[];
+      expect(lastParams).toHaveLength(201 * 4);
+    });
+
+    it("DB 失敗時拋錯，且不發送 ROLLBACK", async () => {
+      mockDbSelect.mockResolvedValueOnce([]);
+      mockDbExecute.mockRejectedValueOnce(new Error("disk full"));
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      await expect(
+        store.importEntries([{ term: "A", weight: 1, source: "manual" }]),
+      ).rejects.toThrow("disk full");
+
+      const sqlCalls = mockDbExecute.mock.calls.map((c) => c[0] as string);
+      expect(sqlCalls).toHaveLength(1);
+      expect(sqlCalls).not.toContain("ROLLBACK");
+    });
+
+    it("第 2 批失敗 → 仍刷新清單（已落地的第 1 批要看得到）再拋錯", async () => {
+      mockDbSelect.mockResolvedValueOnce([]); // 現有詞條
+      mockDbExecute
+        .mockResolvedValueOnce({ rowsAffected: 500 })
+        .mockRejectedValueOnce(new Error("disk full"));
+      const landed = Array.from({ length: 500 }, (_, i) =>
+        createRawVocabularyRow({ id: `id-${i}`, term: `t${i}` }),
+      );
+      mockDbSelect.mockResolvedValueOnce(landed); // 失敗後的 fetchTermList
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      const entries = Array.from({ length: 1201 }, (_, i) => ({
+        term: `t${i}`,
+        weight: 1,
+        source: "manual" as const,
+      }));
+      await expect(store.importEntries(entries)).rejects.toThrow("disk full");
+
+      expect(mockDbExecute).toHaveBeenCalledTimes(2);
+      expect(store.termList).toHaveLength(500);
+      expect(mockEmit).toHaveBeenCalledWith(
+        "vocabulary:changed",
+        expect.objectContaining({ action: "added" }),
+      );
+    });
+
+    it("寫入失敗且刷新也失敗 → 仍拋原始寫入錯誤、事件照發", async () => {
+      mockDbSelect
+        .mockResolvedValueOnce([]) // 現有詞條
+        .mockRejectedValueOnce(new Error("refresh boom")); // 失敗後的 fetchTermList
+      mockDbExecute.mockRejectedValueOnce(new Error("disk full"));
+
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      await expect(
+        store.importEntries([{ term: "A", weight: 1, source: "manual" }]),
+      ).rejects.toThrow("disk full");
+      expect(mockEmit).toHaveBeenCalledWith(
+        "vocabulary:changed",
+        expect.objectContaining({ action: "added" }),
+      );
+    });
+  });
+
+  describe("importFromFileContent（view 只經 store）", () => {
+    it("解析後寫入；空檔回 null 不動 DB", async () => {
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+
+      expect(await store.importFromFileContent("d.txt", "\n\n")).toBeNull();
+      expect(mockDbExecute).not.toHaveBeenCalled();
+
+      mockDbSelect.mockResolvedValueOnce([]);
+      const result = await store.importFromFileContent("d.txt", "蘋果\n香蕉");
+      expect(result).toEqual({ added: 2, merged: 0, skipped: 0 });
+    });
+
+    it("解析錯誤原樣拋出", async () => {
+      const { useVocabularyStore } = await import(
+        "../../src/stores/useVocabularyStore"
+      );
+      const store = useVocabularyStore();
+      await expect(
+        store.importFromFileContent("bad.json", "not json {"),
+      ).rejects.toThrow("INVALID_JSON");
+    });
+  });
 });

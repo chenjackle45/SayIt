@@ -287,7 +287,18 @@
     "weightDescription": "During each speech recognition, the top {limit} terms by weight are included in the AI recognition prompt. When the AI detects you repeatedly correcting the same term, its weight increases automatically.",
     "noAiSuggestions": "No AI suggestions yet. Enable Smart Dictionary Learning to auto-learn new terms",
     "noAiSuggestionsEnabled": "Smart Dictionary Learning is on. New terms are learned automatically when you correct a transcription",
-    "aiTermCount": "{count} terms"
+    "aiTermCount": "{count} terms",
+    "export": "Export",
+    "import": "Import",
+    "exportSuccess": "Exported {count} terms. {filename} was saved to your Downloads folder",
+    "exportEmpty": "No terms to export",
+    "importSuccess": "Import complete: {added} added, {merged} merged, {skipped} skipped",
+    "importEmpty": "No importable terms found in the file",
+    "importTooLarge": "File is too large to import",
+    "importTooManyEntries": "Too many terms (limit {limit}). Please split the file and import in parts",
+    "importInvalidFile": "Unrecognized file format",
+    "importFailed": "Import failed: {error}",
+    "transferHint": "Export your dictionary to a single file and import it on another device. Import also accepts plain .txt (one term per line) and .csv (only the text before the first comma on each line is used; commas inside quotes are not supported, so use .txt for terms containing commas) — handy for migrating from tools like Typeless."
   },
   "accessibility": {
     "title": "Accessibility Permission Required",
