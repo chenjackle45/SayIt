@@ -25,6 +25,14 @@ function getTracesSampleRate(): number {
   return Number.isFinite(rate) && rate > 0 ? rate : 0;
 }
 
+// `integrations: []` 不會關掉 SDK 預設整合，console breadcrumb 仍會收集、可能夾帶逐字稿；
+// 這裡把 console 類 breadcrumb 丟掉。不用 defaultIntegrations:false，那會連未捕捉錯誤的攔截一起關。
+export function dropConsoleBreadcrumb(
+  breadcrumb: Sentry.Breadcrumb,
+): Sentry.Breadcrumb | null {
+  return breadcrumb.category === "console" ? null : breadcrumb;
+}
+
 function isSentryEnabled(): boolean {
   return import.meta.env.PROD && Boolean(getSentryDsn());
 }
@@ -39,6 +47,7 @@ export function initSentryForHud(app: App): void {
     release: getSentryRelease(),
     sendDefaultPii: false,
     integrations: [],
+    beforeBreadcrumb: dropConsoleBreadcrumb,
     initialScope: {
       tags: { window: "hud" },
     },
@@ -59,6 +68,7 @@ export function initSentryForDashboard(app: App, router: Router): void {
     integrations:
       tracesSampleRate > 0 ? [Sentry.browserTracingIntegration({ router })] : [],
     ...(tracesSampleRate > 0 ? { tracesSampleRate } : {}),
+    beforeBreadcrumb: dropConsoleBreadcrumb,
     initialScope: {
       tags: { window: "dashboard" },
     },
