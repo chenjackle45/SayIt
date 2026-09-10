@@ -112,9 +112,12 @@ async function autoCheckAndDownload() {
     updateState.value = "ready-to-install";
 
     // 確保 Dashboard 可見再彈 dialog
-    const currentWindow = getCurrentWindow();
-    await currentWindow.show();
-    await currentWindow.setFocus();
+    // gh-76：使用者開了「啟動時隱藏主視窗」就不主動跳出來，對話框留在視窗內、開啟時再看
+    if (!settingsStore.isStartHiddenEnabled) {
+      const currentWindow = getCurrentWindow();
+      await currentWindow.show();
+      await currentWindow.setFocus();
+    }
 
     showAutoInstallDialog.value = true;
   } catch (err) {

@@ -82,14 +82,17 @@ onMounted(async () => {
   await voiceFlowStore.initialize();
 
   // 啟動時直接顯示 main-window（dashboard），然後隱藏 overlay
-  try {
-    const mainWindow = await Window.getByLabel("main-window");
-    if (mainWindow) {
-      await mainWindow.show();
-      await mainWindow.setFocus();
+  // gh-76：使用者開了「啟動時隱藏主視窗」就跳過；托盤選單／Reopen／再開一次仍可叫出
+  if (!settingsStore.isStartHiddenEnabled) {
+    try {
+      const mainWindow = await Window.getByLabel("main-window");
+      if (mainWindow) {
+        await mainWindow.show();
+        await mainWindow.setFocus();
+      }
+    } catch (err) {
+      console.error("[App] startup: show main-window failed:", err);
     }
-  } catch (err) {
-    console.error("[App] startup: show main-window failed:", err);
   }
 
   await appWindow.hide();

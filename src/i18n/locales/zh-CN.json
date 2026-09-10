@@ -163,7 +163,11 @@
       "transcriptionLanguage": "转录语言",
       "transcriptionLanguageDescription": "语音转文字时使用的识别语言",
       "transcriptionLanguageUpdated": "转录语言已更新",
-      "autoDetect": "自动检测"
+      "autoDetect": "自动检测",
+      "startHidden": "启动时隐藏主窗口",
+      "startHiddenDescription": "手动或开机启动后都不显示主窗口，仅保留菜单栏（系统托盘）图标；从图标菜单或再打开一次 SayIt 即可调出",
+      "startHiddenEnabled": "已启用启动时隐藏主窗口",
+      "startHiddenDisabled": "已关闭启动时隐藏主窗口"
     },
     "audioInput": {
       "title": "输入设备",

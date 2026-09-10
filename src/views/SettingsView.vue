@@ -680,6 +680,23 @@ async function handleToggleHideDockIcon(newValue: boolean) {
   }
 }
 
+// ── 啟動時隱藏主視窗 (gh-76) ──────────────────────────
+const startHiddenFeedback = useFeedbackMessage();
+
+async function handleToggleStartHidden(newValue: boolean) {
+  try {
+    await settingsStore.saveStartHidden(newValue);
+    startHiddenFeedback.show(
+      "success",
+      newValue
+        ? t("settings.app.startHiddenEnabled")
+        : t("settings.app.startHiddenDisabled"),
+    );
+  } catch (err) {
+    startHiddenFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
 // ── 轉錄文字是否複製到剪貼簿 (gh-35) ──────────────────────────
 const copyTranscriptionToClipboardFeedback = useFeedbackMessage();
 
@@ -938,6 +955,7 @@ onBeforeUnmount(() => {
   muteOnRecordingFeedback.clearTimer();
   soundFeedbackFeedback.clearTimer();
   hideDockIconFeedback.clearTimer();
+  startHiddenFeedback.clearTimer();
   copyTranscriptionToClipboardFeedback.clearTimer();
   debugLogFeedback.clearTimer();
   localeFeedback.clearTimer();
@@ -2103,6 +2121,34 @@ onBeforeUnmount(() => {
             "
           >
             {{ autoStartFeedback.message.value }}
+          </p>
+        </transition>
+
+        <div class="border-t border-border" />
+
+        <div class="flex items-center justify-between">
+          <div>
+            <Label for="start-hidden">{{ $t("settings.app.startHidden") }}</Label>
+            <p class="text-sm text-muted-foreground">{{ $t("settings.app.startHiddenDescription") }}</p>
+          </div>
+          <Switch
+            id="start-hidden"
+            :model-value="settingsStore.isStartHiddenEnabled"
+            @update:model-value="handleToggleStartHidden"
+          />
+        </div>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="startHiddenFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              startHiddenFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            {{ startHiddenFeedback.message.value }}
           </p>
         </transition>
       </CardContent>

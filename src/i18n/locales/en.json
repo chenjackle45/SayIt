@@ -163,7 +163,11 @@
       "transcriptionLanguage": "Transcription Language",
       "transcriptionLanguageDescription": "Language used for speech recognition",
       "transcriptionLanguageUpdated": "Transcription language updated",
-      "autoDetect": "Auto Detect"
+      "autoDetect": "Auto Detect",
+      "startHidden": "Hide Main Window on Launch",
+      "startHiddenDescription": "Keep the main window hidden after launch (manual or at login); only the menu bar / tray icon stays. Open it from the icon menu or by launching SayIt again",
+      "startHiddenEnabled": "Main window will stay hidden on launch",
+      "startHiddenDisabled": "Main window will show on launch"
     },
     "audioInput": {
       "title": "Input Device",

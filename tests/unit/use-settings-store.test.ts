@@ -489,6 +489,61 @@ describe("useSettingsStore", () => {
     });
   });
 
+  // ==========================================================================
+  // startHidden（gh-76：啟動時隱藏主視窗）
+  // ==========================================================================
+
+  describe("startHidden", () => {
+    it("[P1] 應持久化 startHidden 並 emit settings:updated", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+
+      await store.saveStartHidden(true);
+
+      expect(mockStoreSet).toHaveBeenCalledWith("startHidden", true);
+      expect(mockStoreSave).toHaveBeenCalled();
+      expect(store.isStartHiddenEnabled).toBe(true);
+      expect(mockEmit).toHaveBeenCalledWith("settings:updated", {
+        key: "startHidden",
+        value: true,
+      });
+    });
+
+    it("[P1] loadSettings 應載入已儲存的 startHidden", async () => {
+      mockStoreData.set("startHidden", true);
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.loadSettings();
+      expect(store.isStartHiddenEnabled).toBe(true);
+    });
+
+    it("[P2] loadSettings 未存過 startHidden 時預設 false", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.loadSettings();
+      expect(store.isStartHiddenEnabled).toBe(false);
+    });
+
+    it("[P1] refreshCrossWindowSettings 應同步另一視窗改過的 startHidden", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.loadSettings();
+      expect(store.isStartHiddenEnabled).toBe(false);
+
+      mockStoreData.set("startHidden", true);
+      await store.refreshCrossWindowSettings();
+      expect(store.isStartHiddenEnabled).toBe(true);
+    });
+  });
+
   describe("refreshCrossWindowSettings", () => {
     it("[P0] 應整包重新讀取跨視窗會用到的設定", async () => {
       mockStoreData.set("hotkeyTriggerKey", "command");

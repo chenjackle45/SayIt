@@ -163,7 +163,11 @@
       "transcriptionLanguage": "전사 언어",
       "transcriptionLanguageDescription": "음성 인식에 사용할 언어",
       "transcriptionLanguageUpdated": "전사 언어가 업데이트되었습니다",
-      "autoDetect": "자동 감지"
+      "autoDetect": "자동 감지",
+      "startHidden": "시작 시 메인 창 숨기기",
+      "startHiddenDescription": "수동 실행이나 로그인 시 자동 시작 후 메인 창을 표시하지 않고 메뉴 막대(트레이) 아이콘만 남깁니다. 아이콘 메뉴에서 열거나 SayIt을 다시 실행하면 나타납니다",
+      "startHiddenEnabled": "시작 시 메인 창 숨기기를 활성화했습니다",
+      "startHiddenDisabled": "시작 시 메인 창 숨기기를 비활성화했습니다"
     },
     "audioInput": {
       "title": "입력 장치",

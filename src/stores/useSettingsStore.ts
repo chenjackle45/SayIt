@@ -78,6 +78,7 @@ const DEFAULT_RECORDING_AUTO_CLEANUP_DAYS = 7;
 const DEFAULT_DEBUG_LOG_ENABLED = false;
 const DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD = true;
 const DEFAULT_HIDE_DOCK_ICON = false;
+const DEFAULT_START_HIDDEN = false;
 const IS_MACOS = navigator.userAgent.includes("Mac");
 
 function getDefaultTriggerKey(): TriggerKey {
@@ -147,6 +148,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const themeMode = ref<ThemeMode>(DEFAULT_THEME_MODE);
   const isSoundEffectsEnabled = ref<boolean>(DEFAULT_SOUND_EFFECTS_ENABLED);
   const isHideDockIconEnabled = ref<boolean>(DEFAULT_HIDE_DOCK_ICON);
+  // gh-76：啟動時隱藏主視窗（HUD 讀此值決定是否 show main-window）
+  const isStartHiddenEnabled = ref<boolean>(DEFAULT_START_HIDDEN);
   const isRecordingAutoCleanupEnabled = ref<boolean>(
     DEFAULT_RECORDING_AUTO_CLEANUP_ENABLED,
   );
@@ -365,6 +368,9 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedHideDockIcon = await store.get<boolean>("hideDockIcon");
       isHideDockIconEnabled.value = savedHideDockIcon ?? DEFAULT_HIDE_DOCK_ICON;
 
+      const savedStartHidden = await store.get<boolean>("startHidden");
+      isStartHiddenEnabled.value = savedStartHidden ?? DEFAULT_START_HIDDEN;
+
       const savedSmartDictionary = await store.get<boolean>(
         "smartDictionaryEnabled",
       );
@@ -421,6 +427,7 @@ export const useSettingsStore = defineStore("settings", () => {
       isMuteOnRecordingEnabled.value = DEFAULT_MUTE_ON_RECORDING;
       isSoundEffectsEnabled.value = DEFAULT_SOUND_EFFECTS_ENABLED;
       isHideDockIconEnabled.value = DEFAULT_HIDE_DOCK_ICON;
+      isStartHiddenEnabled.value = DEFAULT_START_HIDDEN;
       isCopyTranscriptionToClipboardEnabled.value =
         DEFAULT_COPY_TRANSCRIPTION_TO_CLIPBOARD;
     }
@@ -1185,6 +1192,28 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveStartHidden(enabled: boolean) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("startHidden", enabled);
+      await store.save();
+      isStartHiddenEnabled.value = enabled;
+
+      const payload: SettingsUpdatedPayload = {
+        key: "startHidden",
+        value: enabled,
+      };
+      await emitEvent(SETTINGS_UPDATED, payload);
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveStartHidden failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, { source: "settings", step: "save-start-hidden" });
+      throw err;
+    }
+  }
+
   async function saveSmartDictionaryEnabled(enabled: boolean) {
     try {
       const store = await load(STORE_NAME);
@@ -1361,6 +1390,7 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedMuteOnRecording = await store.get<boolean>("muteOnRecording");
       const savedSoundEffects = await store.get<boolean>("soundEffectsEnabled");
       const savedHideDockIcon = await store.get<boolean>("hideDockIcon");
+      const savedStartHidden = await store.get<boolean>("startHidden");
       const savedSmartDictionary = await store.get<boolean>(
         "smartDictionaryEnabled",
       );
@@ -1440,6 +1470,7 @@ export const useSettingsStore = defineStore("settings", () => {
         void applyDockVisibility(nextHideDockIcon);
       }
       isHideDockIconEnabled.value = nextHideDockIcon;
+      isStartHiddenEnabled.value = savedStartHidden ?? DEFAULT_START_HIDDEN;
       isSmartDictionaryEnabled.value =
         savedSmartDictionary ?? DEFAULT_SMART_DICTIONARY_ENABLED;
 
@@ -1561,6 +1592,8 @@ export const useSettingsStore = defineStore("settings", () => {
     saveSoundEffectsEnabled,
     isHideDockIconEnabled,
     saveHideDockIcon,
+    isStartHiddenEnabled,
+    saveStartHidden,
     isSmartDictionaryEnabled,
     saveSmartDictionaryEnabled,
     isRecordingAutoCleanupEnabled,

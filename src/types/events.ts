@@ -35,6 +35,7 @@ export type SettingsKey =
   | "audioInputDevice"
   | "copyTranscriptionToClipboard"
   | "hideDockIcon"
+  | "startHidden"
   | "theme";
 
 export interface SettingsUpdatedPayload {

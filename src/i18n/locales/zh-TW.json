@@ -163,7 +163,11 @@
       "transcriptionLanguage": "轉錄語言",
       "transcriptionLanguageDescription": "語音轉文字時使用的辨識語言",
       "transcriptionLanguageUpdated": "轉錄語言已更新",
-      "autoDetect": "自動偵測"
+      "autoDetect": "自動偵測",
+      "startHidden": "啟動時隱藏主視窗",
+      "startHiddenDescription": "手動或開機啟動後都不顯示主視窗，只保留選單列（系統列）圖示；從圖示選單或再開一次 SayIt 即可叫出",
+      "startHiddenEnabled": "已啟用啟動時隱藏主視窗",
+      "startHiddenDisabled": "已關閉啟動時隱藏主視窗"
     },
     "audioInput": {
       "title": "輸入裝置",

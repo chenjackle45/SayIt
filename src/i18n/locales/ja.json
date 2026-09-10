@@ -163,7 +163,11 @@
       "transcriptionLanguage": "文字起こし言語",
       "transcriptionLanguageDescription": "音声認識に使用する言語",
       "transcriptionLanguageUpdated": "文字起こし言語が更新されました",
-      "autoDetect": "自動検出"
+      "autoDetect": "自動検出",
+      "startHidden": "起動時にメインウィンドウを隠す",
+      "startHiddenDescription": "手動起動・ログイン時起動のどちらでもメインウィンドウを表示せず、メニューバー（タスクトレイ）アイコンだけを残します。アイコンのメニューか SayIt をもう一度起動すると開きます",
+      "startHiddenEnabled": "起動時にメインウィンドウを隠す設定を有効にしました",
+      "startHiddenDisabled": "起動時にメインウィンドウを隠す設定を無効にしました"
     },
     "audioInput": {
       "title": "入力デバイス",
