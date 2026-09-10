@@ -113,6 +113,46 @@ fn update_hotkey_config(
     Ok(())
 }
 
+/// 讀取 OS 目前外觀（深/淺）。Windows 直接讀登錄檔 `AppsUseLightTheme`
+/// （0=深、1=淺），這是不受透明/隱藏視窗 WebView2 影響的權威來源；
+/// 其他平台回傳 `None`，前端沿用 `window.theme()` / matchMedia（本就正常）。
+#[cfg(target_os = "windows")]
+fn current_os_theme_is_dark() -> Option<bool> {
+    use windows::core::w;
+    use windows::Win32::Foundation::ERROR_SUCCESS;
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
+
+    let mut data: u32 = 0;
+    let mut cb = std::mem::size_of::<u32>() as u32;
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"),
+            w!("AppsUseLightTheme"),
+            RRF_RT_REG_DWORD,
+            None,
+            Some(&mut data as *mut u32 as *mut core::ffi::c_void),
+            Some(&mut cb),
+        )
+    };
+    if status == ERROR_SUCCESS {
+        Some(data == 0)
+    } else {
+        None
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn current_os_theme_is_dark() -> Option<bool> {
+    None
+}
+
+/// 供前端在啟動/需要時查詢權威 OS 外觀（"dark" | "light"，未知回 null）。
+#[command]
+fn get_os_theme() -> Option<String> {
+    current_os_theme_is_dark().map(|dark| if dark { "dark" } else { "light" }.to_string())
+}
+
 /// HUD 視窗邏輯寬度（pixels），對應前端 CSS 470px
 const HUD_WINDOW_WIDTH_LOGICAL: f64 = 470.0;
 
@@ -420,6 +460,7 @@ pub fn run() {
             request_app_restart,
             update_hotkey_config,
             get_hud_target_position,
+            get_os_theme,
             plugins::audio_control::mute_system_audio,
             plugins::audio_control::restore_system_audio,
             plugins::clipboard_paste::capture_target_window,
@@ -482,6 +523,31 @@ pub fn run() {
             app.manage(plugins::audio_recorder::AudioPreviewState::new());
             // 初始化 transcription 狀態（共用 HTTP client）
             app.manage(plugins::transcription::TranscriptionState::new());
+
+            // Windows：輪詢 OS 外觀並廣播變更。透明+隱藏的 HUD 視窗收不到
+            // WM_THEMECHANGED（漏接/延遲），改由 Rust 讀登錄檔，變更時以
+            // `theme:os-changed` 自訂事件可靠通知所有 webview。
+            #[cfg(target_os = "windows")]
+            {
+                use tauri::Emitter;
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    let mut last = current_os_theme_is_dark();
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(1500));
+                        let now = current_os_theme_is_dark();
+                        if now != last {
+                            last = now;
+                            if let Some(dark) = now {
+                                let payload = if dark { "dark" } else { "light" };
+                                let _ = handle.emit("theme:os-changed", payload);
+                                #[cfg(debug_assertions)]
+                                println!("[theme] OS appearance changed → broadcast {payload}");
+                            }
+                        }
+                    }
+                });
+            }
 
             let open_dashboard_item =
                 MenuItem::with_id(app, "open-dashboard", "開啟 Dashboard", true, None::<&str>)?;

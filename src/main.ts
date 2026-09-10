@@ -2,6 +2,7 @@ import { createApp } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 import { initSentryForHud, captureError } from "./lib/sentry";
+import { initThemeFromStore } from "./lib/theme";
 import i18n from "./i18n";
 import "./style.css";
 
@@ -19,4 +20,7 @@ app.config.errorHandler = (err, _instance, info) => {
   captureError(err, { source: "hud-vue-error", info });
 };
 
-app.use(pinia).use(i18n).mount("#app");
+// mount 前套用持久化主題，避免閃白；失敗時 fallback 預設主題
+void initThemeFromStore().finally(() => {
+  app.use(pinia).use(i18n).mount("#app");
+});

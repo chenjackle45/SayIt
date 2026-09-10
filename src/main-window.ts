@@ -13,6 +13,7 @@ import {
 } from "./composables/useTauriEvents";
 import { extractErrorMessage } from "./lib/errorUtils";
 import { initSentryForDashboard, captureError } from "./lib/sentry";
+import { initThemeFromStore } from "./lib/theme";
 import { useSettingsStore } from "./stores/useSettingsStore";
 import i18n from "./i18n";
 import "./style.css";
@@ -21,6 +22,9 @@ import "./style.css";
 document.addEventListener("contextmenu", (e) => e.preventDefault());
 
 async function bootstrap() {
+  // mount 前套用持久化主題，避免閃白
+  await initThemeFromStore();
+
   const pinia = createPinia();
   const app = createApp(MainApp);
 

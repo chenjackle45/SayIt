@@ -485,7 +485,14 @@ onUnmounted(() => {
 }
 
 .notch-hud {
-  background: black;
+  --notch-bg: #ffffff;
+  --notch-fg: #18181b;
+  --notch-fg-soft: rgba(24, 24, 27, 0.4);
+  --notch-learned: #1d4ed8;
+  --notch-mode: #6d28d9;
+  --notch-edit-bg: rgba(180, 83, 9, 0.15);
+  --notch-edit-fg: #b45309;
+  background: var(--notch-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -494,6 +501,16 @@ onUnmounted(() => {
     height 0.35s cubic-bezier(0.32, 0.72, 0, 1),
     clip-path 0.35s cubic-bezier(0.32, 0.72, 0, 1),
     background 0.3s ease;
+}
+
+html.dark .notch-hud {
+  --notch-bg: #000000;
+  --notch-fg: #ffffff;
+  --notch-fg-soft: rgba(255, 255, 255, 0.4);
+  --notch-learned: rgba(147, 197, 253, 0.95);
+  --notch-mode: rgba(167, 139, 250, 0.95);
+  --notch-edit-bg: rgba(251, 191, 36, 0.25);
+  --notch-edit-fg: rgba(251, 191, 36, 0.9);
 }
 
 @keyframes notchEnter {
@@ -544,7 +561,7 @@ onUnmounted(() => {
 
 /* ---- Shared Waveform Element ---- */
 .waveform-element {
-  background: white;
+  background: var(--notch-fg);
   transition:
     height 0.3s cubic-bezier(0.32, 0.72, 0, 1),
     width 0.3s cubic-bezier(0.32, 0.72, 0, 1),
@@ -577,7 +594,7 @@ onUnmounted(() => {
   height: 6px;
   border-radius: 50%;
   background: transparent;
-  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  border: 1.5px solid var(--notch-fg-soft);
   animation: dotSlide 1.5s ease-in-out infinite;
 }
 .waveform-dot:nth-child(1) { animation-delay: 0s; }
@@ -590,10 +607,10 @@ onUnmounted(() => {
 }
 
 @keyframes dotSlide {
-  0%     { background: white; border-color: white; }
-  50%    { background: white; border-color: white; }
-  50.01% { background: transparent; border-color: rgba(255, 255, 255, 0.4); }
-  100%   { background: transparent; border-color: rgba(255, 255, 255, 0.4); }
+  0%     { background: var(--notch-fg); border-color: var(--notch-fg); }
+  50%    { background: var(--notch-fg); border-color: var(--notch-fg); }
+  50.01% { background: transparent; border-color: var(--notch-fg-soft); }
+  100%   { background: transparent; border-color: var(--notch-fg-soft); }
 }
 
 /* ---- Success: converge + SVG checkmark ---- */
@@ -677,6 +694,9 @@ onUnmounted(() => {
 }
 
 .learned-icon-svg {
+  /* 用主題變數而非硬編碼淺藍：淺色主題下 --notch-learned 為深藍(#1d4ed8)才看得見。
+     inline stroke 屬性作為 fallback（CSS stroke 屬性優先度高於 presentation attribute）。 */
+  stroke: var(--notch-learned);
   animation: learnedIconFadeIn 0.3s ease-out;
 }
 
@@ -686,7 +706,7 @@ onUnmounted(() => {
 }
 
 .learned-label {
-  color: rgba(147, 197, 253, 0.95);
+  color: var(--notch-learned);
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
@@ -702,7 +722,7 @@ onUnmounted(() => {
 }
 
 .learned-terms {
-  color: rgba(147, 197, 253, 0.95);
+  color: var(--notch-learned);
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
@@ -717,6 +737,7 @@ onUnmounted(() => {
 
 /* ---- Cancelled: X icon + label ---- */
 .cancelled-icon-svg {
+  stroke: var(--notch-fg-soft);
   animation: cancelledIconFadeIn 0.3s ease-out;
 }
 
@@ -726,7 +747,7 @@ onUnmounted(() => {
 }
 
 .cancelled-label {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--notch-fg-soft);
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
@@ -740,7 +761,7 @@ onUnmounted(() => {
 
 /* ---- Mode Switch ---- */
 .mode-switch-label {
-  color: rgba(167, 139, 250, 0.95);
+  color: var(--notch-mode);
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
@@ -760,8 +781,11 @@ onUnmounted(() => {
   white-space: nowrap;
   margin-right: 6px;
 }
-.prompt-mode-badge { background: rgba(255, 255, 255, 0.15); color: rgba(255, 255, 255, 0.7); }
-.edit-mode-badge   { background: rgba(251, 191, 36, 0.25);  color: rgba(251, 191, 36, 0.9); }
+.prompt-mode-badge { background: var(--notch-fg-soft); color: var(--notch-fg); opacity: 0.7; }
+.edit-mode-badge   { background: var(--notch-edit-bg);  color: var(--notch-edit-fg); }
+/* 深色模式：prompt-mode badge 背景略調暗，避免在黑底上過亮（維護者 review 順手項）。
+   只針對此 badge 覆蓋背景，不動共用的 --notch-fg-soft（錄音環邊框也用它）。 */
+html.dark .notch-hud .prompt-mode-badge { background: rgba(255, 255, 255, 0.2); }
 
 /* ---- Error: scatter + shake ---- */
 .waveform-scatter {
@@ -805,7 +829,7 @@ onUnmounted(() => {
 /* ---- Gap 7: Timer font ---- */
 .elapsed-timer {
   font-family: 'JetBrains Mono', monospace;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--notch-fg-soft);
   font-size: 12px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;

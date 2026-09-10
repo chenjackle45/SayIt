@@ -43,3 +43,6 @@ export interface HotkeyConfig {
 export const PROMPT_MODE_VALUES = ["minimal", "active", "custom"] as const;
 export type PromptMode = (typeof PROMPT_MODE_VALUES)[number];
 export type PresetPromptMode = Exclude<PromptMode, "custom">;
+
+export const THEME_MODE_VALUES = ["light", "dark", "system"] as const;
+export type ThemeMode = (typeof THEME_MODE_VALUES)[number];

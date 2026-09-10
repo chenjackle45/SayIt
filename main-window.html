@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SayIt - Dashboard</title>
+    <script>
+      // 首次繪製前依快取主題決定 .dark，避免淺色/跟隨系統時閃黑
+      (function () {
+        try {
+          var m = localStorage.getItem("sayit-theme-mode");
+          var dark = m === "dark" || (m !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.classList.toggle("dark", dark);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

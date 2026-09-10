@@ -11,6 +11,11 @@ export const TRANSCRIPTION_COMPLETED = "transcription:completed" as const;
 export const SETTINGS_UPDATED = "settings:updated" as const;
 export const VOCABULARY_CHANGED = "vocabulary:changed" as const;
 
+// Rust 偵測到 OS 外觀變更時廣播（"dark" | "light"）。
+// 透明+隱藏的 HUD 視窗在 Windows 下收不到 WM_THEMECHANGED，改由 Rust
+// 以此自訂事件可靠地通知所有 webview（見 lib.rs OS 主題輪詢）。
+export const THEME_OS_CHANGED = "theme:os-changed" as const;
+
 export const HOTKEY_PRESSED = "hotkey:pressed" as const;
 export const HOTKEY_RELEASED = "hotkey:released" as const;
 export const HOTKEY_TOGGLED = "hotkey:toggled" as const;

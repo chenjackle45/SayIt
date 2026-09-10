@@ -11,6 +11,7 @@ import {
   type ComboTriggerKey,
   type PromptMode,
   PROMPT_MODE_VALUES,
+  type ThemeMode,
   isCustomTriggerKey,
   isComboTriggerKey,
   isPresetTriggerKey,
@@ -47,6 +48,7 @@ import {
 } from "../i18n/languageConfig";
 import { emitEvent, SETTINGS_UPDATED } from "../composables/useTauriEvents";
 import type { SettingsUpdatedPayload } from "../types/events";
+import { applyTheme, DEFAULT_THEME_MODE, isThemeMode } from "../lib/theme";
 import {
   DEFAULT_LLM_MODEL_ID,
   DEFAULT_LLM_PROVIDER_ID,
@@ -140,6 +142,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const customTriggerKeyDomCode = ref<string>("");
   const selectedLocale = ref<SupportedLocale>(FALLBACK_LOCALE);
   const selectedTranscriptionLocale = ref<TranscriptionLocale>(FALLBACK_LOCALE);
+  const themeMode = ref<ThemeMode>(DEFAULT_THEME_MODE);
   const isSoundEffectsEnabled = ref<boolean>(DEFAULT_SOUND_EFFECTS_ENABLED);
   const isHideDockIconEnabled = ref<boolean>(DEFAULT_HIDE_DOCK_ICON);
   const isRecordingAutoCleanupEnabled = ref<boolean>(
@@ -251,6 +254,13 @@ export const useSettingsStore = defineStore("settings", () => {
         await store.set("selectedTranscriptionLocale", selectedLocale.value);
         await store.save();
       }
+
+      // Load theme mode (default: follow system)
+      const savedThemeMode = await store.get<ThemeMode>("themeMode");
+      themeMode.value = isThemeMode(savedThemeMode)
+        ? savedThemeMode
+        : DEFAULT_THEME_MODE;
+      applyTheme(themeMode.value);
 
       // Load aiPrompt once (used by both migration and normal flow)
       const savedPrompt = await store.get<string>("aiPrompt");
@@ -1002,6 +1012,27 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveTheme(mode: ThemeMode) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("themeMode", mode);
+      themeMode.value = mode;
+      applyTheme(mode);
+      await store.save();
+
+      const payload: SettingsUpdatedPayload = { key: "theme", value: mode };
+      await emitEvent(SETTINGS_UPDATED, payload);
+      console.log(`[useSettingsStore] Theme saved: ${mode}`);
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] saveTheme failed:",
+        extractErrorMessage(err),
+      );
+      captureError(err, { source: "settings", step: "save-theme" });
+      throw err;
+    }
+  }
+
   async function saveLocale(locale: SupportedLocale) {
     try {
       const store = await load(STORE_NAME);
@@ -1324,6 +1355,13 @@ export const useSettingsStore = defineStore("settings", () => {
       selectedTranscriptionLocale.value =
         savedTranscriptionLocale ?? selectedLocale.value;
 
+      // Theme: sync persisted value back to reactive + apply (cross-window)
+      const savedThemeMode = await store.get<ThemeMode>("themeMode");
+      themeMode.value = isThemeMode(savedThemeMode)
+        ? savedThemeMode
+        : DEFAULT_THEME_MODE;
+      applyTheme(themeMode.value);
+
       // Prompt mode (with runtime validation)
       const savedPromptMode = await store.get<string>("promptMode");
       promptMode.value =
@@ -1495,6 +1533,8 @@ export const useSettingsStore = defineStore("settings", () => {
     saveLocale,
     selectedTranscriptionLocale,
     saveTranscriptionLocale,
+    themeMode,
+    saveTheme,
     getWhisperLanguageCode,
     refreshCrossWindowSettings,
     loadAutoStartStatus,

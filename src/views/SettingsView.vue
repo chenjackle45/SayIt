@@ -48,7 +48,7 @@ import {
   type TranscriptionLocale,
 } from "../i18n/languageConfig";
 
-import { PROMPT_MODE_VALUES, type PromptMode } from "../types/settings";
+import { PROMPT_MODE_VALUES, type PromptMode, THEME_MODE_VALUES, type ThemeMode } from "../types/settings";
 import {
   Card,
   CardContent,
@@ -701,6 +701,18 @@ async function handleToggleCopyTranscriptionToClipboard(newValue: boolean) {
 // ── 介面語言 ──────────────────────────────────────────────
 const localeFeedback = useFeedbackMessage();
 
+// ── 佈景主題 ──────────────────────────────────────────────
+const themeFeedback = useFeedbackMessage();
+
+async function handleThemeChange(mode: ThemeMode) {
+  try {
+    await settingsStore.saveTheme(mode);
+    themeFeedback.show("success", t("settings.app.themeUpdated"));
+  } catch (err) {
+    themeFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
 async function handleLocaleChange(newLocale: SupportedLocale) {
   try {
     await settingsStore.saveLocale(newLocale);
@@ -896,6 +908,7 @@ onBeforeUnmount(() => {
   hideDockIconFeedback.clearTimer();
   copyTranscriptionToClipboardFeedback.clearTimer();
   localeFeedback.clearTimer();
+  themeFeedback.clearTimer();
   transcriptionLocaleFeedback.clearTimer();
   autoStartFeedback.clearTimer();
   smartDictionaryFeedback.clearTimer();
@@ -1793,6 +1806,42 @@ onBeforeUnmount(() => {
         <CardTitle class="text-base">{{ $t("settings.app.title") }}</CardTitle>
       </CardHeader>
       <CardContent class="space-y-4">
+        <!-- 佈景主題 -->
+        <div class="flex items-center justify-between">
+          <Label for="theme-select">{{ $t("settings.app.theme") }}</Label>
+          <Select
+            :model-value="settingsStore.themeMode"
+            @update:model-value="handleThemeChange($event as ThemeMode)"
+          >
+            <SelectTrigger id="theme-select" class="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem
+                v-for="mode in THEME_MODE_VALUES"
+                :key="mode"
+                :value="mode"
+              >
+                {{ $t(`settings.app.theme_${mode}`) }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="themeFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              themeFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-destructive'
+            "
+          >
+            {{ themeFeedback.message.value }}
+          </p>
+        </transition>
+
         <!-- 介面語言 -->
         <div class="flex items-center justify-between">
           <Label for="locale-select">{{ $t("settings.app.language") }}</Label>

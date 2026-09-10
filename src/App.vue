@@ -39,6 +39,11 @@ const promptModeLabel = computed(() => {
 onMounted(async () => {
   console.log("[App] Mounted, initializing voice flow...");
 
+  // 設定變更監聽須在任何 await 前註冊，避免啟動期錯過 Dashboard 的主題/設定同步
+  unlistenSettingsUpdated = await listenToEvent(SETTINGS_UPDATED, () => {
+    void settingsStore.refreshCrossWindowSettings();
+  });
+
   // 初始化 DB（供 vocabularyStore 使用）
   let isDatabaseReady = false;
   try {
@@ -63,11 +68,6 @@ onMounted(async () => {
       console.error("[App] Vocabulary fetch failed:", err);
     }
   }
-
-  // 監聽設定變更（Main Window 設定異動時同步到 HUD Window）
-  unlistenSettingsUpdated = await listenToEvent(SETTINGS_UPDATED, () => {
-    void settingsStore.refreshCrossWindowSettings();
-  });
 
   // 監聽詞彙變更（Main Window 新增/刪除詞彙時同步）
   unlistenVocabularyChanged = await listenToEvent(
