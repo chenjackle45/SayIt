@@ -1,0 +1,1530 @@
+<!doctype html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SayIt · 設定頁第二版設計（金鑰跟著服務走）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --ivory: #faf9f5;
+        --paper: #ffffff;
+        --slate: #141413;
+        --clay: #d97757;
+        --clay-d: #b85c3e;
+        --clay-soft: #fbe9df;
+        --oat: #e3dacc;
+        --olive: #788c5d;
+        --olive-soft: #eff1e8;
+        --olive-border: #c8d2b8;
+        --g100: #f0eee6;
+        --g200: #e6e3da;
+        --g300: #d1cfc5;
+        --g500: #87867f;
+        --g700: #3d3d3a;
+        --green: #788c5d; 
+        --green-soft: #eff1e8;
+        --green-border: #c8d2b8;
+        --red: #b85c3e; 
+        --red-soft: #faebe3;
+        --red-border: #e8c4af;
+        --yellow: #c49845;
+        --yellow-soft: #f8efd9;
+        --yellow-border: #e8d4a0;
+        --bg: var(--ivory);
+        --bg-card: var(--paper);
+        --bg-soft: var(--g100);
+        --bg-soft-2: var(--g200);
+        --border: var(--g300);
+        --border-strong: var(--g500);
+        --text: var(--slate);
+        --text-muted: var(--g700);
+        --text-soft: var(--g500);
+        --accent: var(--clay);
+        --accent-soft: var(--clay-soft);
+        --accent-strong: var(--clay-d);
+        --serif: ui-serif, Georgia, "Times New Roman", Times, serif;
+        --sans:
+          system-ui, -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC",
+          Roboto, Helvetica, Arial, sans-serif;
+        --mono: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        font-family: var(--serif);
+        font-weight: 500;
+        color: var(--slate);
+        letter-spacing: -0.012em;
+        margin: 0;
+      }
+      h1 em,
+      h2 em {
+        font-style: italic;
+        color: var(--clay);
+      }
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--g500);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .eyebrow::before {
+        content: "";
+        width: 24px;
+        height: 1.5px;
+        background: var(--clay);
+        flex-shrink: 0;
+      }
+      .card {
+        background: var(--bg-card);
+        border: 1.5px solid var(--border);
+        border-radius: 14px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 999px;
+        letter-spacing: 0.04em;
+        border: 1px solid;
+        white-space: nowrap;
+      }
+      .badge-clay {
+        background: var(--clay-soft);
+        color: var(--clay-d);
+        border-color: #e8c4af;
+      }
+      .choice-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      @media (min-width: 768px) {
+        .choice-row.cols-2 {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      @media (min-width: 768px) {
+        .choice-row.cols-3 {
+          grid-template-columns: 1fr 1fr 1fr;
+        }
+      }
+      .choice {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.18s;
+        background: var(--bg-card);
+        font-size: 14px;
+      }
+      .choice:hover {
+        border-color: var(--slate);
+        transform: translateY(-1px);
+      }
+      .choice input[type="radio"] {
+        display: none;
+      }
+      .choice .choice-dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        border: 1.5px solid var(--border-strong);
+        background: var(--bg-card);
+        flex-shrink: 0;
+        transition: all 0.18s;
+      }
+      .choice input:checked ~ .choice-dot {
+        border-color: var(--clay);
+        background: var(--clay);
+        box-shadow: inset 0 0 0 3px var(--bg-card);
+      }
+      .choice:has(input:checked) {
+        border-color: var(--clay);
+        background: var(--clay-soft);
+      }
+      .choice.choice-warning:has(input:checked) {
+        border-color: var(--red);
+        background: var(--red-soft);
+      }
+      .choice.choice-warning input:checked ~ .choice-dot {
+        border-color: var(--red);
+        background: var(--red);
+      }
+      textarea.note {
+        width: 100%;
+        padding: 12px 14px;
+        background: var(--bg-card);
+        border: 1.5px solid var(--border);
+        border-radius: 10px;
+        font-family: var(--sans);
+        font-size: 14px;
+        color: var(--slate);
+        resize: vertical;
+      }
+      textarea.note:focus {
+        outline: 2px solid var(--clay-soft);
+        border-color: var(--clay);
+      }
+      .metric-card {
+        background: var(--bg-card);
+        border: 1.5px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 18px;
+      }
+      .metric-side .label {
+        font-family: var(--mono);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 600;
+        margin-top: 4px;
+      }
+      .pain-card {
+        background: linear-gradient(
+          135deg,
+          var(--red-soft) 0%,
+          var(--clay-soft) 100%
+        );
+        border: 1.5px solid var(--red-border);
+        border-radius: 14px;
+        padding: 26px 30px;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 26px;
+        align-items: center;
+      }
+      .pain-icon {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: white;
+        box-shadow: 0 4px 14px rgba(184, 92, 62, 0.18);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+      }
+      .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 13.5px;
+        transition: all 0.15s;
+      }
+      .nav-link:hover {
+        background: var(--bg-soft);
+        color: var(--text);
+      }
+      .nav-link.active {
+        background: var(--clay-soft);
+        color: var(--clay-d);
+        font-weight: 500;
+      }
+      .nav-link-num {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: var(--bg-soft-2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: 600;
+        color: var(--g700);
+      }
+      .nav-link.active .nav-link-num {
+        background: var(--clay);
+        color: white;
+      }
+      .sticky-bar {
+        position: sticky;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(12px);
+        border-top: 1.5px solid var(--clay);
+        box-shadow: 0 -8px 24px -10px rgba(20, 20, 19, 0.1);
+        z-index: 30;
+      }
+      pre.preview {
+        font-family: var(--mono);
+        font-size: 12px;
+        background: var(--bg-soft);
+        padding: 14px;
+        border-radius: 8px;
+        border: 1.5px solid var(--border);
+        white-space: pre-wrap;
+        max-height: 380px;
+        overflow-y: auto;
+        line-height: 1.55;
+      }
+      .btn-primary {
+        background: var(--clay);
+        color: white;
+        border: 1.5px solid var(--clay);
+        padding: 10px 22px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.18s;
+      }
+      .btn-primary:hover {
+        background: var(--clay-d);
+        border-color: var(--clay-d);
+      }
+      .btn-secondary {
+        background: var(--bg-card);
+        color: var(--slate);
+        border: 1.5px solid var(--border);
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.18s;
+      }
+      .btn-secondary:hover {
+        border-color: var(--slate);
+        background: var(--oat);
+      }
+      footer.k-mark {
+        margin-top: 32px;
+        padding: 36px 0;
+        text-align: center;
+        border-top: 1.5px solid var(--border);
+      }
+      footer.k-mark .glyph {
+        font-family: var(--serif);
+        font-style: italic;
+        font-size: 28px;
+        color: var(--clay);
+      }
+      footer.k-mark .meta {
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--g500);
+        margin-top: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      .inline-decide {
+        margin-top: 22px;
+        padding-top: 20px;
+        border-top: 1.5px dashed var(--border);
+      }
+      .inline-decide-head {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--clay-d);
+        background: var(--clay-soft);
+        border: 1px solid #e8c4af;
+        border-radius: 4px;
+        padding: 3px 9px;
+        display: inline-block;
+        margin-bottom: 14px;
+      }
+      .qmap-state.done {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .nav-count {
+        margin-left: auto;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 600;
+        padding: 1px 6px;
+        border-radius: 3px;
+        background: var(--bg-soft-2);
+        color: var(--text-muted);
+      }
+      .nav-count.done {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .nav-count:empty {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="sticky top-0 z-20" style="background: rgba(250, 249, 245, 0.94); backdrop-filter: blur(10px); border-bottom: 1.5px solid var(--border);">
+      <div class="max-w-[1760px] w-[94vw] mx-auto px-8 py-4 flex items-center justify-between gap-6">
+        <div>
+          <div class="eyebrow">2026-09-10 · 語音模型服務設定頁 · 第二版設計</div>
+          <h1 style="font-size: 19px; margin-top: 4px">SayIt 設定頁重新設計 — 金鑰跟著服務走</h1>
+        </div>
+        <div class="text-sm flex items-center gap-2" style="color: var(--text-muted)">
+          <span id="progress-summary" style="font-family: var(--mono); font-weight: 600; color: var(--clay)">0 / 0</span>
+          <span>已選</span>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-[1760px] w-[94vw] mx-auto px-8 py-10">
+      <div class="grid grid-cols-12 gap-8">
+        <aside class="col-span-2 hidden lg:block">
+          <div class="sticky top-24 space-y-1">
+            <div class="text-[10px] uppercase tracking-widest font-semibold mb-3 px-3" style="color: var(--g500); font-family: var(--mono)">導覽</div>
+            <a href="#hero" class="nav-link"><span class="nav-link-num">01</span>哪裡奇怪</a>
+            <a href="#design" class="nav-link"><span class="nav-link-num">02</span>兩個設計</a>
+            <a href="#decide" class="nav-link"><span class="nav-link-num">03</span>拍板<span class="nav-count" data-count-for="decide"></span></a>
+            <a href="#moves" class="nav-link"><span class="nav-link-num">04</span>搬了什麼</a>
+            <a href="#bounds" class="nav-link"><span class="nav-link-num">05</span>沒演的</a>
+          </div>
+        </aside>
+
+        <main class="col-span-12 lg:col-span-10 space-y-14">
+          <!-- ══ 01 ══ -->
+          <section id="hero">
+            <div class="card p-8">
+              <div class="eyebrow">01 · 哪裡奇怪</div>
+              <h2 style="font-size: 26px; margin-top: 10px">上一版把「服務」加進去了，但金鑰還留在頁面最上面那張獨立的 Groq 卡，於是切到 ElevenLabs 時 Groq 金鑰仍杵在眼前</h2>
+              <p style="font-size: 14.5px; margin-top: 12px; max-width: 72ch; color: var(--text-muted); line-height: 1.7">
+                根本原因是現在的設定頁把 Groq 金鑰當成「全站金鑰」放在第一張卡，而它其實只是兩條線各自可能用到的其中一把。這一版把金鑰搬到「選了誰、就在誰下面」，設定頁變成兩張功能卡：<strong>語音轉錄</strong>、<strong>文字整理</strong>，各自收齊服務、金鑰、模型。中間那台可以點，切服務時看金鑰怎麼跟著走。
+              </p>
+              <div class="grid md:grid-cols-3 gap-4 mt-6">
+                <div class="metric-card"><div class="metric-num">3 → 2</div><div class="metric-label">頁首三張卡（Groq 金鑰／模型選擇／應用程式）<br />收成兩張功能卡</div></div>
+                <div class="metric-card"><div class="metric-num">0</div><div class="metric-label">切到 ElevenLabs 後畫面上剩下的 Groq 元素<br />（文字整理沒選 Groq 時）</div></div>
+                <div class="metric-card"><div class="metric-num">1 次</div><div class="metric-label">Groq 金鑰只需輸入一次<br />兩條線都選 Groq 時第二處只顯示「共用」</div></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ══ 02 ══ -->
+          <section id="design">
+            <div class="card p-7">
+              <div class="eyebrow">02 · 兩個設計</div>
+              <h2 style="font-size: 22px; margin-top: 10px">A 金鑰跟著服務走（可以點）　vs　B 金鑰集中一張卡</h2>
+              <p style="font-size: 13.5px; margin-top: 8px; color: var(--text-muted); max-width: 72ch; line-height: 1.65">左邊是現況縮圖只留三張卡的骨架；中間是設計 A 的完整互動；右邊是設計 B 的靜態樣張。三邊都照實際深色介面與現有文案。</p>
+
+              <div class="tri-grid mt-5">
+                <!-- ── 現況 ── -->
+                <div>
+                  <div class="flex items-center gap-2 mb-2"><span class="badge badge-oat">現況 · v0.11.0</span></div>
+                  <div class="mock"><div class="si-app compact">
+                    <div class="si-titlebar"><i></i><i></i><i></i><span>SayIt — 設定</span></div>
+                    <div class="si-card"><div class="si-card-head"><span>Groq API Key <span class="si-badge ok">已設定</span></span></div><div class="si-card-body"><div class="si-muted">此 Key 用於語音轉錄（Whisper）。若 LLM Provider 選擇 Groq，也會用於文字整理。</div><div class="si-input"><input type="password" value="gsk_xxxxxxxx" readonly /><button class="si-btn" type="button">顯示</button></div></div></div>
+                    <div class="si-card"><div class="si-card-head">模型選擇</div><div class="si-card-body">
+                      <div class="si-label">語音轉錄模型（Whisper）</div><div class="si-select"><span>Whisper Large V3</span></div>
+                      <div class="si-sep"></div>
+                      <div class="si-label">LLM 模型服務</div><div class="si-radio"><label class="on"><span>Groq（免費）</span></label><label><span>OpenAI（推薦）</span></label><label><span>Anthropic</span></label><label><span>Google Gemini（免費額度）</span></label></div>
+                      <div class="si-note">使用上方 Groq API Key</div>
+                      <div class="si-label">文字整理模型（LLM）</div><div class="si-select"><span>Qwen3.6 27B (Preview)</span></div>
+                    </div></div>
+                    <div class="si-card"><div class="si-card-head">應用程式</div><div class="si-card-body"><div class="si-switch"><div class="si-label">轉錄語言</div><div class="si-select" style="width:120px"><span>自動偵測</span></div></div></div></div>
+                  </div></div>
+                  <div class="legend mt-3">
+                    <div class="row"><span class="dot r">✕</span><span>金鑰卡在最上面、跟它服務的功能分開兩張卡；換轉錄服務時它不會消失。</span></div>
+                    <div class="row"><span class="dot r">✕</span><span>「轉錄語言」躲在應用程式卡，跟轉錄模型不在同一處。</span></div>
+                  </div>
+                </div>
+
+                <!-- ── 設計 A（互動） ── -->
+                <div>
+                  <div class="flex items-center gap-2 mb-2 flex-wrap"><span class="badge badge-clay">設計 A · 推薦</span><span class="live-tag"><i></i>可以點</span><button id="demo-reset" type="button" class="link-btn">重設</button></div>
+                  <div class="mock"><div class="si-app" id="demo-app">
+                    <div class="si-titlebar"><i></i><i></i><i></i><span>SayIt — 設定</span></div>
+
+                    <!-- 語音轉錄卡 -->
+                    <div class="si-card">
+                      <div class="si-card-head"><span>語音轉錄</span><span class="si-badge" id="stt-status">已就緒</span></div>
+                      <div class="si-card-body">
+                        <div class="si-callout-wrap" style="position:relative"><div class="si-num2">1</div>
+                          <div class="si-label">服務</div>
+                          <div class="si-muted" style="margin-top:2px">Groq 有免費額度；ElevenLabs 為付費服務，中文與粵語辨識較準。</div>
+                          <div class="si-radio" style="margin-top:8px">
+                            <label id="stt-groq" class="on" data-stt="groq"><span>Groq（免費）</span></label>
+                            <label id="stt-el" data-stt="elevenlabs"><span>ElevenLabs <span class="si-badge paid" data-paid style="margin-left:4px">付費</span></span></label>
+                          </div>
+                        </div>
+
+                        <!-- Groq 金鑰（轉錄選 Groq 時） -->
+                        <div class="si-keybox si-callout-wrap" data-stt-key="groq" style="position:relative"><div class="si-num2">2</div>
+                          <div class="si-keyhead"><span class="si-label" style="display:flex;align-items:center;gap:8px">Groq API Key <span class="si-badge ok">已設定</span></span><a>前往 Groq Console →</a></div>
+                          <div class="si-muted">若文字整理也選 Groq，會共用這把金鑰。</div>
+                          <div class="si-input"><input type="password" value="gsk_xxxxxxxx" readonly /><button class="si-btn" type="button">顯示</button><button class="si-btn primary" type="button">儲存</button></div>
+                        </div>
+                        <!-- ElevenLabs 金鑰（轉錄選 ElevenLabs 時） -->
+                        <div class="si-keybox si-callout-wrap si-hide" data-stt-key="elevenlabs" style="position:relative"><div class="si-num2">2</div>
+                          <div class="si-keyhead"><span class="si-label" style="display:flex;align-items:center;gap:8px">ElevenLabs API Key <span class="si-badge no" id="el-key-status">未設定</span></span><a>前往 ElevenLabs →</a></div>
+                          <div class="si-muted">免費方案每月約 12 分鐘，超過需付費。</div>
+                          <div class="si-input"><input id="el-key" type="password" placeholder="sk_..." autocomplete="off" /><button class="si-btn" type="button" id="el-key-toggle">顯示</button><button class="si-btn primary" type="button" id="el-key-save">儲存</button></div>
+                          <div id="el-key-msg" class="si-ok si-hide">API Key 已儲存</div>
+                        </div>
+
+                        <div class="si-callout-wrap" style="position:relative"><div class="si-num2">3</div>
+                          <div class="si-two">
+                            <div><div class="si-label">模型</div>
+                              <select class="si-native" id="demo-model">
+                                <option value="whisper-large-v3" data-prov="groq">Whisper Large V3 · 預設</option>
+                                <option value="whisper-large-v3-turbo" data-prov="groq">Whisper Large V3 Turbo</option>
+                                <option value="scribe_v2" data-prov="elevenlabs">Scribe v2</option>
+                              </select></div>
+                            <div><div class="si-label">語言</div>
+                              <select class="si-native" id="demo-lang">
+                                <option value="auto">自動偵測</option><option value="zh">繁體中文</option><option value="yue">廣東話</option><option value="ja">日本語</option><option value="en">English</option>
+                              </select></div>
+                          </div>
+                          <div class="si-muted" id="demo-model-desc" style="margin-top:6px">每小時 $0.111</div>
+                          <div id="demo-lang-hint" class="si-hide"></div>
+                          <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><button class="si-btn sm" type="button" id="demo-test">測試連線</button><span id="demo-test-result"></span></div>
+                        </div>
+
+                        <div class="si-hide si-callout-wrap" data-stt-only="elevenlabs" data-zr style="position:relative"><div class="si-num2">4</div>
+                          <div class="si-switch"><div><div class="si-label">不在 ElevenLabs 保存錄音</div><div class="si-muted">開啟後對方伺服器不留下你的音檔與文字。</div></div><div class="si-toggle on" id="demo-zr" role="switch" aria-checked="true"></div></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 文字整理卡 -->
+                    <div class="si-card">
+                      <div class="si-card-head"><span>文字整理</span><span class="si-badge" id="llm-status">已就緒</span></div>
+                      <div class="si-card-body">
+                        <div class="si-callout-wrap" style="position:relative"><div class="si-num2">5</div>
+                          <div class="si-label">服務</div>
+                          <div class="si-muted" style="margin-top:2px">Groq 和 Gemini 提供免費額度，OpenAI 和 Anthropic 為付費服務。</div>
+                          <div class="si-radio" style="margin-top:8px">
+                            <label class="on" data-llm="groq"><span>Groq（免費）</span></label>
+                            <label data-llm="openai"><span>OpenAI（推薦）</span></label>
+                            <label data-llm="anthropic"><span>Anthropic</span></label>
+                            <label data-llm="gemini"><span>Google Gemini（免費額度）</span></label>
+                          </div>
+                        </div>
+
+                        <div class="si-callout-wrap" style="position:relative"><div class="si-num2">6</div>
+                          <div class="si-note" id="llm-shared">使用語音轉錄的 Groq API Key（已設定）</div>
+                          <div class="si-keybox si-hide" id="llm-groq-key">
+                            <div class="si-keyhead"><span class="si-label" style="display:flex;align-items:center;gap:8px">Groq API Key <span class="si-badge ok">已設定</span></span><a>前往 Groq Console →</a></div>
+                            <div class="si-input"><input type="password" value="gsk_xxxxxxxx" readonly /><button class="si-btn" type="button">顯示</button><button class="si-btn primary" type="button">儲存</button></div>
+                          </div>
+                          <div class="si-keybox si-hide" id="llm-other-key">
+                            <div class="si-keyhead"><span class="si-label" style="display:flex;align-items:center;gap:8px"><span id="llm-other-name">OpenAI API Key</span> <span class="si-badge no">未設定</span></span><a id="llm-other-link">前往 OpenAI Platform →</a></div>
+                            <div class="si-input"><input type="password" id="llm-other-input" placeholder="sk-..." /><button class="si-btn" type="button">顯示</button><button class="si-btn primary" type="button">儲存</button></div>
+                          </div>
+                        </div>
+
+                        <div><div class="si-label">模型</div><select class="si-native" id="llm-model"><option>Qwen3.6 27B (Preview) · 預設</option><option>GPT OSS 120B</option><option>GPT OSS 20B</option></select></div>
+                      </div>
+                    </div>
+
+                    <div class="si-card"><div class="si-card-head">AI 整理 Prompt</div><div class="si-card-body"><div class="si-muted">（照舊，不在這次範圍）</div></div></div>
+                  </div></div>
+                  <div class="legend mt-3">
+                    <div class="row"><span class="dot c">1</span><span>「語音轉錄」卡第一格就是服務；卡片右上角一顆狀態徽章，金鑰沒設就變「需要金鑰」。</span></div>
+                    <div class="row"><span class="dot c">2</span><span>金鑰欄緊接在服務下面、只出現選中那家的；頁首那張獨立 Groq 卡整張拿掉。</span></div>
+                    <div class="row"><span class="dot c">3</span><span>模型與語言並排在同一格；「轉錄語言」從應用程式卡搬過來，因為它本來就是轉錄的參數。</span></div>
+                    <div class="row"><span class="dot c">4</span><span>零留存開關只在 ElevenLabs 時出現，仍受 e-flags 拍板控制。</span></div>
+                    <div class="row"><span class="dot c">5</span><span>「文字整理」卡同一套版型：服務 → 金鑰 → 模型，跟上面對稱，學一次就會。</span></div>
+                    <div class="row"><span class="dot c">6</span><span>兩邊都選 Groq 時這格只顯示「共用上面那把」；轉錄改 ElevenLabs 後 Groq 金鑰欄就搬到這裡，因為只剩文字整理在用它。</span></div>
+                  </div>
+                </div>
+
+                <!-- ── 設計 B（靜態） ── -->
+                <div>
+                  <div class="flex items-center gap-2 mb-2"><span class="badge badge-oat">設計 B · 備選</span><span style="font-size:12px;color:var(--text-soft)">靜態</span></div>
+                  <div class="mock"><div class="si-app compact">
+                    <div class="si-titlebar"><i></i><i></i><i></i><span>SayIt — 設定</span></div>
+                    <div class="si-card"><div class="si-card-head">API 金鑰</div><div class="si-card-body">
+                      <div class="si-keyrow"><span>Groq</span><span class="si-badge ok">已設定</span><button class="si-btn sm" type="button">編輯</button></div>
+                      <div class="si-keyrow"><span>ElevenLabs</span><span class="si-badge no">未設定</span><button class="si-btn sm" type="button">新增</button></div>
+                      <div class="si-keyrow"><span>OpenAI</span><span class="si-badge no">未設定</span><button class="si-btn sm" type="button">新增</button></div>
+                      <div class="si-keyrow"><span>Anthropic</span><span class="si-badge no">未設定</span><button class="si-btn sm" type="button">新增</button></div>
+                      <div class="si-keyrow"><span>Google Gemini</span><span class="si-badge no">未設定</span><button class="si-btn sm" type="button">新增</button></div>
+                    </div></div>
+                    <div class="si-card"><div class="si-card-head"><span>語音轉錄</span><span class="si-badge paid">需要金鑰</span></div><div class="si-card-body">
+                      <div class="si-label">服務</div><div class="si-radio"><label><span>Groq（免費）</span></label><label class="on"><span>ElevenLabs <span class="si-badge paid" style="margin-left:4px">付費</span></span></label></div>
+                      <div class="si-warn">ElevenLabs 金鑰未設定 → 到上方「API 金鑰」新增</div>
+                      <div class="si-two"><div><div class="si-label">模型</div><div class="si-select"><span>Scribe v2</span></div></div><div><div class="si-label">語言</div><div class="si-select"><span>自動偵測</span></div></div></div>
+                    </div></div>
+                    <div class="si-card"><div class="si-card-head"><span>文字整理</span><span class="si-badge ok">已就緒</span></div><div class="si-card-body">
+                      <div class="si-label">服務</div><div class="si-radio"><label class="on"><span>Groq（免費）</span></label><label><span>OpenAI（推薦）</span></label><label><span>Anthropic</span></label><label><span>Google Gemini（免費額度）</span></label></div>
+                      <div class="si-label">模型</div><div class="si-select"><span>Qwen3.6 27B (Preview)</span></div>
+                    </div></div>
+                  </div></div>
+                  <div class="legend mt-3">
+                    <div class="row"><span class="dot g">＋</span><span>五把金鑰一眼看全、一處管理；功能卡很乾淨。</span></div>
+                    <div class="row"><span class="dot r">－</span><span>新手第一次設定要在兩張卡之間來回：選了服務、被告知去上面新增金鑰、再回來。金鑰卡永遠顯示五列，四列多半是空的。</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-wrap mt-6">
+                <table>
+                  <colgroup><col style="width:22%" /><col style="width:39%" /><col style="width:39%" /></colgroup>
+                  <thead><tr><th></th><th>A · 金鑰跟著服務走</th><th>B · 金鑰集中管理</th></tr></thead>
+                  <tbody>
+                    <tr><td>切到 ElevenLabs 時</td><td>Groq 金鑰從轉錄卡消失，只在文字整理仍選 Groq 時出現在那邊</td><td>Groq 金鑰仍列在金鑰卡（但語意是「金鑰清單」，不奇怪）</td></tr>
+                    <tr><td>新手首次設定</td><td>由上到下一張卡填完</td><td>兩張卡來回一次</td></tr>
+                    <tr><td>同一把 Groq 兩邊用</td><td>第二處顯示「共用」，不重複輸入</td><td>天然只有一處</td></tr>
+                    <tr><td>改動量</td><td>設定頁重排＋兩張卡各自的金鑰區塊；store 與後端不變</td><td>多一張金鑰卡＋功能卡加狀態提示；改動略多</td></tr>
+                    <tr><td>推薦</td><td>✅</td><td>金鑰數量再多（六七家）時才划算</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ══ 03 ══ -->
+          <section id="decide">
+            <div class="card p-7 mt-5" data-decision data-id="ux-layout">
+              <div class="flex items-center gap-2 mb-3"><span class="badge badge-clay">設定頁</span></div>
+              <h3 style="font-size: 18px">採用哪個版型</h3>
+              <div class="inline-decide">
+                <div class="inline-decide-head">↳ 拍板</div>
+                <div class="grid md:grid-cols-3 gap-6">
+                  <div class="md:col-span-2"><p style="font-size: 13.5px; line-height: 1.6">推薦 A：跟現有「文字整理選了 OpenAI 就在下面出現 OpenAI 金鑰欄」的做法一致，只是把轉錄那條線也做成同一套，並拿掉頁首那張獨立 Groq 卡。B 留作金鑰家數再增加時的下一步。</p></div>
+                  <div>
+                    <div class="choice-row">
+                      <label class="choice"><input type="radio" name="ux-layout" value="A 金鑰跟著服務走（推薦）" /><span class="choice-dot"></span><span><strong>A</strong> 金鑰跟著服務走（推薦）</span></label>
+                      <label class="choice choice-warning"><input type="radio" name="ux-layout" value="B 金鑰集中一張卡" /><span class="choice-dot"></span><span><strong>B</strong> 金鑰集中一張卡</span></label>
+                      <label class="choice choice-warning"><input type="radio" name="ux-layout" value="都不對，見補充" /><span class="choice-dot"></span><span>都不對，見補充</span></label>
+                    </div>
+                  </div>
+                </div>
+                <textarea class="note mt-3" rows="2" data-comment-for="ux-layout" placeholder="補充：想調的位置、文案、要不要把整理 Prompt 併進文字整理卡…"></textarea>
+              </div>
+            </div>
+
+            <div class="card p-7 mt-5" data-decision data-id="e-go">
+              <div class="flex items-center gap-2 mb-3"><span class="badge badge-clay">ElevenLabs</span></div>
+              <h3 style="font-size: 18px">做不做、排在哪</h3>
+              <div class="inline-decide">
+                <div class="inline-decide-head">↳ 拍板</div>
+                <div class="grid md:grid-cols-3 gap-6">
+                  <div class="md:col-span-2"><p style="font-size: 13.5px; line-height: 1.6">建議做、排 v0.12。設定頁重排跟它綁在同一版做，因為拿掉頁首 Groq 卡的前提就是轉錄有第二家可選。</p></div>
+                  <div>
+                    <div class="choice-row">
+                      <label class="choice"><input type="radio" name="e-go" value="做，排 v0.12（推薦）" /><span class="choice-dot"></span><span><strong>做</strong>，排 v0.12（推薦）</span></label>
+                      <label class="choice choice-warning"><input type="radio" name="e-go" value="做，插隊到 v0.11.x" /><span class="choice-dot"></span><span><strong>做</strong>，插隊到 v0.11.x</span></label>
+                      <label class="choice choice-warning"><input type="radio" name="e-go" value="不做" /><span class="choice-dot"></span><span><strong>不做</strong></span></label>
+                    </div>
+                  </div>
+                </div>
+                <textarea class="note mt-3" rows="2" data-comment-for="e-go" placeholder="補充…"></textarea>
+              </div>
+            </div>
+
+            <div class="card p-7 mt-5" data-decision data-id="e-default">
+              <div class="flex items-center gap-2 mb-3"><span class="badge badge-clay">ElevenLabs</span><span class="badge badge-amber">會改 demo</span></div>
+              <h3 style="font-size: 18px">預設服務</h3>
+              <div class="inline-decide">
+                <div class="inline-decide-head">↳ 拍板</div>
+                <div class="grid md:grid-cols-3 gap-6">
+                  <div class="md:col-span-2"><p style="font-size: 13.5px; line-height: 1.6">維持 Groq 預設：免費、現有使用者升級後零變動。</p></div>
+                  <div>
+                    <div class="choice-row">
+                      <label class="choice"><input type="radio" name="e-default" value="預設 Groq（推薦）" /><span class="choice-dot"></span><span><strong>預設 Groq</strong>（推薦）</span></label>
+                      <label class="choice choice-warning"><input type="radio" name="e-default" value="預設 ElevenLabs" /><span class="choice-dot"></span><span><strong>預設 ElevenLabs</strong></span></label>
+                    </div>
+                  </div>
+                </div>
+                <textarea class="note mt-3" rows="2" data-comment-for="e-default" placeholder="補充…"></textarea>
+              </div>
+            </div>
+
+            <div class="card p-7 mt-5" data-decision data-id="e-flags">
+              <div class="flex items-center gap-2 mb-3"><span class="badge badge-clay">ElevenLabs</span><span class="badge badge-amber">會改 demo</span></div>
+              <h3 style="font-size: 18px">隱私與標示</h3>
+              <div class="inline-decide">
+                <div class="inline-decide-head">↳ 拍板</div>
+                <div class="grid md:grid-cols-3 gap-6">
+                  <div class="md:col-span-2"><p style="font-size: 13.5px; line-height: 1.6">「不在 ElevenLabs 保存錄音」預設開；選項上標「付費」。若查出零留存只限特定方案，退成「有就開」。</p></div>
+                  <div>
+                    <div class="choice-row">
+                      <label class="choice"><input type="radio" name="e-flags" value="零留存預設開＋標付費（推薦）" /><span class="choice-dot"></span><span><strong>零留存預設開</strong>＋標付費（推薦）</span></label>
+                      <label class="choice choice-warning"><input type="radio" name="e-flags" value="只標付費" /><span class="choice-dot"></span><span><strong>只標付費</strong></span></label>
+                      <label class="choice choice-warning"><input type="radio" name="e-flags" value="都不動" /><span class="choice-dot"></span><span><strong>都不動</strong></span></label>
+                    </div>
+                  </div>
+                </div>
+                <textarea class="note mt-3" rows="2" data-comment-for="e-flags" placeholder="補充…"></textarea>
+              </div>
+            </div>
+
+            <div class="card p-7 mt-5">
+              <div class="eyebrow">其他補充</div>
+              <textarea id="extra-notes" class="note mt-3" rows="3" placeholder="對版型的其他意見…"></textarea>
+            </div>
+          </section>
+
+          <!-- ══ 04 ══ -->
+          <section id="moves">
+            <div class="card p-7">
+              <div class="eyebrow">04 · 搬了什麼</div>
+              <h2 style="font-size: 22px; margin-top: 10px">設計 A 相對現況，每個元素去了哪裡</h2>
+              <div class="table-wrap mt-4">
+                <table>
+                  <colgroup><col style="width:26%" /><col style="width:22%" /><col style="width:26%" /><col style="width:26%" /></colgroup>
+                  <thead><tr><th>元素</th><th>現況位置</th><th>設計 A 位置</th><th>備註</th></tr></thead>
+                  <tbody>
+                    <tr><td>Groq API Key 卡</td><td>頁首獨立一張</td><td><strong>拿掉</strong>；金鑰欄併進選了 Groq 的那張功能卡</td><td>首次啟動的歡迎提示改顯示在語音轉錄卡頂部</td></tr>
+                    <tr><td>語音轉錄模型</td><td>模型選擇卡上半</td><td>語音轉錄卡，與語言並排</td><td>清單依服務過濾</td></tr>
+                    <tr><td>轉錄語言</td><td>應用程式卡</td><td>語音轉錄卡</td><td>加「廣東話」</td></tr>
+                    <tr><td>測試連線</td><td>模型選擇卡</td><td>語音轉錄卡，模型下方</td><td>依服務打對應網址</td></tr>
+                    <tr><td>LLM 模型服務 ＋ 各家金鑰欄</td><td>模型選擇卡下半</td><td>文字整理卡</td><td>版型不變，只搬家並改名</td></tr>
+                    <tr><td>文字整理模型</td><td>模型選擇卡末端</td><td>文字整理卡末端</td><td>—</td></tr>
+                    <tr><td>「模型選擇」「應用程式」卡標題</td><td>存在</td><td>模型選擇卡消失；應用程式卡留下其餘開關</td><td>五語系文案要改</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <!-- ══ 05 ══ -->
+          <section id="bounds">
+            <div class="card p-7">
+              <div class="eyebrow">05 · 沒演的</div>
+              <h2 style="font-size: 22px; margin-top: 10px">demo 之外</h2>
+              <div class="grid md:grid-cols-2 gap-4 mt-5">
+                <div class="pain-card"><div class="pain-icon">📐</div><div><div style="font-weight:700">正式設計稿</div><p style="font-size:13px;margin-top:4px;line-height:1.6">拍板後依專案規則先在 Pencil 設計稿完成版面，再動程式。</p></div></div>
+                <div class="pain-card"><div class="pain-icon">🔤</div><div><div style="font-weight:700">文案</div><p style="font-size:13px;margin-top:4px;line-height:1.6">「語音轉錄」「文字整理」兩張卡的標題與說明句在五個語系都要改；demo 只寫了中文。</p></div></div>
+                <div class="pain-card"><div class="pain-icon">🔑</div><div><div style="font-weight:700">刪除金鑰的位置</div><p style="font-size:13px;margin-top:4px;line-height:1.6">現在的「刪除 API Key」按鈕會跟著金鑰欄走進功能卡；demo 省略了它。</p></div></div>
+                <div class="pain-card"><div class="pain-icon">❓</div><div><div style="font-weight:700">上一頁列的四項未查證</div><p style="font-size:13px;margin-top:4px;line-height:1.6">Groq 收不收粵語、零留存是否限方案、Scribe 對靜音回什麼、費率用哪個，仍待動工前驗。</p></div></div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <style>
+      .si-app { background: #09090b; color: #fafafa; border: 1.5px solid #27272a; border-radius: 12px; padding: 14px; font-family: system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; font-size: 12.5px; line-height: 1.5; }
+      .si-app.compact { font-size: 11.5px; padding: 10px; }
+      .si-app .si-titlebar { display: flex; gap: 6px; margin-bottom: 12px; align-items: center; }
+      .si-app .si-titlebar i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+      .si-app .si-titlebar i:nth-child(1) { background: #ff5f57; } .si-app .si-titlebar i:nth-child(2) { background: #febc2e; } .si-app .si-titlebar i:nth-child(3) { background: #28c840; }
+      .si-app .si-titlebar span { margin-left: 8px; color: #a1a1aa; font-size: 11px; }
+      .si-card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; margin-top: 10px; overflow: hidden; }
+      .si-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border-bottom: 1px solid #27272a; font-weight: 600; font-size: 13px; flex-wrap: wrap; }
+      .si-card-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+      .si-muted { color: #a1a1aa; font-size: 11.5px; line-height: 1.55; overflow-wrap: anywhere; }
+      .si-label { font-size: 12px; font-weight: 500; }
+      .si-select { display: flex; align-items: center; justify-content: space-between; border: 1px solid #27272a; background: #09090b; border-radius: 6px; padding: 6px 10px; height: 32px; box-sizing: border-box; margin-top: 4px; }
+      .si-select::after { content: "⌄"; color: #a1a1aa; margin-left: 8px; }
+      select.si-native { appearance: none; -webkit-appearance: none; width: 100%; border: 1px solid #27272a; background: #09090b; color: #fafafa; border-radius: 6px; padding: 6px 10px; height: 32px; font: inherit; font-size: 12.5px; cursor: pointer; margin-top: 4px; }
+      .si-two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; }
+      .si-input { display: flex; gap: 6px; }
+      .si-input input { flex: 1; min-width: 0; border: 1px solid #27272a; background: #09090b; color: #fafafa; border-radius: 6px; padding: 6px 10px; height: 32px; font: inherit; font-size: 12.5px; }
+      .si-input input::placeholder { color: #71717a; }
+      .si-btn { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 12px; border-radius: 6px; font-size: 12.5px; font-weight: 500; border: 1px solid #27272a; background: #18181b; color: #fafafa; cursor: pointer; white-space: nowrap; font-family: inherit; }
+      .si-btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+      .si-btn.primary { background: #fafafa; color: #18181b; border-color: #fafafa; }
+      .si-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+      .si-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 1px 8px; font-size: 10.5px; font-weight: 600; background: #27272a; color: #a1a1aa; }
+      .si-badge.ok { background: rgba(34,197,94,.15); color: #4ade80; }
+      .si-badge.no { background: #27272a; color: #a1a1aa; }
+      .si-badge.paid { background: rgba(245,158,11,.18); color: #fbbf24; }
+      .si-radio { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .si-radio label { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; line-height: 1.6; border: 1px solid #27272a; border-radius: 6px; padding: 8px 10px; cursor: pointer; font-size: 12.5px; font-weight: 500; }
+      .si-radio label > span { min-width: 0; overflow-wrap: anywhere; white-space: normal; line-height: 1.7; padding: 1px 0 2px; display: inline-block; }
+      .si-radio label.on { border-color: #fafafa; background: rgba(250,250,250,.05); }
+      .si-switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .si-toggle { width: 34px; height: 20px; border-radius: 999px; background: #3f3f46; position: relative; flex-shrink: 0; cursor: pointer; transition: background .15s; }
+      .si-toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fafafa; transition: left .15s; }
+      .si-toggle.on { background: #fafafa; } .si-toggle.on::after { left: 16px; background: #18181b; }
+      .si-note { background: #27272a; border-radius: 6px; padding: 8px 10px; font-size: 11.5px; color: #a1a1aa; overflow-wrap: anywhere; }
+      .si-keybox { border: 1px dashed #3f3f46; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+      .si-keyhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+      .si-keyhead a { color: #a1a1aa; font-size: 11.5px; }
+      .si-keyrow { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+      .si-ok { color: #4ade80; font-size: 12px; } .si-err { color: #ef4444; font-size: 12px; } .si-warn { color: #fbbf24; font-size: 11.5px; }
+      .si-sep { border-top: 1px solid #27272a; }
+      .si-hide { display: none !important; }
+      .si-callout-wrap { padding-left: 26px; }
+      .si-num2 { position: absolute; left: 0; top: 4px; width: 18px; height: 18px; border-radius: 50%; background: var(--clay); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; font-family: var(--mono); }
+      .legend { display: grid; gap: 8px; font-size: 13px; line-height: 1.55; }
+      .legend .row { display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; }
+      .legend .dot { width: 18px; height: 18px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; font-family: var(--mono); margin-top: 1px; }
+      .legend .dot.c { background: var(--clay); } .legend .dot.r { background: #b91c1c; } .legend .dot.g { background: #15803d; }
+      .tri-grid { display: grid; gap: 14px; } @media (min-width: 1200px) { .tri-grid { grid-template-columns: 0.8fr 1.3fr 0.9fr; } }
+      .link-btn { font-size: 11.5px; color: var(--clay); background: none; border: none; cursor: pointer; font-family: inherit; text-decoration: underline; text-underline-offset: 3px; }
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .table-wrap table { width: 100%; table-layout: fixed; }
+      .table-wrap th, .table-wrap td { white-space: normal; word-break: break-word; overflow-wrap: anywhere; line-height: 1.55; vertical-align: top; }
+      .eyebrow { flex-wrap: wrap; min-width: 0; line-height: 1.9; padding-bottom: 2px; overflow-wrap: anywhere; }
+      .live-tag { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: #15803d; background: #eff1e8; border: 1px solid #c8d2b8; border-radius: 999px; padding: 2px 9px; }
+      .live-tag i { width: 7px; height: 7px; border-radius: 50%; background: #15803d; display: inline-block; animation: blink 1.4s infinite; }
+      @keyframes blink { 50% { opacity: .25; } }
+      .badge-amber { background: #fef3c7; color: #92400e; }
+      @media (max-width: 1023px) { .grid.grid-cols-12 { display: block; } }
+      @media (max-width: 480px) {
+        body { overflow-x: hidden; } main { min-width: 0; overflow-x: hidden; }
+        .table-wrap table { table-layout: auto; min-width: 560px; }
+        .si-radio, .si-two { grid-template-columns: 1fr; }
+        .si-input { flex-wrap: wrap; } .si-input input { flex: 1 1 100%; }
+        .si-callout-wrap { padding-left: 0; } .si-num2 { display: none; }
+        .si-app { padding: 8px; } .si-card-body { padding: 10px; }
+      }
+    </style>
+
+    <footer class="sticky-bar">
+      <div class="max-w-[1760px] w-[94vw] mx-auto px-8 py-5">
+        <div class="flex items-center justify-between gap-6 flex-wrap">
+          <div>
+            <div class="eyebrow" style="color: var(--g700)">產出決策摘要</div>
+            <div style="font-size: 14px; margin-top: 6px">四題選完 → 複製 → 貼回 chat 給 Claude</div>
+          </div>
+          <div class="flex items-center gap-3">
+            <button id="preview-btn" class="btn-secondary">預覽摘要</button>
+            <button id="copy-btn" class="btn-primary">📋 複製決策摘要</button>
+          </div>
+        </div>
+        <div id="preview-area" class="hidden mt-4"><pre id="preview-content" class="preview"></pre></div>
+      </div>
+    </footer>
+
+    <footer class="k-mark">
+      <div class="glyph">∾</div>
+      <div class="meta">2026-09-10 · 設定頁第二版設計 · SayIt</div>
+    </footer>
+
+    <script>
+      window.vtCopyText = async function (text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try { await navigator.clipboard.writeText(text); return true; } catch (err) {}
+        }
+        const ta = document.createElement("textarea");
+        ta.value = text; ta.setAttribute("readonly", "");
+        ta.style.position = "fixed"; ta.style.top = "-9999px"; ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        try { ta.select(); ta.setSelectionRange(0, ta.value.length); return document.execCommand("copy") === true; }
+        catch (err) { return false; } finally { ta.remove(); }
+      };
+      window.vtSelectForManualCopy = function (text, target, wrap) {
+        let node = target;
+        if (node) { node.textContent = text; if (wrap) wrap.classList.remove("hidden"); }
+        else {
+          node = document.getElementById("vt-manual-copy-box");
+          if (!node) {
+            node = document.createElement("pre"); node.id = "vt-manual-copy-box"; node.title = "雙擊關閉";
+            node.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10000;max-width:min(720px,92vw);max-height:40vh;overflow:auto;white-space:pre-wrap;background:#fff;color:#111;border:1.5px solid #999;border-radius:10px;padding:14px 16px;font-size:12.5px;line-height:1.6;box-shadow:0 12px 40px rgba(0,0,0,.28)";
+            node.addEventListener("dblclick", function () { node.remove(); });
+            document.body.appendChild(node);
+          }
+          node.textContent = text;
+        }
+        node.scrollIntoView({ block: "nearest" });
+        const sel = window.getSelection();
+        if (sel) { const range = document.createRange(); range.selectNodeContents(node); sel.removeAllRanges(); sel.addRange(range); }
+        return node;
+      };
+    </script>
+
+    <script>
+      const demo = { stt: "groq", llm: "groq", elKey: false, zr: true, showZr: true, showPaid: true };
+      const $ = (id) => document.getElementById(id);
+      const MODEL_DESC = {
+        "whisper-large-v3": "每小時 $0.111",
+        "whisper-large-v3-turbo": "每小時 $0.04 · 最快、最便宜",
+        "scribe_v2": "每小時 $0.22 起 · 中文／粵語辨識較準 · 免費方案每月約 12 分鐘",
+      };
+      const OTHER = {
+        openai: ["OpenAI API Key", "前往 OpenAI Platform →", "sk-..."],
+        anthropic: ["Anthropic API Key", "前往 Anthropic Console →", "sk-ant-..."],
+        gemini: ["Gemini API Key", "前往 Google AI Studio →", "AIza..."],
+      };
+      function renderDemo() {
+        const s = demo.stt, l = demo.llm;
+        document.querySelectorAll("#demo-app [data-stt]").forEach((el) => el.classList.toggle("on", el.dataset.stt === s));
+        document.querySelectorAll("#demo-app [data-llm]").forEach((el) => el.classList.toggle("on", el.dataset.llm === l));
+        document.querySelectorAll("#demo-app [data-stt-key]").forEach((el) => el.classList.toggle("si-hide", el.dataset.sttKey !== s));
+        document.querySelectorAll("#demo-app [data-stt-only]").forEach((el) => el.classList.toggle("si-hide", el.dataset.sttOnly !== s || !demo.showZr));
+        document.querySelectorAll("[data-paid]").forEach((el) => el.classList.toggle("si-hide", !demo.showPaid));
+        const sel = $("demo-model"); let first = null;
+        [...sel.options].forEach((o) => { const show = o.dataset.prov === s; o.hidden = !show; o.disabled = !show; if (show && !first) first = o.value; });
+        if (sel.selectedOptions[0]?.dataset.prov !== s) sel.value = first;
+        $("demo-model-desc").textContent = MODEL_DESC[sel.value] || "";
+        $("el-key-status").textContent = demo.elKey ? "已設定" : "未設定";
+        $("el-key-status").className = "si-badge " + (demo.elKey ? "ok" : "no");
+        const sttReady = s === "groq" || demo.elKey;
+        $("stt-status").textContent = sttReady ? "已就緒" : "需要金鑰";
+        $("stt-status").className = "si-badge " + (sttReady ? "ok" : "paid");
+        $("demo-test").disabled = !sttReady; $("demo-test-result").textContent = "";
+        $("demo-zr").classList.toggle("on", demo.zr); $("demo-zr").setAttribute("aria-checked", String(demo.zr));
+        // 文字整理的金鑰格
+        const shared = l === "groq" && s === "groq";
+        $("llm-shared").classList.toggle("si-hide", !shared);
+        $("llm-groq-key").classList.toggle("si-hide", !(l === "groq" && s !== "groq"));
+        $("llm-other-key").classList.toggle("si-hide", l === "groq");
+        if (l !== "groq") { $("llm-other-name").textContent = OTHER[l][0]; $("llm-other-link").textContent = OTHER[l][1]; $("llm-other-input").placeholder = OTHER[l][2]; }
+        const llmReady = l === "groq";
+        $("llm-status").textContent = llmReady ? "已就緒" : "需要金鑰";
+        $("llm-status").className = "si-badge " + (llmReady ? "ok" : "paid");
+        renderLangHint();
+      }
+      function renderLangHint() {
+        const lang = $("demo-lang").value, hint = $("demo-lang-hint");
+        if (lang !== "yue") { hint.classList.add("si-hide"); return; }
+        hint.classList.remove("si-hide");
+        if (demo.stt === "elevenlabs") { hint.className = "si-ok"; hint.textContent = "✅ ElevenLabs 明列支援廣東話"; }
+        else { hint.className = "si-warn"; hint.textContent = "⚠️ Groq 對廣東話的支援尚未驗證；辨識不準時可改用 ElevenLabs"; }
+      }
+      document.querySelectorAll("#demo-app [data-stt]").forEach((l) => l.addEventListener("click", () => { demo.stt = l.dataset.stt; renderDemo(); }));
+      document.querySelectorAll("#demo-app [data-llm]").forEach((l) => l.addEventListener("click", () => { demo.llm = l.dataset.llm; renderDemo(); }));
+      $("demo-model").addEventListener("change", () => { $("demo-model-desc").textContent = MODEL_DESC[$("demo-model").value] || ""; $("demo-test-result").textContent = ""; });
+      $("demo-lang").addEventListener("change", renderLangHint);
+      $("demo-zr").addEventListener("click", () => { demo.zr = !demo.zr; renderDemo(); });
+      $("el-key-toggle").addEventListener("click", () => { const i = $("el-key"); i.type = i.type === "password" ? "text" : "password"; $("el-key-toggle").textContent = i.type === "password" ? "顯示" : "隱藏"; });
+      $("el-key-save").addEventListener("click", () => {
+        const v = $("el-key").value.trim(), msg = $("el-key-msg");
+        if (!v) { msg.className = "si-err"; msg.textContent = "API Key 不可為空白"; demo.elKey = false; }
+        else { msg.className = "si-ok"; msg.textContent = "API Key 已儲存（demo 只存在這一頁）"; demo.elKey = true; }
+        renderDemo();
+      });
+      $("demo-test").addEventListener("click", () => {
+        const btn = $("demo-test"), out = $("demo-test-result");
+        btn.disabled = true; btn.textContent = "測試中..."; out.textContent = "";
+        const ms = demo.stt === "elevenlabs" ? 640 + Math.floor(Math.random() * 300) : 380 + Math.floor(Math.random() * 200);
+        setTimeout(() => { btn.disabled = false; btn.textContent = "測試連線"; out.className = "si-ok"; out.textContent = "✅ 測試成功（" + ms + "ms）"; }, 900);
+      });
+      $("demo-reset").addEventListener("click", () => {
+        demo.stt = "groq"; demo.llm = "groq"; demo.elKey = false; demo.zr = true;
+        $("el-key").value = ""; $("el-key-msg").className = "si-hide"; $("demo-lang").value = "auto";
+        applyDecisionsToDemo(); renderDemo();
+      });
+      function applyDecisionsToDemo() {
+        const d = document.querySelector('input[name="e-default"]:checked')?.value || "";
+        const f = document.querySelector('input[name="e-flags"]:checked')?.value || "";
+        if (d) demo.stt = d.includes("ElevenLabs") ? "elevenlabs" : "groq";
+        demo.showZr = !(f === "只標付費" || f === "都不動");
+        demo.showPaid = f !== "都不動";
+      }
+      document.querySelectorAll('input[name="e-default"], input[name="e-flags"]').forEach((r) => r.addEventListener("change", () => { applyDecisionsToDemo(); renderDemo(); }));
+      renderDemo();
+
+      function renderQuestionMap() {
+        const qmap = document.getElementById("qmap");
+        if (qmap) qmap.remove();
+        document.querySelectorAll("[data-count-for]").forEach((el) => {
+          const sec = document.getElementById(el.dataset.countFor);
+          if (!sec) return (el.textContent = "");
+          const qs = [...sec.querySelectorAll("[data-decision]")];
+          if (!qs.length) return (el.textContent = "");
+          const done = qs.filter((d) => d.querySelector(`input[type="radio"][name="${d.dataset.id.toLowerCase()}"]:checked`)).length;
+          el.textContent = done + "/" + qs.length;
+          el.classList.toggle("done", done === qs.length);
+        });
+      }
+      function updateProgress() {
+        const decisions = document.querySelectorAll("[data-decision]");
+        let answered = 0;
+        decisions.forEach((d) => { if (d.querySelector(`input[type="radio"][name="${d.dataset.id.toLowerCase()}"]:checked`)) answered++; });
+        document.getElementById("progress-summary").textContent = answered + " / " + decisions.length;
+        renderQuestionMap();
+      }
+      document.querySelectorAll('[data-decision] input[type="radio"]').forEach((el) => el.addEventListener("change", updateProgress));
+      updateProgress();
+
+      const navLinks = document.querySelectorAll(".nav-link");
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => { if (entry.isIntersecting) navLinks.forEach((l) => l.classList.toggle("active", l.getAttribute("href") === "#" + entry.target.id)); });
+      }, { rootMargin: "-30% 0px -60% 0px" });
+      document.querySelectorAll("section[id]").forEach((s) => observer.observe(s));
+
+      function buildSummary() {
+        const lines = [];
+        lines.push("# SayIt 設定頁第二版設計拍板（2026-09-10）");
+        lines.push("時間：" + new Date().toLocaleString("zh-TW"));
+        lines.push("");
+        function getValue(name) { const r = document.querySelector(`input[type="radio"][name="${name}"]:checked`); return r ? r.value : "(未選)"; }
+        function getComment(id) { const ta = document.querySelector(`[data-comment-for="${id}"]`); return ta && ta.value.trim() ? ` — ${ta.value.trim()}` : ""; }
+        lines.push("## 設定頁");
+        lines.push(`- 版型（ux-layout）：${getValue("ux-layout")}${getComment("ux-layout")}`);
+        lines.push("## ElevenLabs");
+        lines.push(`- 做不做／排程（e-go）：${getValue("e-go")}${getComment("e-go")}`);
+        lines.push(`- 預設服務（e-default）：${getValue("e-default")}${getComment("e-default")}`);
+        lines.push(`- 隱私與標示（e-flags）：${getValue("e-flags")}${getComment("e-flags")}`);
+        lines.push("");
+        const extra = document.getElementById("extra-notes").value.trim();
+        if (extra) { lines.push("## 補充"); lines.push(extra); }
+        return lines.join(String.fromCharCode(10)) + (window.vtCollectComments?.() || "");
+      }
+      window.vtBuildDecisionExport = buildSummary;
+      document.getElementById("preview-btn").addEventListener("click", () => {
+        document.getElementById("preview-content").textContent = buildSummary();
+        document.getElementById("preview-area").classList.toggle("hidden");
+      });
+      const copyBtn = document.getElementById("copy-btn");
+      copyBtn.addEventListener("click", async () => {
+        const text = buildSummary(), orig = copyBtn.innerHTML;
+        const ok = await window.vtCopyText(text);
+        if (ok) copyBtn.innerHTML = "✅ 已複製！";
+        else { window.vtSelectForManualCopy(text, document.getElementById("preview-content"), document.getElementById("preview-area")); copyBtn.innerHTML = "已選取 → 請按 Cmd+C 複製"; }
+        setTimeout(() => { copyBtn.innerHTML = orig; }, ok ? 2000 : 6000);
+      });
+    </script>
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- 全頁評論系統 — 預設內建、可手動移除                       -->
+    <!-- 完整 snippet 見 references/interaction-patterns.md       -->
+    <!-- 整合：buildSummary 末尾已拼接 vtCollectComments、         -->
+    <!-- window.vtBuildDecisionExport 已註冊、fallback 複製按鈕自動隱藏 -->
+    <!-- pill 因頁面有 sticky bar、bottom 改 70px / list 改 114px  -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <style>
+      .vt-comment-trigger {
+        position: fixed;
+        z-index: 9998;
+        background: var(--paper);
+        border: 1.5px solid var(--clay);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        color: var(--clay);
+        font-family: var(--mono);
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(20, 20, 19, 0.12);
+        display: none;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s;
+      }
+      .vt-comment-trigger:hover {
+        background: var(--clay);
+        color: var(--paper);
+      }
+      .vt-comment-popup {
+        position: fixed;
+        z-index: 9999;
+        background: var(--paper);
+        border: 1.5px solid var(--g300);
+        border-radius: 12px;
+        box-shadow: 0 12px 32px rgba(20, 20, 19, 0.15);
+        padding: 14px 16px;
+        width: 340px;
+        display: none;
+      }
+      .vt-comment-popup .quote {
+        background: var(--g100);
+        border-left: 3px solid var(--clay);
+        padding: 8px 10px;
+        font-size: 12.5px;
+        color: var(--g700);
+        line-height: 1.45;
+        margin-bottom: 10px;
+        max-height: 80px;
+        overflow-y: auto;
+      }
+      .vt-comment-popup textarea {
+        width: 100%;
+        border: 1.5px solid var(--g300);
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 13px;
+        font-family: var(--sans);
+        resize: vertical;
+        min-height: 60px;
+        color: var(--slate);
+        box-sizing: border-box;
+      }
+      .vt-comment-popup textarea:focus {
+        outline: none;
+        border-color: var(--clay);
+      }
+      .vt-comment-popup .actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+        font-size: 11.5px;
+      }
+      .vt-comment-popup .hint {
+        color: var(--g500);
+        font-family: var(--mono);
+      }
+      .vt-comment-popup button.send {
+        background: var(--clay);
+        color: var(--paper);
+        border: none;
+        border-radius: 8px;
+        padding: 6px 14px;
+        font-size: 12.5px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .vt-comment-popup button.send:hover {
+        background: var(--clay-d);
+      }
+      .vt-comment-popup button.cancel {
+        background: transparent;
+        border: 1px solid var(--g300);
+        color: var(--g500);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 12.5px;
+        cursor: pointer;
+        margin-right: 8px;
+      }
+      mark.vt-comment-mark {
+        background: var(--oat);
+        padding: 0 2px;
+        border-radius: 2px;
+        cursor: pointer;
+      }
+      mark.vt-comment-mark:hover {
+        background: #d5c4a8;
+      }
+      .vt-comment-pill {
+        position: fixed;
+        right: 16px;
+        bottom: 70px;
+        z-index: 9992;
+        background: var(--paper);
+        border: 1.5px solid var(--clay);
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--clay);
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(20, 20, 19, 0.1);
+        display: none;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.15s;
+      }
+      .vt-comment-pill.is-active {
+        display: inline-flex;
+      }
+      .vt-comment-pill:hover {
+        background: var(--clay);
+        color: var(--paper);
+      }
+      .vt-comment-pill strong {
+        font-weight: 600;
+      }
+      .vt-comment-list {
+        position: fixed;
+        right: 16px;
+        bottom: 114px;
+        width: 360px;
+        max-height: 60vh;
+        z-index: 9993;
+        background: var(--paper);
+        border: 1.5px solid var(--g300);
+        border-radius: 14px;
+        box-shadow: 0 12px 32px rgba(20, 20, 19, 0.15);
+        display: none;
+        flex-direction: column;
+      }
+      .vt-comment-list.is-open {
+        display: flex;
+      }
+      .vt-comment-list-header {
+        background: var(--paper);
+        border-bottom: 1.5px solid var(--g200);
+        padding: 12px 16px;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--g500);
+        font-weight: 600;
+        border-radius: 14px 14px 0 0;
+      }
+      .vt-comment-list-items {
+        overflow-y: auto;
+        flex: 1;
+      }
+      .vt-comment-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--g200);
+      }
+      .vt-comment-item:last-child {
+        border-bottom: none;
+      }
+      .vt-comment-item .item-quote {
+        font-size: 11.5px;
+        color: var(--g500);
+        font-style: italic;
+        border-left: 2px solid var(--oat);
+        padding-left: 8px;
+        line-height: 1.4;
+        margin-bottom: 6px;
+      }
+      .vt-comment-item .item-body {
+        font-size: 13px;
+        color: var(--slate);
+        line-height: 1.5;
+      }
+      .vt-comment-item .item-del {
+        font-size: 11px;
+        color: var(--g500);
+        background: none;
+        border: none;
+        cursor: pointer;
+        margin-top: 4px;
+        padding: 0;
+        font-family: inherit;
+      }
+      .vt-comment-item .item-del:hover {
+        color: var(--red);
+      }
+      .vt-comment-list-footer {
+        border-top: 1.5px solid var(--g200);
+        padding: 10px 16px;
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        border-radius: 0 0 14px 14px;
+        background: var(--g100);
+      }
+      .vt-comment-list-footer button {
+        background: transparent;
+        border: 1.5px solid var(--g300);
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 12px;
+        color: var(--g700);
+        cursor: pointer;
+        font-family: inherit;
+      }
+      .vt-comment-list-footer button:hover {
+        border-color: var(--slate);
+        color: var(--slate);
+      }
+      .vt-comment-list-footer button.copy {
+        background: var(--clay);
+        color: var(--paper);
+        border-color: var(--clay);
+      }
+      .vt-comment-list-footer button.copy:hover {
+        background: var(--clay-d);
+      }
+      body.vt-has-existing-export .vt-comment-list-footer button.copy {
+        display: none;
+      }
+    </style>
+    <button class="vt-comment-trigger" id="vt-comment-trigger">💬 評論</button>
+    <div class="vt-comment-popup" id="vt-comment-popup">
+      <div class="quote" id="vt-popup-quote"></div>
+      <textarea
+        id="vt-popup-textarea"
+        placeholder="對這段文字的評論 / 疑問 / 補充..."
+      ></textarea>
+      <div class="actions">
+        <span class="hint">⌘ + Enter 送出 · Esc 取消</span>
+        <div>
+          <button class="cancel" id="vt-popup-cancel">取消</button
+          ><button class="send" id="vt-popup-send">送出</button>
+        </div>
+      </div>
+    </div>
+    <button class="vt-comment-pill" id="vt-comment-pill">
+      💬 <strong id="vt-count">0</strong>
+    </button>
+    <div class="vt-comment-list" id="vt-comment-list">
+      <div class="vt-comment-list-header">— 我的評論</div>
+      <div class="vt-comment-list-items" id="vt-comment-list-items"></div>
+      <div class="vt-comment-list-footer">
+        <button id="vt-clear-all">全部清除</button>
+        <button class="copy" id="vt-copy-fallback">📋 複製評論</button>
+      </div>
+    </div>
+    <script>
+      (function () {
+        const S = "vt-comments-" + location.pathname,
+          L = 80;
+        let c = JSON.parse(localStorage.getItem(S) || "[]"),
+          sel = null;
+        const $ = (i) => document.getElementById(i),
+          tr = $("vt-comment-trigger"),
+          p = $("vt-comment-popup"),
+          pq = $("vt-popup-quote"),
+          pt = $("vt-popup-textarea"),
+          pi = $("vt-comment-pill"),
+          ce = $("vt-count"),
+          le = $("vt-comment-list"),
+          li = $("vt-comment-list-items");
+        window.vtCollectComments = function () {
+          if (!c.length) return "";
+          return (
+            "\n\n---\n\n" +
+            c
+              .map((x) => {
+                const q =
+                  x.quote.length > L ? x.quote.slice(0, L) + "…" : x.quote;
+                return `@評論「${q}」\n  → ${x.body}`;
+              })
+              .join("\n\n")
+          );
+        };
+        function hs(e) {
+          if (
+            e.target.closest(
+              ".vt-comment-popup,.vt-comment-trigger,.vt-comment-pill,.vt-comment-list,button,input,select,textarea",
+            )
+          )
+            return;
+          setTimeout(() => {
+            const s = getSelection(),
+              t = s.toString().trim();
+            if (!t || t.length < 2) {
+              tr.style.display = "none";
+              return;
+            }
+            const r = s.getRangeAt(0),
+              b = r.getBoundingClientRect();
+            sel = { text: t, range: r.cloneRange() };
+            tr.style.display = "inline-flex";
+            tr.style.top = Math.max(8, b.top - 38) + "px";
+            tr.style.left = Math.max(8, b.left + b.width / 2 - 40) + "px";
+          }, 10);
+        }
+        document.addEventListener("mouseup", hs);
+        document.addEventListener("touchend", hs);
+        tr.addEventListener("click", op);
+        function op() {
+          if (!sel) return;
+          const q = sel.text.length > L ? sel.text.slice(0, L) + "…" : sel.text;
+          pq.textContent = q;
+          pt.value = "";
+          const t = tr.getBoundingClientRect();
+          let l = t.left;
+          if (l + 340 > innerWidth - 16) l = innerWidth - 356;
+          let to = t.bottom + 6;
+          if (to + 220 > innerHeight) to = t.top - 230;
+          p.style.left = Math.max(8, l) + "px";
+          p.style.top = Math.max(8, to) + "px";
+          tr.style.display = "none";
+          p.style.display = "block";
+          setTimeout(() => pt.focus(), 50);
+        }
+        $("vt-popup-cancel").addEventListener("click", cp);
+        $("vt-popup-send").addEventListener("click", sc);
+        pt.addEventListener("keydown", (e) => {
+          if (e.isComposing || e.keyCode === 229) return;
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            e.stopPropagation();
+            sc();
+          }
+          if (e.key === "Escape") cp();
+        });
+        function cp() {
+          p.style.display = "none";
+          sel = null;
+        }
+        function sc() {
+          const b = pt.value.trim();
+          if (!b || !sel) return cp();
+          const id = "c-" + Date.now(),
+            q = sel.text;
+          try {
+            const m = document.createElement("mark");
+            m.className = "vt-comment-mark";
+            m.dataset.commentId = id;
+            sel.range.surroundContents(m);
+          } catch (e) {}
+          c.push({ id, quote: q, body: b, ts: Date.now() });
+          ps();
+          rn();
+          cp();
+          getSelection().removeAllRanges();
+        }
+        function ps() {
+          localStorage.setItem(S, JSON.stringify(c));
+        }
+        function rn() {
+          ce.textContent = c.length;
+          pi.classList.toggle("is-active", c.length > 0);
+          if (!c.length) le.classList.remove("is-open");
+          li.innerHTML = c
+            .map((x) => {
+              const q =
+                x.quote.length > 60 ? x.quote.slice(0, 60) + "…" : x.quote;
+              return `<div class="vt-comment-item" data-id="${x.id}"><div class="item-quote">「${eh(q)}」</div><div class="item-body">${eh(x.body)}</div><button class="item-del" data-del="${x.id}">刪除</button></div>`;
+            })
+            .join("");
+          li.querySelectorAll("[data-del]").forEach((b) =>
+            b.addEventListener("click", () => dc(b.dataset.del)),
+          );
+        }
+        function dc(id) {
+          c = c.filter((x) => x.id !== id);
+          document
+            .querySelectorAll(`mark.vt-comment-mark[data-comment-id="${id}"]`)
+            .forEach((m) => {
+              const pr = m.parentNode;
+              while (m.firstChild) pr.insertBefore(m.firstChild, m);
+              pr.removeChild(m);
+              pr.normalize();
+            });
+          ps();
+          rn();
+        }
+        function eh(s) {
+          return String(s).replace(
+            /[&<>"']/g,
+            (ch) =>
+              ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;",
+              })[ch],
+          );
+        }
+        pi.addEventListener("click", () => le.classList.toggle("is-open"));
+        $("vt-clear-all").addEventListener("click", () => {
+          if (!c.length) return;
+          if (!confirm("確定清除全部 " + c.length + " 條評論？")) return;
+          document.querySelectorAll("mark.vt-comment-mark").forEach((m) => {
+            const pr = m.parentNode;
+            while (m.firstChild) pr.insertBefore(m.firstChild, m);
+            pr.removeChild(m);
+            pr.normalize();
+          });
+          c = [];
+          ps();
+          rn();
+        });
+        $("vt-copy-fallback").addEventListener("click", async (e) => {
+          if (!c.length) return;
+          const t = window.vtCollectComments().replace(/^\n\n---\n\n/, ""),
+            b = e.currentTarget,
+            o = b.textContent;
+          const ok = await window.vtCopyText(t);
+          if (ok) {
+            b.textContent = "✅ 已複製";
+          } else {
+            // 複製不到就不假報成功：把評論放進臨時區域並全選
+            window.vtSelectForManualCopy(t);
+            b.textContent = "已選取 → 請按 Cmd+C";
+          }
+          setTimeout(() => (b.textContent = o), ok ? 2000 : 6000);
+        });
+        setTimeout(() => {
+          if (typeof window.vtBuildDecisionExport === "function")
+            document.body.classList.add("vt-has-existing-export");
+        }, 100);
+        document.addEventListener("click", (e) => {
+          if (
+            p.style.display === "block" &&
+            !e.target.closest(".vt-comment-popup,.vt-comment-trigger")
+          )
+            cp();
+        });
+        rn();
+      })();
+    </script>
+  
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- Session 識別 — 多視窗並行時分辨這份是哪個 session 產的     -->
+    <!-- 產出時把 scripts/session-label.sh 的結果填進下面兩個值      -->
+    <!-- 留空 = 整段停用（範本原檔即此狀態）                        -->
+    <!-- 完整說明見 references/session-identity.md                 -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <script>
+      window.VT_SESSION = { label: "Pending-SayIt", id: "9e6a2854", project: "say-it" };
+    </script>
+    <style>
+      .vt-session-badge {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 5px 16px;
+        background: var(--vt-session-color, #666);
+        color: #fff;
+        font-family: var(--mono, ui-monospace, monospace);
+        font-size: 11.5px;
+        letter-spacing: 0.06em;
+      }
+      .vt-session-badge .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #fff;
+        opacity: 0.85;
+        flex-shrink: 0;
+      }
+      .vt-session-badge .lb {
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .vt-session-badge .id {
+        margin-left: auto;
+        opacity: 0.75;
+      }
+    </style>
+    <script>
+      (function () {
+        const s = window.VT_SESSION || {};
+        if (!s.label) return;
+        const seed = s.id || s.label;
+        let hue = 7;
+        for (const c of seed) hue = (hue * 31 + c.charCodeAt(0)) % 360;
+        const col = `hsl(${hue} 58% 42%)`;
+        document.title = `${s.label} · ${document.title}`;
+        try {
+          const cv = document.createElement("canvas");
+          cv.width = cv.height = 64;
+          const g = cv.getContext("2d");
+          g.fillStyle = col;
+          if (g.roundRect) {
+            g.beginPath();
+            g.roundRect(2, 2, 60, 60, 14);
+            g.fill();
+          } else {
+            g.fillRect(2, 2, 60, 60);
+          }
+          g.fillStyle = "#fff";
+          g.font = '700 38px ui-sans-serif, system-ui, "PingFang TC"';
+          g.textAlign = "center";
+          g.textBaseline = "middle";
+          const ch = (s.label.match(/[A-Za-z0-9\u4e00-\u9fff]/) || ["?"])[0];
+          g.fillText(ch.toUpperCase(), 32, 36);
+          const link = document.createElement("link");
+          link.rel = "icon";
+          link.href = cv.toDataURL();
+          document.head.appendChild(link);
+        } catch (e) {}
+        const b = document.createElement("div");
+        b.className = "vt-session-badge";
+        b.style.setProperty("--vt-session-color", col);
+        b.innerHTML =
+          '<span class="dot"></span><span class="lb"></span><span class="id"></span>';
+        b.querySelector(".lb").textContent = s.label;
+        b.querySelector(".id").textContent = s.id || "";
+        const host = document.querySelector("header") || document.body;
+        host.insertBefore(b, host.firstChild);
+      })();
+    </script>
+  </body>
+</html>

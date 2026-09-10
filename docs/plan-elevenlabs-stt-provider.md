@@ -1,7 +1,7 @@
 # 計畫：ElevenLabs 轉錄服務 ＋ 設定頁重排（v0.13）
 
 > 建立：2026-09-10 · 狀態：**codex 計劃閘 NO-GO（2026-09-10 晚）—— 三項 HIGH 收斂後才動工** · 排程：v0.13
-> 拍板頁：`~/Documents/claude-html/2026-09/sayit-settings-redesign-2026-09-10.html`
+> 拍板 demo（規格的一部分，與文字衝突時以 demo 為準）：`docs/demos/elevenlabs-settings/settings-redesign.html`（設計 A 互動版）、`docs/demos/elevenlabs-settings/elevenlabs-first-demo.html`（第一版，僅供脈絡）
 
 ## 已拍板
 
