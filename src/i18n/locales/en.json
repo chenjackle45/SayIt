@@ -249,7 +249,14 @@
     "loadingMore": "Loading more...",
     "playRecording": "Play recording",
     "noRecordingFile": "Recording file not available",
-    "failedBadge": "Failed"
+    "failedBadge": "Failed",
+    "retranscribe": "Re-transcribe",
+    "reEnhance": "Re-enhance",
+    "retranscribing": "Re-transcribing…",
+    "reEnhancing": "Re-enhancing…",
+    "retranscribeFailed": "Re-transcription failed, please try again",
+    "reEnhanceFailed": "Re-enhancement failed, please try again",
+    "reEnhanceDrift": "Re-enhancement drifted too far from the original; kept the existing result"
   },
   "dictionary": {
     "termCount": "{count} terms",

@@ -52,6 +52,8 @@ export interface ChatUsageData {
 export interface EnhanceResult {
   text: string;
   usage: ChatUsageData | null;
+  /** true 表示 LLM 回了空內容、text 是退回的原文（不是真正的整理結果）。 */
+  isRawFallback?: boolean;
 }
 
 export interface ApiUsageRecord {

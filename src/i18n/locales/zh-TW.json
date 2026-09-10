@@ -249,7 +249,14 @@
     "loadingMore": "載入更多...",
     "playRecording": "播放錄音",
     "noRecordingFile": "錄音檔案不存在",
-    "failedBadge": "辨識失敗"
+    "failedBadge": "辨識失敗",
+    "retranscribe": "重新辨識",
+    "reEnhance": "重新整理",
+    "retranscribing": "重新辨識中…",
+    "reEnhancing": "重新整理中…",
+    "retranscribeFailed": "重新辨識失敗，請稍後再試",
+    "reEnhanceFailed": "重新整理失敗，請稍後再試",
+    "reEnhanceDrift": "整理結果與原文差異過大，已保留原結果"
   },
   "dictionary": {
     "termCount": "{count} 詞彙",

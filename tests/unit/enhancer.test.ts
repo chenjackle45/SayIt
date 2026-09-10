@@ -523,3 +523,97 @@ describe("enhancer.ts", () => {
     });
   });
 });
+
+describe("enhanceWithAnomalyGuard", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("[P1] 正常整理（無長度爆炸）→ wasAnomalous=false 並採用整理結果", async () => {
+    mockFetch.mockResolvedValue(
+      createSuccessResponse("這是一段整理後的書面語文字。"),
+    );
+    const { enhanceWithAnomalyGuard } = await import("../../src/lib/enhancer");
+    const result = await enhanceWithAnomalyGuard(
+      "這是一段整理後的書面語文字",
+      TEST_API_KEY,
+    );
+    expect(result.wasAnomalous).toBe(false);
+    expect(result.text).toBe("這是一段整理後的書面語文字。");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("[P1] 持續長度爆炸 → 重試後 fallback 回 rawText 並標記 wasAnomalous", async () => {
+    mockFetch.mockResolvedValue(createSuccessResponse("爆".repeat(50)));
+    const { enhanceWithAnomalyGuard } = await import("../../src/lib/enhancer");
+    const result = await enhanceWithAnomalyGuard("短文", TEST_API_KEY, undefined, 3);
+    expect(result.wasAnomalous).toBe(true);
+    expect(result.text).toBe("短文");
+    // 1 次初始 + 3 次重試
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("[P1] 首次長度爆炸、重試後正常 → 採用正常結果", async () => {
+    mockFetch
+      .mockResolvedValueOnce(createSuccessResponse("爆".repeat(50)))
+      .mockResolvedValueOnce(createSuccessResponse("正常整理後的文字"));
+    const { enhanceWithAnomalyGuard } = await import("../../src/lib/enhancer");
+    const result = await enhanceWithAnomalyGuard(
+      "一段原始口語文字",
+      TEST_API_KEY,
+      undefined,
+      3,
+    );
+    expect(result.wasAnomalous).toBe(false);
+    expect(result.text).toBe("正常整理後的文字");
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("[P1] LLM 回空內容 → wasEmptyResponse=true、text 為原文（呼叫端據此保留既有結果）", async () => {
+    mockFetch.mockResolvedValue(createSuccessResponse(""));
+    const { enhanceWithAnomalyGuard } = await import("../../src/lib/enhancer");
+    const result = await enhanceWithAnomalyGuard("一段原始口語文字", TEST_API_KEY);
+    expect(result.wasEmptyResponse).toBe(true);
+    expect(result.wasAnomalous).toBe(false);
+    expect(result.wasDrift).toBe(false);
+    expect(result.text).toBe("一段原始口語文字");
+  });
+
+  it("[P1] 只有 <think> 區塊、去掉後為空 → 同樣視為空回應", async () => {
+    mockFetch.mockResolvedValue(createSuccessResponse("<think>想一想</think>"));
+    const { enhanceWithAnomalyGuard } = await import("../../src/lib/enhancer");
+    const result = await enhanceWithAnomalyGuard("一段原始口語文字", TEST_API_KEY);
+    expect(result.wasEmptyResponse).toBe(true);
+  });
+
+  it("[P1] 語意飄移（整理結果與原文幾乎不相干）→ wasDrift=true、不 fallback、保留整理文字供拒絕", async () => {
+    mockFetch.mockResolvedValue(
+      createSuccessResponse("股票市場今日收盤下跌"),
+    );
+    const { enhanceWithAnomalyGuard } = await import("../../src/lib/enhancer");
+    const result = await enhanceWithAnomalyGuard(
+      "今天天氣很好適合出門散步",
+      TEST_API_KEY,
+    );
+    expect(result.wasAnomalous).toBe(false);
+    expect(result.wasDrift).toBe(true);
+    expect(result.driftOverlapRatio).toBeLessThan(0.2);
+  });
+
+  it("[P1] 正常整理（高 bigram 重疊）→ wasDrift=false", async () => {
+    mockFetch.mockResolvedValue(
+      createSuccessResponse("這是一段整理後的書面語文字。"),
+    );
+    const { enhanceWithAnomalyGuard } = await import("../../src/lib/enhancer");
+    const result = await enhanceWithAnomalyGuard(
+      "這是一段整理後的書面語文字",
+      TEST_API_KEY,
+    );
+    expect(result.wasDrift).toBe(false);
+  });
+});

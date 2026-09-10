@@ -6,8 +6,10 @@ import type {
   DailyQuotaUsage,
   ApiUsageRecord,
   DailyUsageTrend,
+  ChatUsageData,
 } from "../types/transcription";
 import type { TriggerMode } from "../types";
+import type { TranscriptionResult } from "../types/audio";
 import type { TranscriptionCompletedPayload } from "../types/events";
 import { invoke } from "@tauri-apps/api/core";
 import { getDatabase } from "../lib/database";
@@ -15,9 +17,30 @@ import { buildDailyUsageSeries } from "../lib/usageTrend";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { captureError } from "../lib/sentry";
 import {
+  calculateChatCostCeiling,
+  calculateWhisperCostCeiling,
+} from "../lib/apiPricing";
+import {
+  enhanceWithAnomalyGuard,
+  type EnhanceWithGuardResult,
+} from "../lib/enhancer";
+import { applyTranscriptTextTransforms } from "../lib/transcriptTextTransforms";
+import { detectHallucination } from "../lib/hallucinationDetector";
+import { useSettingsStore } from "./useSettingsStore";
+import { useVocabularyStore } from "./useVocabularyStore";
+import {
   emitToWindow,
   TRANSCRIPTION_COMPLETED,
 } from "../composables/useTauriEvents";
+
+/** 歷史紀錄重試（重新辨識／重新整理）的結果；errorKey 為 i18n key，供 UI 顯示。 */
+type HistoryRetryAction = "transcribe" | "enhance";
+
+export interface HistoryRetryResult {
+  ok: boolean;
+  record?: TranscriptionRecord;
+  errorKey?: string;
+}
 
 const PAGE_SIZE = 20;
 const USAGE_TREND_DAYS = 14;
@@ -150,6 +173,27 @@ const UPDATE_ON_RETRY_SUCCESS_SQL = `
   WHERE id = $7
 `;
 
+const UPDATE_ON_RETRANSCRIBE_SQL = `
+  UPDATE transcriptions
+  SET status = 'success',
+      raw_text = $1,
+      processed_text = NULL,
+      transcription_duration_ms = $2,
+      enhancement_duration_ms = NULL,
+      was_enhanced = 0,
+      was_modified = NULL,
+      char_count = $3
+  WHERE id = $4 AND raw_text = $5
+`;
+
+const UPDATE_ON_REENHANCE_SQL = `
+  UPDATE transcriptions
+  SET processed_text = $1,
+      was_enhanced = 1,
+      enhancement_duration_ms = $2
+  WHERE id = $3 AND raw_text = $4
+`;
+
 const DELETE_API_USAGE_BY_TRANSCRIPTION_SQL = `
   DELETE FROM api_usage WHERE transcription_id = $1
 `;
@@ -189,6 +233,22 @@ interface DailyUsageTrendRow {
 export const useHistoryStore = defineStore("history", () => {
   const transcriptionList = ref<TranscriptionRecord[]>([]);
   const isLoading = ref(false);
+  // 歷史重試鎖：整個 Dashboard 同時只允許一筆重試在途。放在 store 而非頁面，
+  // 離開歷史頁再回來（元件重建）不會失去鎖，避免同筆重複送出、舊結果覆蓋新結果。
+  const retryingId = ref<string | null>(null);
+  const retryingAction = ref<HistoryRetryAction | null>(null);
+
+  function acquireRetryLock(id: string, action: HistoryRetryAction): boolean {
+    if (retryingId.value) return false;
+    retryingId.value = id;
+    retryingAction.value = action;
+    return true;
+  }
+
+  function releaseRetryLock(): void {
+    retryingId.value = null;
+    retryingAction.value = null;
+  }
   const searchQuery = ref("");
   const hasMore = ref(true);
   const currentOffset = ref(0);
@@ -565,6 +625,289 @@ export const useHistoryStore = defineStore("history", () => {
     return deletedCount;
   }
 
+  function applyLocalRecordUpdate(
+    id: string,
+    patch: Partial<TranscriptionRecord>,
+  ): TranscriptionRecord | undefined {
+    const target = transcriptionList.value.find((r) => r.id === id);
+    if (!target) return undefined;
+    const updated: TranscriptionRecord = { ...target, ...patch };
+    transcriptionList.value = transcriptionList.value.map((r) =>
+      r.id === id ? updated : r,
+    );
+    return updated;
+  }
+
+  function recordWhisperUsage(
+    transcriptionId: string,
+    audioDurationMs: number,
+    model: string,
+  ): void {
+    void addApiUsage({
+      id: crypto.randomUUID(),
+      transcriptionId,
+      apiType: "whisper",
+      model,
+      promptTokens: null,
+      completionTokens: null,
+      totalTokens: null,
+      promptTimeMs: null,
+      completionTimeMs: null,
+      totalTimeMs: null,
+      audioDurationMs,
+      estimatedCostCeiling: calculateWhisperCostCeiling(audioDurationMs, model),
+    }).catch((err) =>
+      captureError(err, { source: "history", step: "retranscribe-usage" }),
+    );
+  }
+
+  function recordChatUsage(
+    transcriptionId: string,
+    usage: ChatUsageData | null,
+    model: string,
+  ): void {
+    if (!usage) return;
+    void addApiUsage({
+      id: crypto.randomUUID(),
+      transcriptionId,
+      apiType: "chat",
+      model,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens: usage.totalTokens,
+      promptTimeMs: usage.promptTimeMs ?? null,
+      completionTimeMs: usage.completionTimeMs ?? null,
+      totalTimeMs: usage.totalTimeMs ?? null,
+      audioDurationMs: null,
+      estimatedCostCeiling: calculateChatCostCeiling(usage.totalTokens, model),
+    }).catch((err) =>
+      captureError(err, { source: "history", step: "reenhance-usage" }),
+    );
+  }
+
+  /**
+   * 歷史紀錄「重新辨識」：以保存的錄音檔重送轉錄。成功即把該筆 failed → success
+   * 並清空整理結果（等待使用者另行「重新整理」）。只更新該筆，不貼上、不碰 HUD 狀態機。
+   */
+  async function retranscribeRecord(
+    record: TranscriptionRecord,
+  ): Promise<HistoryRetryResult> {
+    if (!record.audioFilePath) {
+      return { ok: false, errorKey: "history.noRecordingFile" };
+    }
+    // 編輯模式記錄：rawText 是語音指令、processedText 是編輯結果；重新辨識會把
+    // 編輯結果清空、只剩指令文字。與「重新整理」同樣在任何 API/DB 動作前擋下。
+    if (record.isEditMode) {
+      return { ok: false, errorKey: "history.retranscribeFailed" };
+    }
+    if (!acquireRetryLock(record.id, "transcribe")) {
+      return { ok: false, errorKey: "history.retranscribeFailed" };
+    }
+    try {
+      return await retranscribeRecordUnlocked(record);
+    } catch (err) {
+      captureError(err, { source: "history", step: "retranscribe" });
+      return { ok: false, errorKey: "history.retranscribeFailed" };
+    } finally {
+      releaseRetryLock();
+    }
+  }
+
+  async function retranscribeRecordUnlocked(
+    record: TranscriptionRecord,
+  ): Promise<HistoryRetryResult> {
+    const settingsStore = useSettingsStore();
+    const vocabularyStore = useVocabularyStore();
+
+    if (!settingsStore.getApiKey()) {
+      await settingsStore.refreshApiKey();
+    }
+    const apiKey = settingsStore.getApiKey();
+    if (!apiKey) {
+      return { ok: false, errorKey: "errors.apiKeyMissing" };
+    }
+
+    const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
+    const model = settingsStore.selectedWhisperModelId;
+
+    let result: TranscriptionResult;
+    try {
+      result = await invoke<TranscriptionResult>("retranscribe_from_file", {
+        filePath: record.audioFilePath,
+        apiKey,
+        vocabularyTermList:
+          whisperTermList.length > 0 ? whisperTermList : null,
+        modelId: model,
+        language: settingsStore.getWhisperLanguageCode(),
+      });
+    } catch (err) {
+      captureError(err, { source: "history", step: "retranscribe-invoke" });
+      return { ok: false, errorKey: "history.retranscribeFailed" };
+    }
+
+    // #39：轉譯語言為繁中時，把 Whisper 的簡體輸出轉成繁體（與即時流程一致，落地前一次到位）。
+    // 與主路徑同樣在 raw_text 寫入 DB 前套用，涵蓋空轉錄/幻覺偵測、charCount 與本地更新。
+    const transcriptionLocale = settingsStore.selectedTranscriptionLocale;
+    const effectiveLocale =
+      transcriptionLocale === "auto"
+        ? settingsStore.selectedLocale
+        : transcriptionLocale;
+    result.rawText = applyTranscriptTextTransforms(
+      result.rawText,
+      effectiveLocale,
+    );
+
+    // HTTP 成功即計費（不論轉錄內容）→ 記錄 whisper 用量
+    recordWhisperUsage(record.id, record.recordingDurationMs, model);
+
+    // 空轉錄或幻覺 → 保留 failed、不覆寫原文
+    const isEmpty = !result.rawText || !result.rawText.trim();
+    // 時長未知/非正時跳過語速異常層（無法判斷語速），仍保留能量/NSP 偵測
+    const recordingDurationForDetection =
+      record.recordingDurationMs > 0
+        ? record.recordingDurationMs
+        : Number.MAX_SAFE_INTEGER;
+    const hallucination = detectHallucination({
+      rawText: result.rawText,
+      recordingDurationMs: recordingDurationForDetection,
+      peakEnergyLevel: result.peakEnergyLevel,
+      rmsEnergyLevel: result.rmsEnergyLevel,
+      noSpeechProbability: result.noSpeechProbability,
+    });
+    if (isEmpty || hallucination.isHallucination) {
+      return { ok: false, errorKey: "history.retranscribeFailed" };
+    }
+
+    const charCount = result.rawText.length;
+    const transcriptionDurationMs = Math.round(result.transcriptionDurationMs);
+
+    const db = getDatabase();
+    const res = await db.execute(UPDATE_ON_RETRANSCRIBE_SQL, [
+      result.rawText,
+      transcriptionDurationMs,
+      charCount,
+      record.id,
+      record.rawText,
+    ]);
+    if (!res?.rowsAffected) {
+      // 樂觀鎖：紀錄已被刪除或 raw_text 已被並行修改 → 放棄，不覆寫
+      return { ok: false, errorKey: "history.retranscribeFailed" };
+    }
+
+    const updated = applyLocalRecordUpdate(record.id, {
+      status: "success",
+      rawText: result.rawText,
+      processedText: null,
+      wasEnhanced: false,
+      wasModified: null,
+      transcriptionDurationMs,
+      enhancementDurationMs: null,
+      charCount,
+    });
+    return { ok: true, record: updated };
+  }
+
+  /**
+   * 歷史紀錄「重新整理」：用既有原文重跑 AI 校對，套用與即時流程相同的長度爆炸防護。
+   * 成功則寫入 processed_text 並標記 was_enhanced。只更新該筆，不貼上、不碰 HUD 狀態機。
+   */
+  async function reEnhanceRecord(
+    record: TranscriptionRecord,
+  ): Promise<HistoryRetryResult> {
+    if (!record.rawText.trim()) {
+      return { ok: false, errorKey: "history.reEnhanceFailed" };
+    }
+
+    // 編輯模式記錄：rawText 是語音指令、processedText 是編輯結果；
+    // 「重新整理」會把編輯結果覆寫成清理過的指令文字。UI 已停用該按鈕，
+    // 此處為防繞過 UI 直呼 store 的守衛——在任何 API/DB 動作前就擋下。
+    if (record.isEditMode) {
+      return { ok: false, errorKey: "history.reEnhanceFailed" };
+    }
+    if (!acquireRetryLock(record.id, "enhance")) {
+      return { ok: false, errorKey: "history.reEnhanceFailed" };
+    }
+    try {
+      return await reEnhanceRecordUnlocked(record);
+    } catch (err) {
+      captureError(err, { source: "history", step: "reenhance" });
+      return { ok: false, errorKey: "history.reEnhanceFailed" };
+    } finally {
+      releaseRetryLock();
+    }
+  }
+
+  async function reEnhanceRecordUnlocked(
+    record: TranscriptionRecord,
+  ): Promise<HistoryRetryResult> {
+    const settingsStore = useSettingsStore();
+    const vocabularyStore = useVocabularyStore();
+
+    await settingsStore.refreshLlmApiKey();
+    const llmApiKey = settingsStore.getLlmApiKey();
+    if (!llmApiKey) {
+      return { ok: false, errorKey: "errors.apiKeyMissing" };
+    }
+
+    const termList = await vocabularyStore.getTopTermListByWeight(50);
+    const startTime = performance.now();
+
+    let enhanceResult: EnhanceWithGuardResult;
+    try {
+      enhanceResult = await enhanceWithAnomalyGuard(
+        record.rawText,
+        llmApiKey,
+        {
+          systemPrompt: settingsStore.getAiPrompt(),
+          vocabularyTermList: termList.length > 0 ? termList : undefined,
+          modelId: settingsStore.selectedLlmModelId,
+        },
+      );
+    } catch (err) {
+      captureError(err, { source: "history", step: "reenhance" });
+      return { ok: false, errorKey: "history.reEnhanceFailed" };
+    }
+
+    const enhancementDurationMs = Math.round(performance.now() - startTime);
+
+    // API 已呼叫（即使 anomaly fallback）→ 記錄 chat 用量
+    recordChatUsage(
+      record.id,
+      enhanceResult.usage,
+      settingsStore.selectedLlmModelId,
+    );
+
+    // 空回應（LLM 回空、enhanceText 退回原文）→ 不是整理結果，保留既有 processed_text
+    if (enhanceResult.wasAnomalous || enhanceResult.wasEmptyResponse) {
+      return { ok: false, errorKey: "history.reEnhanceFailed" };
+    }
+
+    // #43 語意飄移守衛：整理結果與原文 bigram 重疊過低（疑似答非所問）→
+    // 拒絕並保留既有結果、不覆寫 DB，並以 reEnhanceDrift 訊息提示使用者。
+    if (enhanceResult.wasDrift) {
+      return { ok: false, errorKey: "history.reEnhanceDrift" };
+    }
+
+    const db = getDatabase();
+    const res = await db.execute(UPDATE_ON_REENHANCE_SQL, [
+      enhanceResult.text,
+      enhancementDurationMs,
+      record.id,
+      record.rawText,
+    ]);
+    if (!res?.rowsAffected) {
+      // 樂觀鎖：紀錄已被刪除或 raw_text 已被並行修改（整理結果基於舊原文）→ 放棄
+      return { ok: false, errorKey: "history.reEnhanceFailed" };
+    }
+
+    const updated = applyLocalRecordUpdate(record.id, {
+      processedText: enhanceResult.text,
+      wasEnhanced: true,
+      enhancementDurationMs,
+    });
+    return { ok: true, record: updated };
+  }
+
   return {
     transcriptionList,
     isLoading,
@@ -589,5 +932,9 @@ export const useHistoryStore = defineStore("history", () => {
     clearAudioFilePathByIdList,
     deleteTranscription,
     deleteAllRecordingFiles,
+    retryingId,
+    retryingAction,
+    retranscribeRecord,
+    reEnhanceRecord,
   };
 });

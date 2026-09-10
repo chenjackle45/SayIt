@@ -76,6 +76,13 @@ pub struct TranscriptionResult {
     pub raw_text: String,
     pub transcription_duration_ms: f64,
     pub no_speech_probability: f64,
+    // Peak/RMS energy (0.0..=1.0) of the source audio. Populated by
+    // `retranscribe_from_file` (computed from the WAV) so the frontend
+    // hallucination detector can run on history retries; the live
+    // transcription path leaves these at 0.0 (it derives energy from the
+    // recorder's StopRecordingResult instead).
+    pub peak_energy_level: f32,
+    pub rms_energy_level: f32,
 }
 
 // ========== Groq API Response ==========
@@ -324,6 +331,9 @@ async fn send_transcription_request(
                     raw_text,
                     transcription_duration_ms,
                     no_speech_probability,
+                    // Live path doesn't compute energy here; retranscribe_from_file fills these in.
+                    peak_energy_level: 0.0,
+                    rms_energy_level: 0.0,
                 });
             }
             Err(failure) => {
@@ -349,6 +359,57 @@ async fn send_transcription_request(
     }
 
     unreachable!("retry loop always returns within MAX_TRANSCRIPTION_ATTEMPTS")
+}
+
+/// Locate the byte offset of the PCM samples (start of the "data" sub-chunk body)
+/// in a RIFF/WAVE buffer. Returns None if the buffer is not a recognizable WAV.
+fn find_wav_data_offset(wav_data: &[u8]) -> Option<usize> {
+    if wav_data.len() < 12 || &wav_data[0..4] != b"RIFF" || &wav_data[8..12] != b"WAVE" {
+        return None;
+    }
+    let mut pos = 12;
+    while pos + 8 <= wav_data.len() {
+        let chunk_id = &wav_data[pos..pos + 4];
+        let chunk_size = u32::from_le_bytes([
+            wav_data[pos + 4],
+            wav_data[pos + 5],
+            wav_data[pos + 6],
+            wav_data[pos + 7],
+        ]) as usize;
+        let body = pos + 8;
+        if chunk_id == b"data" {
+            return Some(body);
+        }
+        // Sub-chunks are word-aligned (padded to an even byte count).
+        pos = body + chunk_size + (chunk_size & 1);
+    }
+    None
+}
+
+/// Compute peak & RMS energy (0.0..=1.0) from a 16-bit mono PCM WAV byte buffer.
+/// Mirrors the live-recording formula in `audio_recorder.rs` so the hallucination
+/// detector can run on re-transcribed history recordings.
+fn compute_wav_energy(wav_data: &[u8]) -> (f32, f32) {
+    let data_offset = find_wav_data_offset(wav_data).unwrap_or(44);
+    let pcm = match wav_data.get(data_offset..) {
+        Some(slice) => slice,
+        None => return (0.0, 0.0),
+    };
+    let sample_count = pcm.len() / 2;
+    if sample_count == 0 {
+        return (0.0, 0.0);
+    }
+    let mut peak = 0.0_f32;
+    let mut sum_squares = 0.0_f64;
+    for frame in pcm.chunks_exact(2) {
+        let s = i16::from_le_bytes([frame[0], frame[1]]);
+        let abs_normalized = (s as f32).abs() / i16::MAX as f32;
+        peak = peak.max(abs_normalized);
+        let norm_f64 = s as f64 / i16::MAX as f64;
+        sum_squares += norm_f64 * norm_f64;
+    }
+    let rms = (sum_squares / sample_count as f64).sqrt() as f32;
+    (peak, rms)
 }
 
 // ========== Commands ==========
@@ -411,7 +472,11 @@ pub async fn retranscribe_from_file(
         wav_data.len()
     );
 
-    send_transcription_request(
+    // Compute energy from the WAV before the bytes are moved into the request,
+    // so the frontend hallucination detector can run on this history retry.
+    let (peak_energy_level, rms_energy_level) = compute_wav_energy(&wav_data);
+
+    let mut result = send_transcription_request(
         wav_data,
         &transcription_state,
         api_key,
@@ -419,7 +484,10 @@ pub async fn retranscribe_from_file(
         model_id,
         language,
     )
-    .await
+    .await?;
+    result.peak_energy_level = peak_energy_level;
+    result.rms_energy_level = rms_energy_level;
+    Ok(result)
 }
 
 #[command]
@@ -487,11 +555,61 @@ mod tests {
             raw_text: "hello".to_string(),
             transcription_duration_ms: 320.5,
             no_speech_probability: 0.01,
+            peak_energy_level: 0.5,
+            rms_energy_level: 0.1,
         };
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("\"rawText\""));
         assert!(json.contains("\"transcriptionDurationMs\""));
         assert!(json.contains("\"noSpeechProbability\""));
+        assert!(json.contains("\"peakEnergyLevel\""));
+        assert!(json.contains("\"rmsEnergyLevel\""));
+    }
+
+    /// Build a minimal mono 16-bit PCM WAV around the given samples.
+    fn make_test_wav(samples: &[i16]) -> Vec<u8> {
+        let mut v = Vec::new();
+        v.extend_from_slice(b"RIFF");
+        v.extend_from_slice(&0u32.to_le_bytes()); // chunk size (ignored by parser)
+        v.extend_from_slice(b"WAVE");
+        v.extend_from_slice(b"fmt ");
+        v.extend_from_slice(&16u32.to_le_bytes());
+        v.extend_from_slice(&1u16.to_le_bytes()); // PCM
+        v.extend_from_slice(&1u16.to_le_bytes()); // mono
+        v.extend_from_slice(&16000u32.to_le_bytes()); // sample rate
+        v.extend_from_slice(&32000u32.to_le_bytes()); // byte rate
+        v.extend_from_slice(&2u16.to_le_bytes()); // block align
+        v.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
+        v.extend_from_slice(b"data");
+        v.extend_from_slice(&((samples.len() * 2) as u32).to_le_bytes());
+        for &s in samples {
+            v.extend_from_slice(&s.to_le_bytes());
+        }
+        v
+    }
+
+    #[test]
+    fn test_compute_wav_energy() {
+        // Silence → (0, 0)
+        let (peak, rms) = compute_wav_energy(&make_test_wav(&[0i16; 8]));
+        assert!(peak < 1e-6, "peak={peak}");
+        assert!(rms < 1e-6, "rms={rms}");
+
+        // Full-scale square wave → peak ≈ 1.0, rms ≈ 1.0
+        let (peak, rms) =
+            compute_wav_energy(&make_test_wav(&[i16::MAX, -i16::MAX, i16::MAX, -i16::MAX]));
+        assert!((peak - 1.0).abs() < 1e-3, "peak={peak}");
+        assert!(rms > 0.9, "rms={rms}");
+
+        // Empty data chunk → (0, 0), no panic
+        let (peak, rms) = compute_wav_energy(&make_test_wav(&[]));
+        assert_eq!(peak, 0.0);
+        assert_eq!(rms, 0.0);
+
+        // Non-WAV / too short → (0, 0), no panic
+        let (peak, rms) = compute_wav_energy(&[1u8, 2, 3]);
+        assert_eq!(peak, 0.0);
+        assert_eq!(rms, 0.0);
     }
 
     // ========== Retry classification (gh-10) ==========

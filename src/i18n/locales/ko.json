@@ -249,7 +249,14 @@
     "loadingMore": "더 불러오는 중...",
     "playRecording": "녹음 재생",
     "noRecordingFile": "녹음 파일이 없습니다",
-    "failedBadge": "인식 실패"
+    "failedBadge": "인식 실패",
+    "retranscribe": "다시 인식",
+    "reEnhance": "다시 정리",
+    "retranscribing": "다시 인식 중…",
+    "reEnhancing": "다시 정리 중…",
+    "retranscribeFailed": "다시 인식하지 못했습니다. 잠시 후 다시 시도하세요",
+    "reEnhanceFailed": "다시 정리하지 못했습니다. 잠시 후 다시 시도하세요",
+    "reEnhanceDrift": "정리 결과가 원문에서 너무 벗어나 기존 결과를 유지했습니다"
   },
   "dictionary": {
     "termCount": "{count} 단어",

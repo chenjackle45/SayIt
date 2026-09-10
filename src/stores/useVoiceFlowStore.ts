@@ -16,7 +16,7 @@ import { enhanceText, buildSystemPrompt } from "../lib/enhancer";
 import { getEditModePromptForLocale } from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
 import { analyzeCorrections } from "../lib/vocabularyAnalyzer";
-import { convertSimplifiedToTraditional } from "../lib/simplifiedToTraditional";
+import { applyTranscriptTextTransforms as applySharedTranscriptTextTransforms } from "../lib/transcriptTextTransforms";
 import i18n from "../i18n";
 import { useVocabularyStore } from "./useVocabularyStore";
 import { useHistoryStore } from "./useHistoryStore";
@@ -86,8 +86,8 @@ function t(key: string, params?: Record<string, unknown>): string {
 
 /**
  * 轉錄原文落地前的文字轉換。
- * 目前只做：轉譯語言解析為繁中（zh-TW）時，把 Whisper 的簡體輸出轉成繁體（#39）。
- * 「auto」模式回退到介面語言；其餘語言原樣返回。
+ * 解析有效轉譯語言（auto 回退到介面語言）後，委派給共用的 applyTranscriptTextTransforms。
+ * 目前只做：繁中（zh-TW）時把 Whisper 的簡體輸出轉成繁體（#39）。
  */
 function applyTranscriptTextTransforms(rawText: string): string {
   if (!rawText) return rawText;
@@ -97,9 +97,7 @@ function applyTranscriptTextTransforms(rawText: string): string {
     transcriptionLocale === "auto"
       ? settingsStore.selectedLocale
       : transcriptionLocale;
-  return effectiveLocale === "zh-TW"
-    ? convertSimplifiedToTraditional(rawText)
-    : rawText;
+  return applySharedTranscriptTextTransforms(rawText, effectiveLocale);
 }
 
 const MONITOR_POLL_INTERVAL_MS = 250;

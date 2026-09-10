@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { useHistoryStore } from "../stores/useHistoryStore";
@@ -19,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ChevronDown, Copy, Check, Trash2, Play, Pause } from "lucide-vue-next";
+import { Search, ChevronDown, Copy, Check, Trash2, Play, Pause, RefreshCw, Sparkles, Loader2 } from "lucide-vue-next";
 import { captureError } from "../lib/sentry";
 
 const historyStore = useHistoryStore();
@@ -30,6 +30,10 @@ const copiedRecordId = ref<string | null>(null);
 const copiedRawRecordId = ref<string | null>(null);
 const sentinelRef = ref<HTMLElement | null>(null);
 const playingRecordId = ref<string | null>(null);
+// 重試鎖在 store（跨路由存活）；頁面只讀狀態來顯示 spinner / disabled
+const retryingId = computed(() => historyStore.retryingId);
+const retryingAction = computed(() => historyStore.retryingAction);
+const retryError = ref<{ id: string; key: string } | null>(null);
 let currentAudio: HTMLAudioElement | null = null;
 let currentBlobUrl: string | null = null;
 
@@ -145,6 +149,31 @@ async function handlePlayRecording(record: TranscriptionRecord) {
     cleanupAudio();
     playingRecordId.value = null;
     captureError(err, { source: "history-view", step: "play-recording" });
+  }
+}
+
+// 鎖、錯誤攔截與上報都在 store；頁面只把結果轉成訊息
+async function handleRetranscribe(record: TranscriptionRecord) {
+  if (retryingId.value) return;
+  retryError.value = null;
+  const result = await historyStore.retranscribeRecord(record);
+  if (!result.ok) {
+    retryError.value = {
+      id: record.id,
+      key: result.errorKey ?? "history.retranscribeFailed",
+    };
+  }
+}
+
+async function handleReEnhance(record: TranscriptionRecord) {
+  if (retryingId.value) return;
+  retryError.value = null;
+  const result = await historyStore.reEnhanceRecord(record);
+  if (!result.ok) {
+    retryError.value = {
+      id: record.id,
+      key: result.errorKey ?? "history.reEnhanceFailed",
+    };
   }
 }
 
@@ -285,6 +314,30 @@ onBeforeUnmount(() => {
                     <Check v-if="copiedRecordId === record.id" class="h-3.5 w-3.5 text-green-400" />
                     <Copy v-else class="h-3.5 w-3.5" />
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="h-7 w-7"
+                    data-testid="retranscribe-button"
+                    :disabled="!record.audioFilePath || record.isEditMode || retryingId !== null"
+                    :title="retryingId === record.id && retryingAction === 'transcribe' ? $t('history.retranscribing') : (record.audioFilePath ? $t('history.retranscribe') : $t('history.noRecordingFile'))"
+                    @click.stop="handleRetranscribe(record)"
+                  >
+                    <Loader2 v-if="retryingId === record.id && retryingAction === 'transcribe'" class="h-3.5 w-3.5 animate-spin" />
+                    <RefreshCw v-else class="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="h-7 w-7"
+                    data-testid="reenhance-button"
+                    :disabled="!record.rawText.trim() || record.isEditMode || retryingId !== null"
+                    :title="retryingId === record.id && retryingAction === 'enhance' ? $t('history.reEnhancing') : $t('history.reEnhance')"
+                    @click.stop="handleReEnhance(record)"
+                  >
+                    <Loader2 v-if="retryingId === record.id && retryingAction === 'enhance'" class="h-3.5 w-3.5 animate-spin" />
+                    <Sparkles v-else class="h-3.5 w-3.5" />
+                  </Button>
                   <ChevronDown
                     class="h-3.5 w-3.5 text-muted-foreground transition-transform"
                     :class="{ 'rotate-180': expandedRecordId === record.id }"
@@ -295,6 +348,14 @@ onBeforeUnmount(() => {
                 {{ truncateText(getDisplayText(record)) }}
               </p>
             </div>
+            <!-- 重試錯誤訊息（每筆常駐顯示）-->
+            <p
+              v-if="retryError && retryError.id === record.id"
+              class="px-5 pb-2 text-xs text-destructive"
+              data-testid="retry-error"
+            >
+              {{ $t(retryError.key) }}
+            </p>
 
             <!-- 展開詳細 -->
             <div
