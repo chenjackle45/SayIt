@@ -40,22 +40,23 @@ pub struct SelectionState {
 }
 
 impl SelectionState {
-    // selection / no_selection 僅 macOS 的 AX 分類器使用；
-    // Windows 端一律 unavailable，cfg 閘避免 dead_code 撞上 clippy -D warnings
-    #[cfg(target_os = "macos")]
+    // selection / no_selection 由 macOS 的 AX 分類器與 Windows 的剪貼簿判定使用；
+    // unavailable 只剩 macOS 與其他平台會回。cfg 閘避免 dead_code 撞上 clippy -D warnings
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     fn selection(text: String) -> Self {
         Self {
             kind: "selection".to_string(),
             text: Some(text),
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     fn no_selection() -> Self {
         Self {
             kind: "noSelection".to_string(),
             text: None,
         }
     }
+    #[cfg(not(target_os = "windows"))]
     fn unavailable() -> Self {
         Self {
             kind: "unavailable".to_string(),
@@ -71,7 +72,12 @@ impl SelectionState {
 ///                  CodeMirror 類編輯器的「無選取複製整行」誤判（#24）在此被排除
 ///   unavailable  — AX 不可見或讀值失真（Heptabase/LINE 類）→ 前端在錄音停止、
 ///                  按鍵放開後改走剪貼簿後備（read_selected_text）
-/// Windows / 其他平台：一律 unavailable（沿用剪貼簿後備；選取讀取待 UIA 版補上）。
+/// Windows：錄音開始時當場走剪貼簿擷取（Ctrl+C）並回 selection / noSelection，
+///   即 v0.10.0 的時序。回 unavailable 會讓前端改在「觸發鍵放開後」才送 Ctrl+C，
+///   瀏覽器把單獨放開的 Alt 當成選單鍵、之後的貼上失焦（#70/#72 回歸）。
+///   擷取失敗或沒抓到文字一律回 noSelection＝本輪不進編輯模式（與 v0.10.0 相同），
+///   不回 unavailable 以免重新排程停止後的擷取。選取讀取待 UIA 版補上。
+/// 其他平台：一律 unavailable。
 #[tauri::command]
 pub fn read_selection_state() -> SelectionState {
     #[cfg(target_os = "macos")]
@@ -79,7 +85,15 @@ pub fn read_selection_state() -> SelectionState {
         macos::read_selection_state_impl()
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        match super::clipboard_paste::capture_selected_text_via_clipboard() {
+            Ok(Some(text)) => SelectionState::selection(text),
+            _ => SelectionState::no_selection(),
+        }
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         SelectionState::unavailable()
     }
