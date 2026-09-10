@@ -14,6 +14,9 @@ import type {
 import type { VocabularyChangedPayload } from "../types/events";
 import i18n from "../i18n";
 
+/** 匯入時每批 upsert 的詞條數（500 × 4 個參數，遠低於 SQLite 變數上限） */
+const IMPORT_BATCH_SIZE = 500;
+
 interface RawVocabularyRow {
   id: string;
   term: string;
@@ -188,10 +191,14 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
   }
 
   /**
-   * 批次匯入詞條，以單一交易寫入。合併策略（term 以小寫比對）：
+   * 批次匯入詞條。合併策略（term 以小寫比對）：
    * - 不存在 → 新增（added）
    * - 已存在且匯入 weight 較大 → 更新為較大值（merged）
    * - 已存在且 weight 未較大 → 略過（skipped）
+   *
+   * 不使用跨呼叫交易：tauri-plugin-sql 的連線池無連線親和性，BEGIN/COMMIT
+   * 可能落在不同連線（見 #65）。改以分批 multi-row upsert 寫入，每批單一語句
+   * 原子；upsert 取 MAX(weight) 使整個流程冪等，中途失敗重跑即可補齊。
    */
   async function importEntries(
     entries: ImportedTerm[],
@@ -201,50 +208,62 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
 
     const db = getDatabase();
 
-    // 建立現有詞條索引（小寫 term → { id, weight }）
-    const existingRows = await db.select<
-      { id: string; term: string; weight: number }[]
-    >("SELECT id, term, weight FROM vocabulary");
-    const existingByTerm = new Map<string, { id: string; weight: number }>();
+    // 建立現有詞條索引（小寫 term → { term 原字串, weight }）
+    const existingRows = await db.select<{ term: string; weight: number }[]>(
+      "SELECT term, weight FROM vocabulary",
+    );
+    const existingByTerm = new Map<string, { term: string; weight: number }>();
     for (const row of existingRows) {
       existingByTerm.set(row.term.trim().toLowerCase(), {
-        id: row.id,
+        term: row.term,
         weight: row.weight,
       });
     }
 
+    // 先在記憶體分類：只把需要寫入的（新增 / 合併）收進 upsert 清單。
+    // 合併時沿用 DB 既有的 term 字串（UNIQUE(term) 大小寫敏感），讓 ON CONFLICT 命中。
+    const rowsToUpsert: ImportedTerm[] = [];
+    for (const entry of entries) {
+      const key = entry.term.toLowerCase();
+      const existing = existingByTerm.get(key);
+      if (!existing) {
+        rowsToUpsert.push(entry);
+        // 同次匯入若有重複（理論上已去重）也視為已存在
+        existingByTerm.set(key, { term: entry.term, weight: entry.weight });
+        result.added += 1;
+      } else if (entry.weight > existing.weight) {
+        rowsToUpsert.push({ ...entry, term: existing.term });
+        existing.weight = entry.weight;
+        result.merged += 1;
+      } else {
+        result.skipped += 1;
+      }
+    }
+
     try {
-      await db.execute("BEGIN TRANSACTION");
-      for (const entry of entries) {
-        const key = entry.term.toLowerCase();
-        const existing = existingByTerm.get(key);
-        if (!existing) {
-          const id = crypto.randomUUID();
-          await db.execute(
-            "INSERT INTO vocabulary (id, term, weight, source) VALUES ($1, $2, $3, $4)",
-            [id, entry.term, entry.weight, entry.source],
+      for (let i = 0; i < rowsToUpsert.length; i += IMPORT_BATCH_SIZE) {
+        const batch = rowsToUpsert.slice(i, i + IMPORT_BATCH_SIZE);
+        const placeholders: string[] = [];
+        const params: (string | number)[] = [];
+        batch.forEach((entry, index) => {
+          const base = index * 4;
+          placeholders.push(
+            `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`,
           );
-          // 同次匯入若有重複（理論上已去重）也視為已存在
-          existingByTerm.set(key, { id, weight: entry.weight });
-          result.added += 1;
-        } else if (entry.weight > existing.weight) {
-          await db.execute(
-            "UPDATE vocabulary SET weight = $1 WHERE id = $2",
-            [entry.weight, existing.id],
+          params.push(
+            crypto.randomUUID(),
+            entry.term,
+            entry.weight,
+            entry.source,
           );
-          existing.weight = entry.weight;
-          result.merged += 1;
-        } else {
-          result.skipped += 1;
-        }
+        });
+        await db.execute(
+          `INSERT INTO vocabulary (id, term, weight, source) VALUES ${placeholders.join(", ")} ` +
+            "ON CONFLICT(term) DO UPDATE SET weight = MAX(vocabulary.weight, excluded.weight)",
+          params,
+        );
       }
-      await db.execute("COMMIT");
     } catch (error) {
-      try {
-        await db.execute("ROLLBACK");
-      } catch {
-        // 忽略 rollback 失敗
-      }
       console.error(
         `[vocabulary-store] importEntries failed: ${extractErrorMessage(error)}`,
       );

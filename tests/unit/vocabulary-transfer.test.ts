@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   EXPORT_FORMAT,
   EXPORT_VERSION,
+  MAX_IMPORT_ENTRIES,
   MAX_TERM_LENGTH,
+  MAX_WEIGHT,
   buildExportFile,
   parseImportContent,
   serializeExport,
@@ -30,6 +32,14 @@ describe("buildExportFile / serializeExport", () => {
     );
     expect(file.terms[0].weight).toBe(1);
     expect(file.terms[0].source).toBe("manual");
+  });
+
+  it("匯出時 weight 超過上限夾到 MAX_WEIGHT", () => {
+    const file = buildExportFile(
+      [{ term: "X", weight: 9e15, source: "manual" }],
+      "2026-06-09T00:00:00.000Z",
+    );
+    expect(file.terms[0].weight).toBe(MAX_WEIGHT);
   });
 
   it("serializeExport 產生可被 parseImportContent 解析的 JSON", () => {
@@ -66,6 +76,22 @@ describe("parseImportContent — SayIt JSON", () => {
     const json = JSON.stringify({ terms: [{ term: "  " }, { term: "OK" }] });
     const result = parseImportContent("a.json", json);
     expect(result).toEqual([{ term: "OK", weight: 1, source: "manual" }]);
+  });
+
+  it("weight 超過上限夾到 MAX_WEIGHT（壞檔不能霸佔排序）", () => {
+    const json = JSON.stringify({
+      terms: [
+        { term: "Huge", weight: 9e15 },
+        { term: "Edge", weight: MAX_WEIGHT },
+        { term: "Str", weight: "99999" },
+      ],
+    });
+    const result = parseImportContent("a.json", json);
+    expect(result.map((e) => e.weight)).toEqual([
+      MAX_WEIGHT,
+      MAX_WEIGHT,
+      MAX_WEIGHT,
+    ]);
   });
 
   it("非 JSON 內容的 .json 檔拋出 INVALID_JSON", () => {
@@ -114,5 +140,38 @@ describe("parseImportContent — 純文字 / CSV（Typeless 遷移）", () => {
     const long = "a".repeat(MAX_TERM_LENGTH + 50);
     const result = parseImportContent("d.txt", long);
     expect(result[0].term).toHaveLength(MAX_TERM_LENGTH);
+  });
+});
+
+describe("parseImportContent — 詞條數上限", () => {
+  const lines = (n: number) =>
+    Array.from({ length: n }, (_, i) => `term${i}`).join("\n");
+
+  it("剛好等於上限可以匯入", () => {
+    const result = parseImportContent("d.txt", lines(MAX_IMPORT_ENTRIES));
+    expect(result).toHaveLength(MAX_IMPORT_ENTRIES);
+  });
+
+  it("超過上限拋出 TOO_MANY_ENTRIES", () => {
+    expect(() =>
+      parseImportContent("d.txt", lines(MAX_IMPORT_ENTRIES + 1)),
+    ).toThrow("TOO_MANY_ENTRIES");
+  });
+
+  it("以去重後的數量計算（重複行不算）", () => {
+    const txt = lines(MAX_IMPORT_ENTRIES) + "\n" + lines(10);
+    const result = parseImportContent("d.txt", txt);
+    expect(result).toHaveLength(MAX_IMPORT_ENTRIES);
+  });
+
+  it("JSON 格式同樣受上限限制", () => {
+    const json = JSON.stringify({
+      terms: Array.from({ length: MAX_IMPORT_ENTRIES + 1 }, (_, i) => ({
+        term: `t${i}`,
+      })),
+    });
+    expect(() => parseImportContent("a.json", json)).toThrow(
+      "TOO_MANY_ENTRIES",
+    );
   });
 });

@@ -12,14 +12,17 @@ export const EXPORT_VERSION = 1 as const;
 export const MAX_TERM_LENGTH = 100;
 /** 匯入檔案大小上限（位元組），避免一次塞入過大檔案 */
 export const MAX_IMPORT_FILE_BYTES = 2 * 1024 * 1024;
+/** 單次匯入詞條數上限，超過請使用者拆檔（避免數萬筆寫入長時間鎖住 DB） */
+export const MAX_IMPORT_ENTRIES = 5000;
+/** 權重上限，避免壞檔塞入超大 weight 永久霸佔 top-N 排序 */
+export const MAX_WEIGHT = 1000;
 
 const VALID_SOURCES: VocabularySource[] = ["manual", "ai"];
 
 function normalizeWeight(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return 1;
-  const int = Math.floor(n);
-  return int < 1 ? 1 : int;
+  return Math.min(Math.max(Math.floor(n), 1), MAX_WEIGHT);
 }
 
 function normalizeSource(value: unknown): VocabularySource {
@@ -128,13 +131,18 @@ function looksLikeJson(content: string): boolean {
  * 依檔名與內容判斷格式並解析。
  * - .json 或內容像 JSON → 當作 SayIt 匯出檔
  * - 其他（.txt / .csv / 純文字）→ 寬鬆純文字匯入
- * 回傳去重後的詞條陣列。
+ * 回傳去重後的詞條陣列；去重後超過 MAX_IMPORT_ENTRIES 拋出 TOO_MANY_ENTRIES。
  */
 export function parseImportContent(
   filename: string,
   content: string,
 ): ImportedTerm[] {
   const isJson = /\.json$/i.test(filename) || looksLikeJson(content);
-  const entries = isJson ? parseSayItJson(content) : parsePlainText(content);
-  return dedupe(entries);
+  const entries = dedupe(
+    isJson ? parseSayItJson(content) : parsePlainText(content),
+  );
+  if (entries.length > MAX_IMPORT_ENTRIES) {
+    throw new Error("TOO_MANY_ENTRIES");
+  }
+  return entries;
 }

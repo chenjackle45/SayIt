@@ -269,11 +269,12 @@
     "aiTermCount": "{count} terms",
     "export": "Export",
     "import": "Import",
-    "exportSuccess": "Exported {count} terms",
+    "exportSuccess": "Exported {count} terms. {filename} was saved to your Downloads folder",
     "exportEmpty": "No terms to export",
     "importSuccess": "Import complete: {added} added, {merged} merged, {skipped} skipped",
     "importEmpty": "No importable terms found in the file",
     "importTooLarge": "File is too large to import",
+    "importTooManyEntries": "Too many terms (limit {limit}). Please split the file and import in parts",
     "importInvalidFile": "Unrecognized file format",
     "importFailed": "Import failed: {error}",
     "transferHint": "Export your dictionary to a single file and import it on another device. Import also accepts a plain .txt/.csv file (one term per line) — handy for migrating from tools like Typeless."

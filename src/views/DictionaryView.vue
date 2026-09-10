@@ -9,6 +9,7 @@ import { Plus, Trash2, Bot, Hand, Info, Download, Upload } from "lucide-vue-next
 import {
   serializeExport,
   parseImportContent,
+  MAX_IMPORT_ENTRIES,
   MAX_IMPORT_FILE_BYTES,
 } from "../lib/vocabularyTransfer";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -107,14 +108,11 @@ async function handleExport() {
     }
     const iso = new Date().toISOString();
     const stamp = iso.slice(0, 10).replace(/-/g, "");
-    downloadTextFile(
-      `sayit-dictionary-${stamp}.json`,
-      serializeExport(entries, iso),
-      "application/json",
-    );
+    const filename = `sayit-dictionary-${stamp}.json`;
+    downloadTextFile(filename, serializeExport(entries, iso), "application/json");
     feedback.show(
       "success",
-      t("dictionary.exportSuccess", { count: entries.length }),
+      t("dictionary.exportSuccess", { count: entries.length, filename }),
     );
   } catch (err) {
     feedback.show("error", extractErrorMessage(err));
@@ -162,8 +160,13 @@ async function handleImportFileSelected(event: Event) {
     const key =
       message === "INVALID_JSON" || message === "INVALID_FORMAT"
         ? "dictionary.importInvalidFile"
-        : "dictionary.importFailed";
-    feedback.show("error", t(key, { error: message }));
+        : message === "TOO_MANY_ENTRIES"
+          ? "dictionary.importTooManyEntries"
+          : "dictionary.importFailed";
+    feedback.show(
+      "error",
+      t(key, { error: message, limit: MAX_IMPORT_ENTRIES }),
+    );
     captureError(err, { source: "dictionary-import" });
   } finally {
     isImporting.value = false;
