@@ -420,11 +420,11 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "AI model refresh: all four providers now use the latest models — your previous choice migrates automatically, no reconfiguration needed (older Groq models are being retired, please stay updated)",
-      "item2": "Edit mode rebuilt: rewriting selected text is now reliable — no more false triggers or stray \"c\" characters",
-      "item3": "Transcription now retries automatically on failure; error messages clearly state whether it's quota, a busy service, or a network issue",
-      "item4": "Traditional Chinese output no longer falls back to Simplified; added a guard against AI producing text you never said",
-      "item5": "New \"Hide Dock Icon\" option (macOS); the dashboard now shows today's actual usage",
+      "item1": "Windows auto-paste fix: text not being pasted in browsers and some other apps is addressed — please give it a try",
+      "item2": "New Theme setting: light, dark, or follow system — applies to both the HUD and the main window",
+      "item3": "Each history entry can now be re-transcribed or re-enhanced — no need to record again after a bad result",
+      "item4": "Dictionary export / import (JSON, TXT, CSV) for moving between machines or from other tools",
+      "item5": "New \"Debug log\" switch in Settings (off by default) so you can attach a log file when reporting issues",
       "dismiss": "Got it"
     }
   },
