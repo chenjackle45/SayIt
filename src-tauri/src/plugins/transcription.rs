@@ -401,8 +401,8 @@ fn compute_wav_energy(wav_data: &[u8]) -> (f32, f32) {
     }
     let mut peak = 0.0_f32;
     let mut sum_squares = 0.0_f64;
-    for frame in pcm.chunks_exact(2) {
-        let s = i16::from_le_bytes([frame[0], frame[1]]);
+    for frame in pcm.as_chunks::<2>().0 {
+        let s = i16::from_le_bytes(*frame);
         let abs_normalized = (s as f32).abs() / i16::MAX as f32;
         peak = peak.max(abs_normalized);
         let norm_f64 = s as f64 / i16::MAX as f64;
