@@ -10,6 +10,8 @@ optimized_for_llm: true
 
 # Project Context for AI Agents
 
+> **2026-09-11 起降為歷史參考、不再新增。** 現行規則以 `CLAUDE.md`、`.claude/rules/*.md`（依路徑自動載入）與 `docs/development-process.md` 為準；本檔內容新舊混雜，引用前逐條核對程式碼。
+
 _This file contains critical rules and patterns that AI agents must follow when implementing code in this project. Focus on unobvious details that agents might otherwise miss._
 
 ---

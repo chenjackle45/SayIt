@@ -273,10 +273,12 @@ sqlite3 %APPDATA%\com.sayit.app\app.db
 
 ## 八、Pre-commit Checklist
 
+> 這是 commit 前的機械檢查；閘門（codex 雙閘、雙向追溯閘）與整條流程見 [`development-process.md`](./development-process.md)。
+
 ```
 □ pnpm test                  全部單元測試通過
 □ npx vue-tsc --noEmit       無型別錯誤
-□ cargo check (src-tauri)    Rust 編譯通過
+□ cargo clippy --workspace --all-targets -- -D warnings && cargo test（src-tauri，與 CI 同條件）
 □ pnpm exec eslint src       ESLint 無錯（hook 已自動跑）
 □ 若改 IPC：用 tauri-reviewer subagent 雙端對齊審查
 □ 若改 UI：先在 design.pen 完成設計稿

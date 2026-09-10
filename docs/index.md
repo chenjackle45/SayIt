@@ -90,8 +90,10 @@
 
 ### 4.1 規範性文件（authoritative · 必讀）
 
-- [`_bmad-output/project-context.md`](../_bmad-output/project-context.md) — **AI Agent 必讀規則 · 323 條**（最高優先）
-- [`CLAUDE.md`](../CLAUDE.md) — Claude Code 專案記憶、IPC 契約表、Hooks 設定
+- [`CLAUDE.md`](../CLAUDE.md) — 全 repo 規則入口（架構、禁忌、Hooks）；細則依路徑載入 `.claude/rules/{ipc,ui,i18n,release,windows}.md`
+- [`development-process.md`](./development-process.md) — **開發流程**：需求→分流→計畫→實作→閘門→commit→發版→回承諾；社群 PR 接法
+- [`community-commitments.md`](./community-commitments.md) — 對外承諾追蹤表（發版前必對帳）
+- [`_bmad-output/project-context.md`](../_bmad-output/project-context.md) — 323 條實作規則，**2026-09-11 起為歷史參考、不再新增**
 - [`_bmad-output/planning-artifacts/architecture.md`](../_bmad-output/planning-artifacts/architecture.md) — 架構決策（ADR）
 - [`_bmad-output/planning-artifacts/ux-ui-design-spec.md`](../_bmad-output/planning-artifacts/ux-ui-design-spec.md) — UI 設計規範
 - [`design.pen`](../design.pen) — Pencil MCP 設計稿（UI 實作前必讀）
@@ -128,15 +130,16 @@
 | 改 SQLite                         | `data-models.md` §三 Migration                                        |
 | 加 LLM Provider                   | `architecture-frontend.md` §4.4 + `development-guide.md` §4.4         |
 | 改 hotkey / paste 機制            | `architecture-backend.md` §4.1 / §4.4 + `_bmad-output/project-context.md` |
-| 發版                              | `deployment-guide.md` §四 + `scripts/release.sh`                      |
-| 看實作規則（323 條）              | `_bmad-output/project-context.md`                                     |
-| 看 IPC 契約表                     | `CLAUDE.md` §IPC 契約表（authoritative）                              |
+| 發版                              | `development-process.md` §發版 + `.claude/rules/release.md` + `scripts/release.sh` |
+| 接社群 PR、回 issue               | `development-process.md` §社群 PR + `community-commitments.md`        |
+| 看實作規則                        | `CLAUDE.md` + `.claude/rules/`（323 條舊表在 `_bmad-output/project-context.md`，歷史參考） |
+| 看 IPC 契約表                     | `.claude/rules/ipc.md`（authoritative）                               |
 
 ---
 
 ## 六、Hard Rules（最常違反的，必看）
 
-> 完整列表見 `_bmad-output/project-context.md`。本節只列「最容易踩」。
+> 完整規則見 `CLAUDE.md` 與 `.claude/rules/`。本節只列「最容易踩」。
 
 1. **❌ 瀏覽器原生 `fetch`** → ✅ `@tauri-apps/plugin-http`
 2. **❌ Options API** → ✅ `<script setup lang="ts">`
