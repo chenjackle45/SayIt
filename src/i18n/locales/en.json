@@ -440,9 +440,7 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "New \"Cantonese\" transcription language: transcripts and AI cleanup keep Cantonese wording instead of rewriting into written Chinese",
-      "item2": "Settings reorganized into two cards, \"Speech to Text\" and \"Text Cleanup\": keys follow their feature, and transcription language moved into the Speech to Text card",
-      "item3": "Model list now marks \"Paid only\" and \"Limited free tier\" so free-tier projects can see it before choosing",
+      "item1": "Windows custom trigger key: fixed a case where a captured key could be missed while recording. If recording still does not respond, a \"Report on GitHub\" button now appears under the card so you can send the diagnostics in one click, no log file hunting",
       "dismiss": "Got it"
     }
   },
