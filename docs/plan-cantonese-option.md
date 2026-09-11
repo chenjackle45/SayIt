@@ -1,6 +1,6 @@
 # 計畫：轉錄語言加「廣東話」（#74）
 
-> 建立：2026-09-11 · 狀態：codex 計劃閘一輪（1 HIGH、8 MED、1 LOW；HIGH 以補探針消解、其餘全收）＋實作閘一輪（0 HIGH、2 MED、1 LOW，全收）→ 待 commit · 排程：v0.13 第三張（**與 ElevenLabs 脫鉤**，在 Groq 上就能做；ElevenLabs 進來時只需在服務對照表多一行 `yue`）
+> 建立：2026-09-11 · 狀態：codex 計劃閘一輪（1 HIGH、8 MED、1 LOW；HIGH 以補探針消解、其餘全收）＋實作閘一輪（0 HIGH、2 MED、1 LOW，全收）→ **已交付 v0.13.0（2026-09-11 公開；f2eab44）** · 排程：v0.13 第三張（**與 ElevenLabs 脫鉤**，在 Groq 上就能做；ElevenLabs 進來時只需在服務對照表多一行 `yue`）
 
 ## 探針結果（2026-09-11，真金鑰、Groq 正式端點）
 
