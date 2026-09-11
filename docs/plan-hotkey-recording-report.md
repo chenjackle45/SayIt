@@ -1,6 +1,6 @@
 # 計畫：自訂鍵錄製失敗一鍵回報（#30 配套，v0.13.1）
 
-> 建立：2026-09-11 · 狀態：codex 計劃閘一輪（0 HIGH、6 MED，全收）＋實作閘一輪（0 HIGH、3 MED、2 LOW，全收）→ 待 commit（macOS dev 驗收見實作紀錄）· 排程：v0.13.1（與 `docs/plan-windows-hotkey-recording-diagnostics.md` 同版出）
+> 建立：2026-09-11 · 狀態：codex 計劃閘一輪（0 HIGH、6 MED，全收）＋實作閘一輪（0 HIGH、3 MED、2 LOW，全收）→ **已交付 v0.13.1（2026-09-11 公開；656bff4）**，Windows 打包版驗收等同事 · 排程：v0.13.1（與 `docs/plan-windows-hotkey-recording-diagnostics.md` 同版出）
 > 使用者 2026-09-11 拍板：走 GitHub 預填 issue（不走 Sentry）、先只做錄製入口（通用版排 v0.14）、v0.13.1 等這個做完再發。
 
 ## 計劃閘結果（2026-09-11，codex 唯讀審查）
