@@ -424,11 +424,8 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Windows auto-paste fix: text not being pasted in browsers and some other apps is addressed — please give it a try",
-      "item2": "New Theme setting: light, dark, or follow system — applies to both the HUD and the main window",
-      "item3": "Each history entry can now be re-transcribed or re-enhanced — no need to record again after a bad result",
-      "item4": "Dictionary export / import (JSON, TXT, CSV) for moving between machines or from other tools",
-      "item5": "New \"Debug log\" switch in Settings (off by default) so you can attach a log file when reporting issues",
+      "item1": "Windows fix: with Ctrl as the trigger key, the previous version stopped recording immediately and showed \"No speech detected\". Fixed — if you switched to Alt to work around it, you can switch back",
+      "item2": "New \"Hide main window on launch\" setting: after startup only the tray icon stays; open the main window from the tray menu",
       "dismiss": "Got it"
     }
   },
