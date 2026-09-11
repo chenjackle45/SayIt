@@ -433,8 +433,9 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Windows fix: with Ctrl as the trigger key, the previous version stopped recording immediately and showed \"No speech detected\". Fixed — if you switched to Alt to work around it, you can switch back",
-      "item2": "New \"Hide main window on launch\" setting: after startup only the tray icon stays; open the main window from the tray menu",
+      "item1": "New \"Cantonese\" transcription language: transcripts and AI cleanup keep Cantonese wording instead of rewriting into written Chinese",
+      "item2": "Settings reorganized into two cards, \"Speech to Text\" and \"Text Cleanup\": keys follow their feature, and transcription language moved into the Speech to Text card",
+      "item3": "Model list now marks \"Paid only\" and \"Limited free tier\" so free-tier projects can see it before choosing",
       "dismiss": "Got it"
     }
   },
