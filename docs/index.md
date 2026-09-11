@@ -96,7 +96,7 @@
 - [`_bmad-output/project-context.md`](../_bmad-output/project-context.md) — 323 條實作規則，**2026-09-11 起為歷史參考、不再新增**
 - [`_bmad-output/planning-artifacts/architecture.md`](../_bmad-output/planning-artifacts/architecture.md) — 架構決策（ADR）
 - [`_bmad-output/planning-artifacts/ux-ui-design-spec.md`](../_bmad-output/planning-artifacts/ux-ui-design-spec.md) — UI 設計規範
-- [`design.pen`](../design.pen) — Pencil MCP 設計稿（UI 實作前必讀）
+- [`design.pen`](../design.pen) — Pencil MCP 設計稿（歷史檔；2026-09-11 起不再要求 UI 實作前先出設計稿，見 `.claude/rules/ui.md`）
 
 ### 4.2 規劃 / 故事文件（`_bmad-output/`）
 
@@ -126,7 +126,7 @@
 | 第一次接觸這專案                  | `project-overview.md` → `index.md`（這個）→ `source-tree-analysis.md` |
 | 寫 brownfield PRD                 | `project-overview.md` + `integration-architecture.md` + `architecture-{frontend,backend}.md` |
 | 加 IPC 契約                       | `api-contracts-backend.md` §七 checklist + `integration-architecture.md` §九 |
-| 改 UI                             | `_bmad-output/planning-artifacts/ux-ui-design-spec.md` + `design.pen`（先設計）+ `component-inventory-frontend.md` |
+| 改 UI                             | `_bmad-output/planning-artifacts/ux-ui-design-spec.md` + `component-inventory-frontend.md`（小改動直接做、截圖驗收；大改版走拍板 demo） |
 | 改 SQLite                         | `data-models.md` §三 Migration                                        |
 | 加 LLM Provider                   | `architecture-frontend.md` §4.4 + `development-guide.md` §4.4         |
 | 改 hotkey / paste 機制            | `architecture-backend.md` §4.1 / §4.4 + `_bmad-output/project-context.md` |
@@ -149,7 +149,7 @@
 6. **❌ `@tabler/icons-vue`** → ✅ 只用 `lucide-vue-next`
 7. **❌ 手寫 UI 元件** → ✅ shadcn-vue（new-york style）
 8. **❌ 直接 import Tauri event API** → ✅ 透過 `composables/useTauriEvents.ts`
-9. **❌ 未經 Pencil 設計直接寫 UI** → ✅ 先在 `design.pen` 完成設計
+9. ~~未經 Pencil 設計直接寫 UI~~ → 2026-09-11 已移除此規定（小改動直接做、截圖驗收；大改版走拍板 demo） 
 10. **❌ 改舊 SQL migration**（v1～v8） → ✅ 追加 v9 等新版本
 11. **❌ 改 `Cargo.lock` / `pnpm-lock.yaml`** → ✅ 受 `protect-config.sh` 阻擋
 

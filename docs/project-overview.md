@@ -69,7 +69,7 @@ say-it/
 | `CLAUDE.md`                                              | Claude Code 專案記憶 + IPC 契約表 + Hook 設定 |
 | `_bmad-output/planning-artifacts/architecture.md`        | 架構決策（ADR）                              |
 | `_bmad-output/planning-artifacts/ux-ui-design-spec.md`   | UI 設計、色彩、元件規範                      |
-| `design.pen`                                             | Pencil MCP 設計稿（UI 實作前必讀）           |
+| `design.pen`                                             | Pencil MCP 設計稿（歷史檔，2026-09-11 起不再要求先出稿） |
 
 ### 5.2 本次掃描產出（docs/）
 

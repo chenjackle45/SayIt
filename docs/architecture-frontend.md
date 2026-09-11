@@ -247,7 +247,7 @@ CI 只跑 `pnpm test`（unit + component），E2E 目前未在 CI 執行（仍�
 6. **❌ `@tabler/icons-vue`** → ✅ 只用 `lucide-vue-next`
 7. **❌ 手寫 UI 元件** → ✅ 用 shadcn-vue（new-york style）
 8. **❌ 直接 import Tauri event API** → ✅ 透過 `composables/useTauriEvents.ts`
-9. **❌ 未經 Pencil 設計直接寫 UI** → ✅ 先在 `design.pen` 完成設計
+9. ~~未經 Pencil 設計直接寫 UI~~ → 2026-09-11 已移除此規定（小改動直接做、截圖驗收；大改版走拍板 demo）
 
 ---
 

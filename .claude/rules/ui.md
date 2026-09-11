@@ -4,16 +4,14 @@ paths:
   - src/components/**
   - src/App.vue
   - src/MainApp.vue
-  - design.pen
 ---
 
-# UI 規則（shadcn-vue、設計稿先行）
+# UI 規則（shadcn-vue、拍板 demo）
 
-> 2026-09-11 自 `CLAUDE.md` 搬入，內容未改；末段「拍板 demo」為新增。完整 UX 規範見 `_bmad-output/planning-artifacts/ux-ui-design-spec.md`。
+> 2026-09-11 自 `CLAUDE.md` 搬入；「拍板 demo」為新增。**2026-09-11 使用者拍板移除「先出 design.pen 設計稿」規定**：小改動直接做、做完 `pnpm tauri dev` 截圖給使用者看；大改版仍走決策頁 HTML demo 拍板。完整 UX 規範見 `_bmad-output/planning-artifacts/ux-ui-design-spec.md`。
 
-## 設計稿先行
+## 拍板 demo
 
-- **❌ 未經設計直接實作 UI** → 先用 Pencil MCP 在 `design.pen` 完成設計稿並取得使用者確認，再寫程式碼
 - **拍板 demo 視為規格的一部分**：決策頁上拍過板的畫面（HTML demo），複製一份進 `docs/demos/<主題>/`，計畫檔直接引用該路徑；文字描述與 demo 衝突時以 demo 為準。UI 類改動驗收要做「demo vs 實畫面」對照，不只對文字
 
 ## shadcn-vue 元件使用規則

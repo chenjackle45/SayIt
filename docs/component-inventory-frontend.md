@@ -148,10 +148,10 @@ App.vue（HUD root）
 
 ## 六、設計流程強制（不可跳過）
 
-> **❌ 未經設計直接實作 UI** → ✅ **先用 Pencil MCP 完成 `design.pen` 設計稿**
+> ~~未經設計直接實作 UI → 先用 Pencil MCP 完成 `design.pen` 設計稿~~ **2026-09-11 已移除此規定**：小改動直接做、做完 `pnpm tauri dev` 截圖驗收；大改版走決策頁 HTML demo 拍板（`.claude/rules/ui.md`）
 
 新 UI 功能必須走：
-1. 在 `design.pen` 完成視覺設計（Pencil MCP `batch_design`）
+1. ~~在 `design.pen` 完成視覺設計~~（已移除；大改版改為拍板 demo）
 2. 跟使用者對齊設計稿
 3. 才開始實作 Vue 元件
 4. 實作後對照設計稿微調

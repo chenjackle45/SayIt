@@ -13,7 +13,7 @@
 |---|---|---|
 | 1 需求入口 | issue、PR、自己的想法 | — |
 | 2 分流 | 做不做、排哪版、是不是 trivial；**只要對外說了「會做」就記進 `community-commitments.md`** | 承諾表一行 |
-| 3 計畫 | 非 trivial 寫 `docs/plan-<slug>.md`（要解決什麼、範圍、不做、動工前要驗），交 codex 計劃閘；UI 先在 `design.pen` 出稿；拍板 demo 複製進 `docs/demos/<主題>/` | 計畫檔、設計稿 |
+| 3 計畫 | 非 trivial 寫 `docs/plan-<slug>.md`（要解決什麼、範圍、不做、動工前要驗），交 codex 計劃閘；大改版的拍板 demo 複製進 `docs/demos/<主題>/`（小 UI 改動不需設計稿，做完截圖給使用者看） | 計畫檔、demo |
 | 4 實作 | 依 rules；hooks 自動跑型別檢查與 lint | diff |
 | 5 閘門 | 雙向追溯閘 → codex 實作閘 → `pnpm test`、`vue-tsc`、clippy、`cargo test` 全綠 | 閘門紀錄 |
 | 6 commit | 列檔案清單等授權；conventional commit；社群 PR 接手時 squash 並保留 `Co-authored-by` | commit |

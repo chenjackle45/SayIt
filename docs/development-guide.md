@@ -281,7 +281,7 @@ sqlite3 %APPDATA%\com.sayit.app\app.db
 □ cargo clippy --workspace --all-targets -- -D warnings && cargo test（src-tauri，與 CI 同條件）
 □ pnpm exec eslint src       ESLint 無錯（hook 已自動跑）
 □ 若改 IPC：用 tauri-reviewer subagent 雙端對齊審查
-□ 若改 UI：先在 design.pen 完成設計稿
+□ 若改 UI：大改版對照拍板 demo；小改動做完 `pnpm tauri dev` 截圖給使用者看
 □ 若改 SQL schema：寫 v(N+1) migration 不改舊 migration
 ```
 

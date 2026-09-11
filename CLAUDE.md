@@ -11,13 +11,12 @@
 | 對外說過要做什麼、交付了沒 | `docs/community-commitments.md`（發版前必對帳） |
 | 五種常見改動的食譜、pre-commit 清單 | `docs/development-guide.md` |
 | IPC 契約表、Tauri macOS 注意事項 | `.claude/rules/ipc.md`（碰 `src-tauri/**` 自動載入） |
-| shadcn-vue、設計稿先行、拍板 demo | `.claude/rules/ui.md`（碰 `src/views`／`src/components`） |
+| shadcn-vue、拍板 demo | `.claude/rules/ui.md`（碰 `src/views`／`src/components`） |
 | 五語系、更新摘要彈窗 | `.claude/rules/i18n.md` |
 | CI、發版硬規則、Secrets、自動更新 | `.claude/rules/release.md`（碰 `.github`／`scripts`／版本檔） |
 | Windows 鍵盤 hook、貼上時序 | `.claude/rules/windows.md`（碰四個 Windows 相關 plugin） |
 | UX/UI 規範 | `_bmad-output/planning-artifacts/ux-ui-design-spec.md` |
 | 架構決策 | `_bmad-output/planning-artifacts/architecture.md` |
-| 設計稿 | `design.pen`（UI 實作前先完成） |
 
 Codex 不會依 `paths` 自動載入 rules，派工時把相關那檔路徑寫進任務檔。
 
@@ -58,7 +57,7 @@ Codex 不會依 `paths` 自動載入 rules，派工時把相關那檔路徑寫�
   ❌ 元件不可直接執行 SQL
 ```
 
-## 關鍵禁忌（最常違反的 9 條）
+## 關鍵禁忌（最常違反的 8 條）
 
 1. **❌ 瀏覽器原生 `fetch`** → 用 `@tauri-apps/plugin-http` 的 `fetch`
 2. **❌ Options API** → 僅 `<script setup lang="ts">`
@@ -68,7 +67,6 @@ Codex 不會依 `paths` 自動載入 rules，派工時把相關那檔路徑寫�
 6. **❌ `@tabler/icons-vue`** → 只用 `lucide-vue-next`
 7. **❌ 手寫 UI 元件** → 用 shadcn-vue（new-york style），細則見 `.claude/rules/ui.md`
 8. **❌ 直接 import Tauri event API** → 用 `useTauriEvents.ts` 封裝
-9. **❌ 未經設計直接實作 UI** → 先用 Pencil MCP 完成 `design.pen` 設計稿，再寫程式碼
 
 ## 型別命名慣例
 
