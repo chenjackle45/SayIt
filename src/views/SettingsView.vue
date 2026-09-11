@@ -157,6 +157,8 @@ const currentPresetKey = computed(() => {
 });
 
 let recordingUnlisteners: UnlistenFn[] = [];
+// gh-30：listener 註冊是非同步的，期間若使用者取消（或重新開始），舊請求不得再啟動 Rust 錄製
+let recordingRequestSeq = 0;
 
 async function handleRecordingCaptured(payload: RecordingCapturedPayload) {
   const { keycode, modifiers } = payload;
@@ -230,32 +232,44 @@ async function startRecording() {
   isRecording.value = true;
   recordingWarning.value = "";
   recordingHint.value = "";
+  const requestId = ++recordingRequestSeq;
 
-  // Tell Rust to enter recording mode
-  try {
-    await invoke("start_hotkey_recording");
-  } catch (err) {
-    hotkeyFeedback.show("error", extractErrorMessage(err));
-    isRecording.value = false;
-    return;
-  }
-
-  // Listen for Rust recording events
+  // gh-30：先掛好 listener 再叫 Rust 進錄製模式，否則中間發出的 captured 會漏接（Tauri 不補播）
   const [unlistenCaptured, unlistenRejected] = await Promise.all([
     listenToEvent<RecordingCapturedPayload>(
       HOTKEY_RECORDING_CAPTURED,
-      (event) => void handleRecordingCaptured(event.payload),
+      (event) => {
+        console.info(`[SettingsView] hotkey recording: captured received keycode=0x${event.payload.keycode.toString(16)}`);
+        void handleRecordingCaptured(event.payload);
+      },
     ),
     listenToEvent<RecordingRejectedPayload>(
       HOTKEY_RECORDING_REJECTED,
       (event) => handleRecordingRejected(event.payload),
     ),
   ]);
+  if (!isRecording.value || requestId !== recordingRequestSeq) {
+    // 註冊期間已取消或已被新的一次錄製取代：只收掉剛建的 listener，不啟動 Rust
+    unlistenCaptured();
+    unlistenRejected();
+    return;
+  }
   recordingUnlisteners = [unlistenCaptured, unlistenRejected];
+  console.info("[SettingsView] hotkey recording: listeners ready");
+
+  // Tell Rust to enter recording mode
+  try {
+    await invoke("start_hotkey_recording");
+  } catch (err) {
+    hotkeyFeedback.show("error", extractErrorMessage(err));
+    stopKeyRecording();
+    return;
+  }
 
   // 10s timeout
   recordingTimeoutId = setTimeout(() => {
     if (isRecording.value) {
+      console.info("[SettingsView] hotkey recording: timeout fired");
       hotkeyFeedback.show("error", settingsStore.getHotkeyRecordingTimeoutMessage());
       stopKeyRecording();
     }

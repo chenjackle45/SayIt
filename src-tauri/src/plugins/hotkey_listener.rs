@@ -961,7 +961,10 @@ mod windows_hook {
             if vk as u32 == VK_ESCAPE {
                 if let Ok(mut shared) = ctx.shared.try_lock() {
                     shared.recording.reset();
+                } else {
+                    log::warn!("[hotkey-listener] shared lock busy at recording-esc");
                 }
+                log::info!("[hotkey-listener] recording rejected reason=esc_reserved");
                 (ctx.recording_rejected_handler)(RecordingRejectedPayload {
                     reason: "esc_reserved".to_string(),
                 });
@@ -974,6 +977,8 @@ mod windows_hook {
                     let mods = unsafe { get_active_modifiers_windows() };
                     shared.recording.accumulated_modifiers = mods;
                     shared.recording.last_modifier_keycode = Some(vk);
+                } else {
+                    log::warn!("[hotkey-listener] shared lock busy at recording-modifier");
                 }
             } else {
                 // Non-modifier key pressed: capture with accumulated modifiers
@@ -987,8 +992,12 @@ mod windows_hook {
                     shared.recording.reset();
                     m
                 } else {
+                    log::warn!("[hotkey-listener] shared lock busy at recording-capture");
                     vec![]
                 };
+                log::info!(
+                    "[hotkey-listener] recording captured keycode=0x{vk:02X} mods={mods:?}"
+                );
                 (ctx.recording_captured_handler)(RecordingCapturedPayload {
                     keycode: vk,
                     modifiers: mods,
@@ -1003,11 +1012,16 @@ mod windows_hook {
                         if let Some(last_kc) = shared.recording.last_modifier_keycode.take() {
                             shared.recording.reset();
                             drop(shared);
+                            log::info!(
+                                "[hotkey-listener] recording captured keycode=0x{last_kc:02X} mods=[] (modifier-only)"
+                            );
                             (ctx.recording_captured_handler)(RecordingCapturedPayload {
                                 keycode: last_kc,
                                 modifiers: vec![],
                             });
                         }
+                    } else {
+                        log::warn!("[hotkey-listener] shared lock busy at recording-release");
                     }
                 }
             }
@@ -1057,10 +1071,14 @@ mod windows_hook {
                     let _ = app_handle_escape.emit("escape:pressed", ());
                 }),
                 recording_captured_handler: Box::new(move |payload| {
-                    let _ = app_handle_rec_captured.emit("hotkey:recording-captured", payload);
+                    if let Err(e) = app_handle_rec_captured.emit("hotkey:recording-captured", payload) {
+                        log::error!("[hotkey-listener] emit recording-captured failed: {e}");
+                    }
                 }),
                 recording_rejected_handler: Box::new(move |payload| {
-                    let _ = app_handle_rec_rejected.emit("hotkey:recording-rejected", payload);
+                    if let Err(e) = app_handle_rec_rejected.emit("hotkey:recording-rejected", payload) {
+                        log::error!("[hotkey-listener] emit recording-rejected failed: {e}");
+                    }
                 }),
             })
             .ok();
@@ -1121,12 +1139,21 @@ mod windows_hook {
 
                 if is_key_down || is_key_up {
                     // Recording mode: delegate to recording handler, skip all trigger logic
-                    let is_recording = ctx
-                        .shared
-                        .try_lock()
-                        .map(|s| s.recording.is_active)
-                        .unwrap_or(false);
+                    let is_recording = match ctx.shared.try_lock() {
+                        Ok(s) => s.recording.is_active,
+                        Err(_) => {
+                            // gh-30 診斷：只記階段、不記鍵值（一般模式也會經過這裡）
+                            log::warn!("[hotkey-listener] shared lock busy at recording-check");
+                            false
+                        }
+                    };
                     if is_recording {
+                        // gh-30 診斷：只在錄製中記鍵值，回報者開除錯記錄即可看到 hook 有沒有收到
+                        log::info!(
+                            "[hotkey-listener] recording: vk=0x{:02X} down={}",
+                            kbd.vkCode,
+                            is_key_down
+                        );
                         handle_recording_event_windows(ctx, kbd.vkCode as u16, is_key_down);
                         return CallNextHookEx(None, n_code, w_param, l_param);
                     }
@@ -1151,7 +1178,10 @@ mod windows_hook {
                                 mods,
                             )
                         }
-                        Err(_) => return CallNextHookEx(None, n_code, w_param, l_param),
+                        Err(_) => {
+                            log::warn!("[hotkey-listener] shared lock busy at trigger");
+                            return CallNextHookEx(None, n_code, w_param, l_param);
+                        }
                     };
 
                     // Combo trigger
