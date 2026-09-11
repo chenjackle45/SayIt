@@ -103,7 +103,13 @@ export function getWhisperCodeForLocale(locale: SupportedLocale): string {
   return option?.whisperCode ?? "zh";
 }
 
-export type TranscriptionLocale = SupportedLocale | "auto";
+/** 只作轉錄語言、不是介面語言：gh-74 廣東話（Whisper `yue`） */
+export type TranscriptionOnlyLocale = "yue";
+
+export type TranscriptionLocale =
+  | SupportedLocale
+  | TranscriptionOnlyLocale
+  | "auto";
 
 export interface TranscriptionLanguageOption {
   locale: TranscriptionLocale;
@@ -122,11 +128,17 @@ export const TRANSCRIPTION_LANGUAGE_OPTIONS: TranscriptionLanguageOption[] = [
     displayName: opt.displayName,
     whisperCode: opt.whisperCode,
   })),
+  {
+    locale: "yue",
+    displayName: "\u5EE3\u6771\u8A71",
+    whisperCode: "yue",
+  },
 ];
 
 export function getWhisperCodeForTranscriptionLocale(
   locale: TranscriptionLocale,
 ): string | null {
   if (locale === "auto") return null;
+  if (locale === "yue") return "yue";
   return getWhisperCodeForLocale(locale);
 }

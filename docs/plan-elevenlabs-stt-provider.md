@@ -24,7 +24,7 @@
 | MED | keyterms 契約 | 官方 SDK 是重複送 `keyterms` 欄位（非 JSON 陣列）；詞條有長度、最多五詞、禁用字元限制，本機字典沒有——不合格詞條略過並提示，不改壞本機字典。費率官方口徑不一（+20% vs $0.05/hr），不寫死。 |
 | MED | `tag_audio_events` 預設 true | 固定 false，否則笑聲等標記會被當成轉錄內容貼上。`no_verbatim` 維持 false。 |
 | MED | 用量分帳 | 儀表板目前把 STT 一律當免費 Groq；以請求開始時的模型計費、歷史紀錄不套用當下服務；ElevenLabs 只顯示本機用量與估算，不做推測的剩餘額度條。「免費 12 分鐘」是 Scribe UI 表、非 API 額度。連線測試（1 秒）標示會計費。 |
-| MED | 粵語不只是加選項 | 轉錄語言同時影響 LLM prompt 語系與簡繁轉換；Groq 收不收 `yue` **未查證**——實測前 Groq 不提供「廣東話」選項，只有 ElevenLabs 開放；從 ElevenLabs 粵語切回 Groq 時明示改成自動偵測。 |
+| MED | 粵語不只是加選項 | 轉錄語言同時影響 LLM prompt 語系與簡繁轉換；Groq 收不收 `yue` **已查證（2026-09-11）：接受，回報 Yue Chinese、用字更準**——「廣東話」選項改為與 ElevenLabs 脫鉤、獨立成 `docs/plan-cantonese-option.md`；ElevenLabs 進來時服務對照表多一行 `yue` 即可，不需要「切回 Groq 改自動」的規則。 |
 | MED 可刪 | 依服務放大檔案上限 | 沒有需求；維持共同 25 MB。 |
 | 另 | 錯誤轉譯 | `errorUtils` 的 Groq 專用錯誤對應要補 ElevenLabs 的額度不足／權限不足。 |
 
@@ -63,7 +63,7 @@
 - 設計 B（金鑰集中卡），金鑰家數再增加時再議。
 
 ## 動工前要驗（不當事實用）
-1. Groq 是否接受粵語代碼 `yue`（送一段粵語實測）。
+1. ~~Groq 是否接受粵語代碼 `yue`~~ 已驗（2026-09-11，見 `docs/plan-cantonese-option.md` 探針段）。
 2. ElevenLabs 零留存是否限特定方案；被拒時開關要顯示原因、不靜默失敗。
 3. Scribe 對純靜音回什麼（決定幻覺偵測第 2a 層行為）。
 4. 費率 $0.22 與 $0.40 哪個適用 API 直呼。

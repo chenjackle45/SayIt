@@ -34,6 +34,7 @@ import { captureError } from "../lib/sentry";
 import { openLogFolder, setFileLoggingEnabled } from "../lib/logger";
 import { getDefaultSystemPrompt } from "../lib/enhancer";
 import {
+  type PromptLocale,
   getMinimalPromptForLocale,
   getPromptForModeAndLocale,
   isKnownDefaultPrompt,
@@ -164,8 +165,8 @@ export const useSettingsStore = defineStore("settings", () => {
   );
   let isLoaded = false;
 
-  /** Resolve which SupportedLocale to use for prompt default (shared logic). */
-  function getEffectivePromptLocale(): SupportedLocale {
+  /** Resolve which prompt locale to use for prompt default (shared logic); 廣東話直接透傳（gh-74）. */
+  function getEffectivePromptLocale(): PromptLocale {
     return selectedTranscriptionLocale.value === "auto"
       ? selectedLocale.value
       : selectedTranscriptionLocale.value;

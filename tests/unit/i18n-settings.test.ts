@@ -127,13 +127,20 @@ describe("i18n 設定功能", () => {
       expect(getWhisperCodeForTranscriptionLocale("ja")).toBe("ja");
       expect(getWhisperCodeForTranscriptionLocale("zh-CN")).toBe("zh");
       expect(getWhisperCodeForTranscriptionLocale("ko")).toBe("ko");
+      // gh-74：廣東話只作轉錄語言，Whisper 代碼 yue
+      expect(getWhisperCodeForTranscriptionLocale("yue")).toBe("yue");
     });
 
-    it("[P0] TRANSCRIPTION_LANGUAGE_OPTIONS 應包含 auto + 5 個語言選項", async () => {
+    it("[P0] TRANSCRIPTION_LANGUAGE_OPTIONS 應包含 auto + 5 個語言 + 廣東話", async () => {
       const { TRANSCRIPTION_LANGUAGE_OPTIONS } = await import(
         "../../src/i18n/languageConfig"
       );
-      expect(TRANSCRIPTION_LANGUAGE_OPTIONS).toHaveLength(6);
+      expect(TRANSCRIPTION_LANGUAGE_OPTIONS).toHaveLength(7);
+      expect(TRANSCRIPTION_LANGUAGE_OPTIONS.at(-1)).toEqual({
+        locale: "yue",
+        displayName: "廣東話",
+        whisperCode: "yue",
+      });
       expect(TRANSCRIPTION_LANGUAGE_OPTIONS[0].locale).toBe("auto");
       expect(TRANSCRIPTION_LANGUAGE_OPTIONS[0].whisperCode).toBeNull();
 
@@ -316,6 +323,27 @@ describe("i18n 設定功能", () => {
       await store.saveTranscriptionLocale("en");
 
       expect(store.getAiPrompt()).toBe(customPrompt);
+    });
+
+    it("[P0] 轉錄語言切到廣東話（gh-74）：Whisper 送 yue、內建 prompt 換成粵語版", async () => {
+      mockStoreData.set("selectedLocale", "zh-TW");
+
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.loadSettings();
+
+      await store.saveTranscriptionLocale("yue");
+
+      expect(store.getWhisperLanguageCode()).toBe("yue");
+      const { getMinimalPromptForLocale, getPromptForModeAndLocale } =
+        await import("../../src/i18n/prompts");
+      expect(store.getAiPrompt()).toBe(getMinimalPromptForLocale("yue"));
+      expect(store.getAiPrompt()).not.toBe(getMinimalPromptForLocale("zh-TW"));
+
+      await store.savePromptMode("active");
+      expect(store.getAiPrompt()).toBe(getPromptForModeAndLocale("active", "yue"));
     });
 
     it("[P0] 轉錄語言為特定語言時，切換 UI 語言不應改變 prompt", async () => {

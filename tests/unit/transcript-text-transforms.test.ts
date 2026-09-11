@@ -18,6 +18,12 @@ describe("applyTranscriptTextTransforms", () => {
     expect(result).toBe("[繁]简体");
   });
 
+  it("[P1] yue（廣東話，gh-74）→ 同樣委派簡→繁", () => {
+    const result = applyTranscriptTextTransforms("我们", "yue");
+    expect(mockConvert).toHaveBeenCalledWith("我们");
+    expect(result).toBe("[繁]我们");
+  });
+
   it("[P1] 非 zh-TW（en）→ 原樣返回、不呼叫轉換", () => {
     const result = applyTranscriptTextTransforms("hello", "en");
     expect(mockConvert).not.toHaveBeenCalled();
