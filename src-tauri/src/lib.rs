@@ -448,6 +448,7 @@ pub fn run() {
             request_app_restart,
             plugins::logging::set_file_logging_enabled,
             plugins::logging::open_log_folder,
+            plugins::logging::get_hotkey_recording_diagnostics,
             update_hotkey_config,
             get_hud_target_position,
             get_os_theme,

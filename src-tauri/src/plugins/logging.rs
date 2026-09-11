@@ -7,6 +7,7 @@
 //! - `set_file_logging_enabled`：前端設定開關時即時切換（免重啟）；關閉時順手清掉既有記錄檔。
 //! - `open_log_folder`：以系統檔案管理員開啟 Log 資料夾。
 
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -23,6 +24,39 @@ static LOG_GATE: Mutex<()> = Mutex::new(());
 
 /// plugin-log 的 LogDir 檔名基底（不含副檔名）。active 檔為 `{LOG_FILE_NAME}.log`。
 pub const LOG_FILE_NAME: &str = "sayit";
+
+/// 自訂鍵錄製診斷用的記憶體環狀緩衝（gh-30）。與檔案日誌開關無關，關 app 即消失。
+/// 只收訊息以 `HOTKEY_DIAG_PREFIXES` 開頭的日誌：這些行只有鍵碼、修飾鍵、階段與固定文字，
+/// 沒有任何轉錄內容——白名單是資料來源的約束，不是內容消毒。
+const HOTKEY_DIAG_PREFIXES: [&str; 2] = ["[hotkey-listener]", "[SettingsView] hotkey"];
+const HOTKEY_DIAG_CAPACITY: usize = 200;
+static HOTKEY_DIAG_BUFFER: Mutex<VecDeque<String>> = Mutex::new(VecDeque::new());
+
+/// 把一筆日誌（已格式化的訊息）依白名單收進緩衝；不在 `LOG_GATE` 內呼叫、只持緩衝自己的鎖。
+fn push_hotkey_diagnostic(level: log::Level, message: &str) {
+    if !HOTKEY_DIAG_PREFIXES.iter().any(|p| message.starts_with(p)) {
+        return;
+    }
+    // 不引新依賴：時間戳是「自第一筆白名單日誌起算的毫秒」（不是 app 啟動），看事件間隔與順序夠用
+    static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    let elapsed_ms = START.get_or_init(std::time::Instant::now).elapsed().as_millis();
+    let line = format!("+{elapsed_ms}ms {level} {message}");
+    if let Ok(mut buf) = HOTKEY_DIAG_BUFFER.lock() {
+        if buf.len() >= HOTKEY_DIAG_CAPACITY {
+            buf.pop_front();
+        }
+        buf.push_back(line);
+    }
+}
+
+/// 回傳自訂鍵錄製診斷緩衝的快照（不清空：先複製再開 GitHub 仍是同一批）。
+#[command]
+pub fn get_hotkey_recording_diagnostics() -> Vec<String> {
+    HOTKEY_DIAG_BUFFER
+        .lock()
+        .map(|buf| buf.iter().cloned().collect())
+        .unwrap_or_default()
+}
 
 /// 包住 plugin logger：每筆寫入持有 `LOG_GATE`。鎖內不呼叫全域 `log::*`（會重入死鎖）。
 pub struct GatedLogger {
@@ -41,6 +75,12 @@ impl log::Log for GatedLogger {
     }
 
     fn log(&self, record: &log::Record) {
+        // gh-30：診斷緩衝在 LOG_GATE 之外做，避免巢狀持鎖拉長 hook 執行緒的等待。
+        // 純字串訊息（webview 轉送、無格式引數）用 as_str() 借用，免配置；其餘才格式化
+        match record.args().as_str() {
+            Some(msg) => push_hotkey_diagnostic(record.level(), msg),
+            None => push_hotkey_diagnostic(record.level(), &record.args().to_string()),
+        }
         let _guard = LOG_GATE.lock().expect("log gate poisoned");
         self.inner.log(record);
     }
@@ -303,4 +343,56 @@ mod tests {
         assert!(!FILE_LOG_ENABLED.load(Ordering::SeqCst));
         let _ = fs::remove_dir_all(&dir);
     }
+    /// gh-30：用真的 GatedLogger 餵前端轉送形狀的 record（target=webview、訊息原樣在 args）
+    struct NullLog;
+    impl log::Log for NullLog {
+        fn enabled(&self, _: &log::Metadata) -> bool {
+            true
+        }
+        fn log(&self, _: &log::Record) {}
+        fn flush(&self) {}
+    }
+
+    fn feed(logger: &GatedLogger, target: &str, msg: &str) {
+        use log::Log;
+        logger.log(
+            &log::Record::builder()
+                .level(log::Level::Info)
+                .target(target)
+                .args(format_args!("{msg}"))
+                .build(),
+        );
+    }
+
+    #[test]
+    fn hotkey_diag_buffer_whitelist_capacity_and_snapshot() {
+        HOTKEY_DIAG_BUFFER.lock().unwrap().clear();
+        let logger = GatedLogger::new(Box::new(NullLog));
+
+        feed(&logger, "sayit", "[transcription] Response: \"這是逐字稿\"");
+        feed(&logger, "webview", "[SettingsView] hotkey recording: listeners ready");
+        feed(&logger, "sayit", "[hotkey-listener] recording: vk=0x4B down=true");
+        feed(&logger, "webview", "[VoiceFlow] enhancement done");
+
+        let snap = get_hotkey_recording_diagnostics();
+        assert_eq!(snap.len(), 2, "只有白名單前綴進緩衝");
+        assert!(snap[0].ends_with("INFO [SettingsView] hotkey recording: listeners ready"));
+        assert!(snap[1].contains("[hotkey-listener] recording: vk=0x4B"));
+        assert!(snap.iter().all(|l| !l.contains("逐字稿")));
+
+        // 快照不清空
+        assert_eq!(get_hotkey_recording_diagnostics().len(), 2);
+
+        // 上限：塞滿後淘汰最舊
+        for i in 0..(HOTKEY_DIAG_CAPACITY + 5) {
+            feed(&logger, "sayit", &format!("[hotkey-listener] filler {i}"));
+        }
+        let snap = get_hotkey_recording_diagnostics();
+        assert_eq!(snap.len(), HOTKEY_DIAG_CAPACITY);
+        // 2 行原始 + 205 行 filler = 207，淘汰最舊 7 行：2 行原始與 filler 0..=4
+        assert!(snap[0].contains("filler 5"), "got {}", snap[0]);
+        assert!(!snap.iter().any(|l| l.contains("listeners ready")));
+        HOTKEY_DIAG_BUFFER.lock().unwrap().clear();
+    }
+
 }

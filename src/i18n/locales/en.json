@@ -45,6 +45,13 @@
         "rightAlt": "Right Alt",
         "leftAlt": "Left Alt",
         "control": "Control"
+      },
+      "report": {
+        "prompt": "Recording not responding? Send the diagnostics to the developer:",
+        "github": "Report on GitHub",
+        "copy": "Copy diagnostics",
+        "copied": "Copied. Paste it to the developer",
+        "note": "Contains only key codes pressed while recording, your hotkey settings and app stage logs. No transcripts"
       }
     },
     "apiKey": {

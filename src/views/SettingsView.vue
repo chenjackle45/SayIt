@@ -10,6 +10,13 @@ import {
 } from "../stores/useSettingsStore";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
+import {
+  buildGitHubIssueUrl,
+  buildHotkeyDiagnosticsText,
+  type HotkeyDiagnosticsInput,
+  type HotkeyRecordingFailureKind,
+} from "../composables/useHotkeyDiagnostics";
+import { open as openExternalUrl } from "@tauri-apps/plugin-shell";
 import { useHistoryStore } from "../stores/useHistoryStore";
 import {
   listenToEvent,
@@ -139,6 +146,56 @@ let recordingTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
 const RECORDING_TIMEOUT_MS = 10_000;
 
+// ── 錄製失敗一鍵回報（gh-30）──
+declare const __APP_VERSION__: string;
+const recordingFailure = ref<{ kind: HotkeyRecordingFailureKind; reason?: string } | null>(null);
+const reportFeedback = useFeedbackMessage();
+
+async function buildDiagnosticsInput(): Promise<HotkeyDiagnosticsInput | null> {
+  // await 期間使用者可能重新錄製（會清掉 recordingFailure）：先把本次失敗與設定存下來
+  const failure = recordingFailure.value;
+  if (!failure) return null;
+  const key = settingsStore.hotkeyConfig?.triggerKey;
+  const triggerKeyLabel = key
+    ? settingsStore.getTriggerKeyDisplayName(key)
+    : t("settings.hotkey.notSet");
+  const triggerMode = settingsStore.triggerMode;
+  const uiLocale = settingsStore.selectedLocale;
+  const logLines = await invoke<string[]>("get_hotkey_recording_diagnostics");
+  return {
+    appVersion: __APP_VERSION__,
+    userAgent: navigator.userAgent,
+    uiLocale,
+    triggerMode,
+    triggerKeyLabel,
+    failureKind: failure.kind,
+    failureReason: failure.reason,
+    logLines,
+  };
+}
+
+async function handleReportToGitHub() {
+  try {
+    const input = await buildDiagnosticsInput();
+    if (!input) return;
+    const { url } = buildGitHubIssueUrl(input);
+    await openExternalUrl(url);
+  } catch (err) {
+    reportFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleCopyDiagnostics() {
+  try {
+    const input = await buildDiagnosticsInput();
+    if (!input) return;
+    await invoke("copy_to_clipboard", { text: buildHotkeyDiagnosticsText(input) });
+    reportFeedback.show("success", t("settings.hotkey.report.copied"));
+  } catch (err) {
+    reportFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
 const currentCustomKeyDisplay = computed(() => {
   const key = settingsStore.hotkeyConfig?.triggerKey;
   if (key && isComboTriggerKey(key)) {
@@ -222,7 +279,9 @@ async function handleRecordingCaptured(payload: RecordingCapturedPayload) {
 }
 
 function handleRecordingRejected(payload: RecordingRejectedPayload) {
+  console.info(`[SettingsView] hotkey recording: rejected reason=${payload.reason}`);
   stopKeyRecording();
+  recordingFailure.value = { kind: "rejected", reason: payload.reason };
   if (payload.reason === "esc_reserved") {
     hotkeyFeedback.show("error", settingsStore.getEscapeReservedMessage());
   }
@@ -232,6 +291,7 @@ async function startRecording() {
   isRecording.value = true;
   recordingWarning.value = "";
   recordingHint.value = "";
+  recordingFailure.value = null;
   const requestId = ++recordingRequestSeq;
 
   // gh-30：先掛好 listener 再叫 Rust 進錄製模式，否則中間發出的 captured 會漏接（Tauri 不補播）
@@ -261,8 +321,10 @@ async function startRecording() {
   try {
     await invoke("start_hotkey_recording");
   } catch (err) {
+    console.info("[SettingsView] hotkey recording: start failed");
     hotkeyFeedback.show("error", extractErrorMessage(err));
     stopKeyRecording();
+    recordingFailure.value = { kind: "start-failed" };
     return;
   }
 
@@ -272,6 +334,7 @@ async function startRecording() {
       console.info("[SettingsView] hotkey recording: timeout fired");
       hotkeyFeedback.show("error", settingsStore.getHotkeyRecordingTimeoutMessage());
       stopKeyRecording();
+      recordingFailure.value = { kind: "timeout" };
     }
   }, RECORDING_TIMEOUT_MS);
 }
@@ -967,6 +1030,7 @@ onBeforeUnmount(() => {
   void stopPreview();
   stopKeyRecording();
   hotkeyFeedback.clearTimer();
+  reportFeedback.clearTimer();
   apiKeyFeedback.clearTimer();
   promptFeedback.clearTimer();
   enhancementThresholdFeedback.clearTimer();
@@ -1133,6 +1197,29 @@ onBeforeUnmount(() => {
           <p v-if="recordingHint" class="text-sm text-muted-foreground">
             {{ recordingHint }}
           </p>
+
+          <!-- gh-30：錄製失敗一鍵回報 -->
+          <div v-if="recordingFailure" class="space-y-2 rounded-md border border-border p-3">
+            <p class="text-sm text-foreground">{{ $t("settings.hotkey.report.prompt") }}</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" @click="handleReportToGitHub">
+                {{ $t("settings.hotkey.report.github") }}
+              </Button>
+              <Button variant="outline" size="sm" @click="handleCopyDiagnostics">
+                {{ $t("settings.hotkey.report.copy") }}
+              </Button>
+            </div>
+            <p class="text-xs text-muted-foreground">{{ $t("settings.hotkey.report.note") }}</p>
+            <Transition name="fade">
+              <p
+                v-if="reportFeedback.message.value !== ''"
+                class="text-sm"
+                :class="reportFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
+              >
+                {{ reportFeedback.message.value }}
+              </p>
+            </Transition>
+          </div>
         </div>
 
         <!-- 觸發模式 -->

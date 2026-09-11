@@ -45,6 +45,13 @@
         "rightAlt": "右 Alt",
         "leftAlt": "左 Alt",
         "control": "Control"
+      },
+      "report": {
+        "prompt": "錄製沒反應？把診斷資訊交給開發者：",
+        "github": "回報到 GitHub",
+        "copy": "複製診斷資訊",
+        "copied": "已複製，貼給開發者即可",
+        "note": "內容只有錄製期間的按鍵代碼、快捷鍵設定與程式階段記錄，不含任何轉錄內容"
       }
     },
     "apiKey": {
