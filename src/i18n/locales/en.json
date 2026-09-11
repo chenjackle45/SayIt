@@ -48,11 +48,11 @@
       }
     },
     "apiKey": {
-      "title": "Groq API Key (Speech-to-Text + Groq LLM)",
+      "title": "Groq API Key",
       "set": "Set",
       "notSet": "Not Set",
       "goToConsole": "Go to Groq Console",
-      "instruction": "This Key is used for speech transcription (Whisper). If Groq is selected as LLM Provider, it's also used for text enhancement.",
+      "instruction": "Used for speech transcription. Shared with text enhancement when Groq is selected there too.",
       "onboarding": "Welcome to SayIt! Please set up your Groq API Key to enable voice input.",
       "show": "Show",
       "hide": "Hide",
@@ -68,7 +68,8 @@
       "openai": "OpenAI (Recommended)",
       "anthropic": "Anthropic",
       "gemini": "Google Gemini (Free Quota)",
-      "groqNote": "Uses Groq API Key above"
+      "groqNote": "Uses the Groq API Key from Speech to Text (set)",
+      "groqNoteNotSet": "Uses the Groq API Key from Speech to Text (not set yet — add it in the Speech to Text card above)"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -87,21 +88,23 @@
       "success": "Connected ({ms}ms)"
     },
     "model": {
-      "title": "Model Selection",
-      "description": "Choose the AI models for speech transcription and text enhancement. Faster models respond quicker, while larger models offer better quality.",
       "whisperLabel": "Speech Transcription Model (Whisper)",
       "llmLabel": "Text Enhancement Model (LLM)",
       "whisperUpdated": "Speech transcription model updated",
       "llmUpdated": "Text enhancement model updated",
       "default": "Default",
-      "costPerHour": "${cost}/hour"
+      "costPerHour": "${cost}/hour",
+      "paidOnlyHint": "No free tier; requires billing on the provider's platform",
+      "limitedFreeHint": "Free tier is tiny or varies by project; free projects often get \"too many requests\""
     },
     "modelBadge": {
       "balanced": "Balanced · Default",
       "stableCostly": "Stable · Production",
       "fastCheap": "Fastest · Cheapest",
       "smartestSlow": "Smartest · Slower",
-      "premium": "Premium"
+      "premium": "Premium",
+      "paidOnly": "Paid",
+      "limitedFree": "Tiny free tier"
     },
     "prompt": {
       "title": "AI Enhancement Prompt",
@@ -209,6 +212,12 @@
       "description": "Auto-detect corrections after paste and learn new terms via AI analysis",
       "privacyNote": "When enabled, the system reads text near the cursor for AI analysis. No original text is stored",
       "analysisModelUpdated": "Dictionary analysis model updated"
+    },
+    "stt": {
+      "title": "Speech to Text"
+    },
+    "llm": {
+      "title": "Text Enhancement"
     }
   },
   "dashboard": {

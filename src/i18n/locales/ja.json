@@ -48,11 +48,11 @@
       }
     },
     "apiKey": {
-      "title": "Groq API Key（音声認識 + Groq LLM）",
+      "title": "Groq API Key",
       "set": "設定済み",
       "notSet": "未設定",
       "goToConsole": "Groq Console へ",
-      "instruction": "このキーは音声認識（Whisper）に使用します。LLM プロバイダーが Groq の場合、テキスト整理にも使用されます。",
+      "instruction": "音声文字起こしに使用します。文章整形でも Groq を選ぶとこのキーを共用します。",
       "onboarding": "SayIt へようこそ！音声入力を有効にするには、まず Groq API Key を設定してください。",
       "show": "表示",
       "hide": "非表示",
@@ -68,7 +68,8 @@
       "openai": "OpenAI（おすすめ）",
       "anthropic": "Anthropic",
       "gemini": "Google Gemini（無料枠あり）",
-      "groqNote": "上記の Groq API Key を使用"
+      "groqNote": "音声文字起こしの Groq API Key を使用（設定済み）",
+      "groqNoteNotSet": "音声文字起こしの Groq API Key を使用（未設定。上の「音声文字起こし」で入力してください）"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -87,21 +88,23 @@
       "success": "接続成功（{ms}ms）"
     },
     "model": {
-      "title": "モデル選択",
-      "description": "音声文字起こしとテキスト整理に使用する AI モデルを選択します。高速なモデルはより即時に応答し、大型モデルはより高品質です。",
       "whisperLabel": "音声文字起こしモデル（Whisper）",
       "llmLabel": "テキスト整理モデル（LLM）",
       "whisperUpdated": "音声文字起こしモデルが更新されました",
       "llmUpdated": "テキスト整理モデルが更新されました",
       "default": "デフォルト",
-      "costPerHour": "1時間あたり ${cost}"
+      "costPerHour": "1時間あたり ${cost}",
+      "paidOnlyHint": "無料枠がなく、各プラットフォームで課金を有効にする必要があります",
+      "limitedFreeHint": "無料枠がごく少ないかプロジェクトによって異なり、無料プロジェクトでは「リクエストが多すぎます」になりがちです"
     },
     "modelBadge": {
       "balanced": "バランス · デフォルト",
       "stableCostly": "安定 · 正式版",
       "fastCheap": "最速 · 最安",
       "smartestSlow": "最賢 · 低速",
-      "premium": "高品質"
+      "premium": "高品質",
+      "paidOnly": "有料",
+      "limitedFree": "無料枠が少ない"
     },
     "prompt": {
       "title": "AI 整理 Prompt",
@@ -209,6 +212,12 @@
       "description": "貼り付け後に修正を自動検出し、AI 分析で新語を学習",
       "privacyNote": "有効にすると、AI 分析のためにカーソル付近のテキストを読み取ります。原文は保存されません",
       "analysisModelUpdated": "辞書分析モデルを更新しました"
+    },
+    "stt": {
+      "title": "音声文字起こし"
+    },
+    "llm": {
+      "title": "文章整形"
     }
   },
   "dashboard": {

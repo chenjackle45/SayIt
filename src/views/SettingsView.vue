@@ -510,8 +510,9 @@ async function handleSaveThresholdCharCount() {
   }
 }
 
-// ── 模型選擇 ──────────────────────────────────────────────
-const modelFeedback = useFeedbackMessage();
+// ── 模型選擇（語音轉錄卡與文字整理卡各自回饋，避免回饋跑錯卡）──
+const whisperModelFeedback = useFeedbackMessage();
+const llmModelFeedback = useFeedbackMessage();
 
 const whisperModelDescription = computed(() => {
   const config = findWhisperModelConfig(settingsStore.selectedWhisperModelId);
@@ -523,7 +524,11 @@ const llmModelDescription = computed(() => {
   const config = findLlmModelConfig(settingsStore.selectedLlmModelId);
   if (!config) return "";
   const tpsInfo = config.speedTps > 0 ? `${config.speedTps} TPS · ` : "";
-  return `${tpsInfo}$${config.inputCostPerMillion}/$${config.outputCostPerMillion} per M tokens`;
+  const base = `${tpsInfo}$${config.inputCostPerMillion}/$${config.outputCostPerMillion} per M tokens`;
+  // gh-71：免費專案選到沒額度的模型會直接 429，事前把付費狀態講清楚
+  if (config.freeTier === "none") return `${base} · ${t("settings.model.paidOnlyHint")}`;
+  if (config.freeTier === "limited") return `${base} · ${t("settings.model.limitedFreeHint")}`;
+  return base;
 });
 
 const providerModelList = computed(() =>
@@ -533,18 +538,18 @@ const providerModelList = computed(() =>
 async function handleWhisperModelChange(newId: WhisperModelId) {
   try {
     await settingsStore.saveWhisperModel(newId);
-    modelFeedback.show("success", t("settings.model.whisperUpdated"));
+    whisperModelFeedback.show("success", t("settings.model.whisperUpdated"));
   } catch (err) {
-    modelFeedback.show("error", extractErrorMessage(err));
+    whisperModelFeedback.show("error", extractErrorMessage(err));
   }
 }
 
 async function handleLlmModelChange(newId: LlmModelId) {
   try {
     await settingsStore.saveLlmModel(newId);
-    modelFeedback.show("success", t("settings.model.llmUpdated"));
+    llmModelFeedback.show("success", t("settings.model.llmUpdated"));
   } catch (err) {
-    modelFeedback.show("error", extractErrorMessage(err));
+    llmModelFeedback.show("error", extractErrorMessage(err));
   }
 }
 
@@ -951,7 +956,8 @@ onBeforeUnmount(() => {
   apiKeyFeedback.clearTimer();
   promptFeedback.clearTimer();
   enhancementThresholdFeedback.clearTimer();
-  modelFeedback.clearTimer();
+  whisperModelFeedback.clearTimer();
+  llmModelFeedback.clearTimer();
   muteOnRecordingFeedback.clearTimer();
   soundFeedbackFeedback.clearTimer();
   hideDockIconFeedback.clearTimer();
@@ -1178,137 +1184,190 @@ onBeforeUnmount(() => {
       </CardContent>
     </Card>
 
-    <!-- Groq API Key -->
-    <Card>
-      <CardHeader class="flex-row items-center justify-between border-b border-border">
-        <div class="flex items-center gap-2">
-          <CardTitle class="text-base">Groq API Key</CardTitle>
-          <Badge
-            :class="apiKeyStatusClass"
-            class="border-0"
-          >
-            {{ apiKeyStatusLabel }}
-          </Badge>
-        </div>
-        <a
-          href="https://console.groq.com/keys"
-          target="_blank"
-          rel="noreferrer"
-          class="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {{ $t("settings.apiKey.goToConsole") }} &rarr;
-        </a>
-      </CardHeader>
-      <CardContent class="space-y-4">
-        <p class="text-sm text-muted-foreground leading-relaxed">
-          {{ $t("settings.apiKey.instruction") }}
-        </p>
-
-        <p
-          v-if="shouldShowOnboardingHint"
-          class="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm text-blue-200"
-        >
-          {{ $t("settings.apiKey.onboarding") }}
-        </p>
-
-        <div class="flex gap-2">
-          <div class="flex flex-1 gap-2">
-            <Input
-              v-model="apiKeyInput"
-              :type="isApiKeyVisible ? 'text' : 'password'"
-              placeholder="gsk_..."
-              autocomplete="off"
-              class="flex-1"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              class="shrink-0"
-              @click="toggleApiKeyVisibility"
-            >
-              {{ isApiKeyVisible ? $t("settings.apiKey.hide") : $t("settings.apiKey.show") }}
-            </Button>
-          </div>
-          <Button
-            :disabled="isSubmittingApiKey"
-            @click="handleSaveApiKey"
-          >
-            {{ $t("common.save") }}
-          </Button>
-        </div>
-
-        <div class="flex items-center justify-between">
-          <transition name="feedback-fade">
-            <p
-              v-if="apiKeyFeedback.message.value !== ''"
-              class="text-sm"
-              :class="
-                apiKeyFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'
-              "
-            >
-              {{ apiKeyFeedback.message.value }}
-            </p>
-          </transition>
-
-          <Button
-            v-if="settingsStore.hasApiKey"
-            variant="outline"
-            :class="
-              isConfirmingDeleteApiKey
-                ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
-                : 'text-destructive border-destructive hover:bg-destructive/10'
-            "
-            :disabled="isSubmittingApiKey"
-            @click="requestDeleteApiKey"
-          >
-            {{ isConfirmingDeleteApiKey ? $t('settings.apiKey.confirmDelete') : $t('settings.apiKey.delete') }}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-
-    <!-- 模型選擇 -->
+    <!-- 語音轉錄：金鑰 → 模型｜語言 → 測試連線（設計 A，金鑰跟著功能走） -->
     <Card>
       <CardHeader class="border-b border-border">
-        <CardTitle class="text-base">{{ $t("settings.model.title") }}</CardTitle>
+        <CardTitle class="text-base">{{ $t("settings.stt.title") }}</CardTitle>
       </CardHeader>
       <CardContent class="space-y-5">
-        <p class="text-sm text-muted-foreground leading-relaxed">
-          {{ $t("settings.model.description") }}
-        </p>
-
-        <!-- Whisper 模型 -->
-        <div class="space-y-2">
-          <Label for="whisper-model">{{ $t("settings.model.whisperLabel") }}</Label>
-          <Select
-            :model-value="settingsStore.selectedWhisperModelId"
-            @update:model-value="handleWhisperModelChange($event as WhisperModelId)"
-          >
-            <SelectTrigger id="whisper-model" class="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="model in WHISPER_MODEL_LIST"
-                :key="model.id"
-                :value="model.id"
+        <!-- Groq API Key -->
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Label for="groq-api-key">{{ $t("settings.apiKey.title") }}</Label>
+              <Badge
+                :class="apiKeyStatusClass"
+                class="border-0"
               >
-                {{ model.displayName }}
-                <template v-if="model.isDefault" #extra>
-                  <Badge variant="secondary" class="ml-2 text-xs">{{ $t("settings.model.default") }}</Badge>
-                </template>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <p class="text-xs text-muted-foreground">{{ whisperModelDescription }}</p>
-          <ConnectionTestButton
-            :on-test="() => testWhisperConnection(settingsStore.selectedWhisperModelId, settingsStore.getApiKey())"
-            :disabled="!settingsStore.hasApiKey"
-          />
+                {{ apiKeyStatusLabel }}
+              </Badge>
+            </div>
+            <a
+              href="https://console.groq.com/keys"
+              target="_blank"
+              rel="noreferrer"
+              class="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {{ $t("settings.apiKey.goToConsole") }} &rarr;
+            </a>
+          </div>
+
+          <p class="text-sm text-muted-foreground leading-relaxed">
+            {{ $t("settings.apiKey.instruction") }}
+          </p>
+
+          <p
+            v-if="shouldShowOnboardingHint"
+            class="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm text-blue-200"
+          >
+            {{ $t("settings.apiKey.onboarding") }}
+          </p>
+
+          <div class="flex gap-2">
+            <div class="flex flex-1 gap-2">
+              <Input
+                id="groq-api-key"
+                v-model="apiKeyInput"
+                :type="isApiKeyVisible ? 'text' : 'password'"
+                placeholder="gsk_..."
+                autocomplete="off"
+                class="flex-1"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                class="shrink-0"
+                @click="toggleApiKeyVisibility"
+              >
+                {{ isApiKeyVisible ? $t("settings.apiKey.hide") : $t("settings.apiKey.show") }}
+              </Button>
+            </div>
+            <Button
+              :disabled="isSubmittingApiKey"
+              @click="handleSaveApiKey"
+            >
+              {{ $t("common.save") }}
+            </Button>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <transition name="feedback-fade">
+              <p
+                v-if="apiKeyFeedback.message.value !== ''"
+                class="text-sm"
+                :class="
+                  apiKeyFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'
+                "
+              >
+                {{ apiKeyFeedback.message.value }}
+              </p>
+            </transition>
+
+            <Button
+              v-if="settingsStore.hasApiKey"
+              variant="outline"
+              :class="
+                isConfirmingDeleteApiKey
+                  ? 'bg-destructive text-destructive-foreground border-destructive hover:bg-destructive/90'
+                  : 'text-destructive border-destructive hover:bg-destructive/10'
+              "
+              :disabled="isSubmittingApiKey"
+              @click="requestDeleteApiKey"
+            >
+              {{ isConfirmingDeleteApiKey ? $t('settings.apiKey.confirmDelete') : $t('settings.apiKey.delete') }}
+            </Button>
+          </div>
         </div>
 
         <Separator />
 
+        <!-- 模型｜語言 並排 -->
+        <div class="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
+          <div class="space-y-2">
+            <Label for="whisper-model">{{ $t("settings.model.whisperLabel") }}</Label>
+            <Select
+              :model-value="settingsStore.selectedWhisperModelId"
+              @update:model-value="handleWhisperModelChange($event as WhisperModelId)"
+            >
+              <SelectTrigger id="whisper-model" class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="model in WHISPER_MODEL_LIST"
+                  :key="model.id"
+                  :value="model.id"
+                >
+                  {{ model.displayName }}
+                  <template v-if="model.isDefault" #extra>
+                    <Badge variant="secondary" class="ml-2 text-xs">{{ $t("settings.model.default") }}</Badge>
+                  </template>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p class="text-xs text-muted-foreground">{{ whisperModelDescription }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="transcription-locale-select">{{ $t("settings.app.transcriptionLanguage") }}</Label>
+            <Select
+              :model-value="settingsStore.selectedTranscriptionLocale"
+              @update:model-value="handleTranscriptionLocaleChange($event as TranscriptionLocale)"
+            >
+              <SelectTrigger id="transcription-locale-select" class="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="opt in TRANSCRIPTION_LANGUAGE_OPTIONS"
+                  :key="opt.locale"
+                  :value="opt.locale"
+                >
+                  {{ opt.locale === 'auto' ? $t('settings.app.autoDetect') : opt.displayName }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p class="text-xs text-muted-foreground">{{ $t("settings.app.transcriptionLanguageDescription") }}</p>
+          </div>
+        </div>
+
+        <ConnectionTestButton
+          :on-test="() => testWhisperConnection(settingsStore.selectedWhisperModelId, settingsStore.getApiKey())"
+          :disabled="!settingsStore.hasApiKey"
+        />
+
+        <transition name="feedback-fade">
+          <p
+            v-if="whisperModelFeedback.message.value !== ''"
+            class="text-sm"
+            :class="whisperModelFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
+          >
+            {{ whisperModelFeedback.message.value }}
+          </p>
+        </transition>
+
+        <transition name="feedback-fade">
+          <p
+            v-if="transcriptionLocaleFeedback.message.value !== ''"
+            class="text-sm"
+            :class="
+              transcriptionLocaleFeedback.type.value === 'success'
+                ? 'text-green-400'
+                : 'text-red-400'
+            "
+          >
+            {{ transcriptionLocaleFeedback.message.value }}
+          </p>
+        </transition>
+      </CardContent>
+    </Card>
+
+    <!-- 文字整理：服務 → 金鑰 → 測試連線 → 模型 -->
+    <Card>
+      <CardHeader class="border-b border-border">
+        <CardTitle class="text-base">{{ $t("settings.llm.title") }}</CardTitle>
+      </CardHeader>
+      <CardContent class="space-y-5">
         <!-- LLM Provider 選擇 -->
         <div class="space-y-3">
           <Label>{{ $t("settings.provider.title") }}</Label>
@@ -1333,7 +1392,9 @@ onBeforeUnmount(() => {
 
         <!-- Provider-specific API Key -->
         <div v-if="settingsStore.selectedLlmProviderId === 'groq'" class="rounded-md bg-muted/50 p-3">
-          <p class="text-xs text-muted-foreground">{{ $t("settings.provider.groqNote") }}</p>
+          <p class="text-xs text-muted-foreground">
+            {{ settingsStore.hasApiKey ? $t("settings.provider.groqNote") : $t("settings.provider.groqNoteNotSet") }}
+          </p>
         </div>
 
         <div v-else-if="settingsStore.selectedLlmProviderId === 'openai'" class="space-y-2">
@@ -1478,6 +1539,9 @@ onBeforeUnmount(() => {
                   {{ model.displayName }}
                   <template #extra>
                     <Badge variant="secondary" class="ml-2 text-xs">{{ $t(model.badgeKey) }}</Badge>
+                    <Badge v-if="model.freeTier !== 'full'" variant="outline" class="ml-1 text-xs">
+                      {{ model.freeTier === 'none' ? $t("settings.modelBadge.paidOnly") : $t("settings.modelBadge.limitedFree") }}
+                    </Badge>
                   </template>
                 </SelectItem>
               </SelectContent>
@@ -1488,15 +1552,11 @@ onBeforeUnmount(() => {
 
         <transition name="feedback-fade">
           <p
-            v-if="modelFeedback.message.value !== ''"
+            v-if="llmModelFeedback.message.value !== ''"
             class="text-sm"
-            :class="
-              modelFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
-            "
+            :class="llmModelFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
           >
-            {{ modelFeedback.message.value }}
+            {{ llmModelFeedback.message.value }}
           </p>
         </transition>
       </CardContent>
@@ -1926,45 +1986,6 @@ onBeforeUnmount(() => {
             "
           >
             {{ localeFeedback.message.value }}
-          </p>
-        </transition>
-
-        <!-- 轉錄語言 -->
-        <div class="flex items-center justify-between">
-          <div>
-            <Label for="transcription-locale-select">{{ $t("settings.app.transcriptionLanguage") }}</Label>
-            <p class="text-sm text-muted-foreground">{{ $t("settings.app.transcriptionLanguageDescription") }}</p>
-          </div>
-          <Select
-            :model-value="settingsStore.selectedTranscriptionLocale"
-            @update:model-value="handleTranscriptionLocaleChange($event as TranscriptionLocale)"
-          >
-            <SelectTrigger id="transcription-locale-select" class="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="opt in TRANSCRIPTION_LANGUAGE_OPTIONS"
-                :key="opt.locale"
-                :value="opt.locale"
-              >
-                {{ opt.locale === 'auto' ? $t('settings.app.autoDetect') : opt.displayName }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <transition name="feedback-fade">
-          <p
-            v-if="transcriptionLocaleFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              transcriptionLocaleFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
-            "
-          >
-            {{ transcriptionLocaleFeedback.message.value }}
           </p>
         </transition>
 

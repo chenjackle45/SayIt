@@ -31,9 +31,18 @@ interface BaseModelConfig {
   isDefault: boolean;
 }
 
+/**
+ * 免費專案能不能用（gh-71）：
+ * - full：免費額度足夠日常使用
+ * - limited：官方有免費層，但額度極小或依專案而異，免費專案常直接 429
+ * - none：沒有免費層，必須在該平台開通付費
+ */
+export type FreeTierLevel = "full" | "limited" | "none";
+
 export interface LlmModelConfig extends BaseModelConfig {
   id: LlmModelId;
   providerId: LlmProviderId;
+  freeTier: FreeTierLevel;
 }
 
 export interface WhisperModelConfig {
@@ -84,6 +93,7 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
     // Preview 模型：Groq 可無預警下架，顯示名稱標明讓使用者知情
     id: "qwen/qwen3.6-27b",
     providerId: "groq",
+    freeTier: "full",
     displayName: "Qwen3.6 27B (Preview)",
     badgeKey: "settings.modelBadge.balanced",
     speedTps: 500,
@@ -96,6 +106,7 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
   {
     id: "openai/gpt-oss-120b",
     providerId: "groq",
+    freeTier: "full",
     displayName: "GPT OSS 120B",
     badgeKey: "settings.modelBadge.stableCostly",
     speedTps: 500,
@@ -108,6 +119,7 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
   {
     id: "openai/gpt-oss-20b",
     providerId: "groq",
+    freeTier: "full",
     displayName: "GPT OSS 20B",
     badgeKey: "settings.modelBadge.fastCheap",
     speedTps: 1_000,
@@ -121,6 +133,7 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
   {
     id: "gemini-3.5-flash",
     providerId: "gemini",
+    freeTier: "limited",
     displayName: "Gemini 3.5 Flash",
     badgeKey: "settings.modelBadge.premium",
     speedTps: 0,
@@ -133,6 +146,7 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
   {
     id: "gemini-3.1-flash-lite",
     providerId: "gemini",
+    freeTier: "full",
     displayName: "Gemini 3.1 Flash-Lite",
     badgeKey: "settings.modelBadge.fastCheap",
     speedTps: 0,
@@ -146,6 +160,7 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
   {
     id: "gpt-5.6-luna",
     providerId: "openai",
+    freeTier: "none",
     displayName: "GPT-5.6 Luna",
     badgeKey: "settings.modelBadge.premium",
     speedTps: 0,
@@ -158,6 +173,7 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
   {
     id: "gpt-5.4-nano",
     providerId: "openai",
+    freeTier: "none",
     displayName: "GPT-5.4 Nano",
     badgeKey: "settings.modelBadge.fastCheap",
     speedTps: 0,
@@ -171,6 +187,7 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
   {
     id: "claude-haiku-4-5-20251001",
     providerId: "anthropic",
+    freeTier: "none",
     displayName: "Claude Haiku 4.5",
     badgeKey: "settings.modelBadge.premium",
     speedTps: 0,

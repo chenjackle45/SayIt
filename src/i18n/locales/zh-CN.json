@@ -48,11 +48,11 @@
       }
     },
     "apiKey": {
-      "title": "Groq API Key（语音转录 + Groq LLM）",
+      "title": "Groq API Key",
       "set": "已设置",
       "notSet": "未设置",
       "goToConsole": "前往 Groq Console",
-      "instruction": "此 Key 用于语音转录（Whisper）。若 LLM Provider 选择 Groq，也会用于文字整理。",
+      "instruction": "用于语音转录。文字整理也选 Groq 时会共用这把密钥。",
       "onboarding": "欢迎使用 SayIt！请先设置 Groq API Key 以启用语音输入功能。",
       "show": "显示",
       "hide": "隐藏",
@@ -68,7 +68,8 @@
       "openai": "OpenAI（推荐）",
       "anthropic": "Anthropic",
       "gemini": "Google Gemini（免费额度）",
-      "groqNote": "使用上方 Groq API Key"
+      "groqNote": "使用语音转录的 Groq API Key（已设置）",
+      "groqNoteNotSet": "使用语音转录的 Groq API Key（尚未设置，请先到上方“语音转录”填入）"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -87,21 +88,23 @@
       "success": "测试成功（{ms}ms）"
     },
     "model": {
-      "title": "模型选择",
-      "description": "选择语音转录和文字整理使用的 AI 模型。速度较快的模型响应更即时，较大的模型品质更好。",
       "whisperLabel": "语音转录模型（Whisper）",
       "llmLabel": "文字整理模型（LLM）",
       "whisperUpdated": "语音转录模型已更新",
       "llmUpdated": "文字整理模型已更新",
       "default": "默认",
-      "costPerHour": "每小时 ${cost}"
+      "costPerHour": "每小时 ${cost}",
+      "paidOnlyHint": "此模型没有免费层，需在该平台开通付费",
+      "limitedFreeHint": "免费额度极少或因项目而异，免费项目常会返回“请求过于频繁”"
     },
     "modelBadge": {
       "balanced": "平衡 · 默认",
       "stableCostly": "稳定 · 正式版",
       "fastCheap": "最快 · 最便宜",
       "smartestSlow": "最聪明 · 较慢",
-      "premium": "高品质"
+      "premium": "高品质",
+      "paidOnly": "需付费",
+      "limitedFree": "免费额度少"
     },
     "prompt": {
       "title": "AI 整理 Prompt",
@@ -209,6 +212,12 @@
       "description": "转录粘贴后自动检测修正，通过 AI 分析学习新词汇",
       "privacyNote": "启用后，系统会读取光标附近的文字用于 AI 分析，不存储原文",
       "analysisModelUpdated": "字典分析模型已更新"
+    },
+    "stt": {
+      "title": "语音转录"
+    },
+    "llm": {
+      "title": "文字整理"
     }
   },
   "dashboard": {

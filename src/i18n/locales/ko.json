@@ -48,11 +48,11 @@
       }
     },
     "apiKey": {
-      "title": "Groq API Key (음성 인식 + Groq LLM)",
+      "title": "Groq API Key",
       "set": "설정됨",
       "notSet": "미설정",
       "goToConsole": "Groq Console로 이동",
-      "instruction": "이 키는 음성 인식(Whisper)에 사용됩니다. LLM 제공업체로 Groq를 선택하면 텍스트 정리에도 사용됩니다.",
+      "instruction": "음성 인식에 사용됩니다. 텍스트 정리에서도 Groq를 선택하면 이 키를 공유합니다.",
       "onboarding": "SayIt에 오신 것을 환영합니다! 음성 입력 기능을 사용하려면 먼저 Groq API Key를 설정하세요.",
       "show": "표시",
       "hide": "숨기기",
@@ -68,7 +68,8 @@
       "openai": "OpenAI (추천)",
       "anthropic": "Anthropic",
       "gemini": "Google Gemini (무료 할당량)",
-      "groqNote": "위의 Groq API Key 사용"
+      "groqNote": "음성 인식의 Groq API Key 사용(설정됨)",
+      "groqNoteNotSet": "음성 인식의 Groq API Key 사용(아직 미설정, 위 「음성 인식」에서 먼저 입력하세요)"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -87,21 +88,23 @@
       "success": "연결 성공 ({ms}ms)"
     },
     "model": {
-      "title": "모델 선택",
-      "description": "음성 전사 및 텍스트 정리에 사용할 AI 모델을 선택하세요. 빠른 모델은 응답이 즉각적이고, 큰 모델은 품질이 더 좋습니다.",
       "whisperLabel": "음성 전사 모델 (Whisper)",
       "llmLabel": "텍스트 정리 모델 (LLM)",
       "whisperUpdated": "음성 전사 모델이 업데이트되었습니다",
       "llmUpdated": "텍스트 정리 모델이 업데이트되었습니다",
       "default": "기본",
-      "costPerHour": "시간당 ${cost}"
+      "costPerHour": "시간당 ${cost}",
+      "paidOnlyHint": "무료 등급이 없어 해당 플랫폼에서 결제를 활성화해야 합니다",
+      "limitedFreeHint": "무료 한도가 매우 적거나 프로젝트마다 달라 무료 프로젝트에서는 「요청이 너무 많음」이 자주 발생합니다"
     },
     "modelBadge": {
       "balanced": "균형 · 기본",
       "stableCostly": "안정 · 정식 버전",
       "fastCheap": "가장 빠름 · 가장 저렴",
       "smartestSlow": "가장 똑똑 · 느림",
-      "premium": "프리미엄"
+      "premium": "프리미엄",
+      "paidOnly": "유료",
+      "limitedFree": "무료 한도 적음"
     },
     "prompt": {
       "title": "AI 정리 Prompt",
@@ -209,6 +212,12 @@
       "description": "붙여넣기 후 수정을 자동 감지하고 AI 분석으로 새 용어 학습",
       "privacyNote": "활성화하면 AI 분석을 위해 커서 주변의 텍스트를 읽습니다. 원문은 저장되지 않습니다",
       "analysisModelUpdated": "사전 분석 모델이 업데이트되었습니다"
+    },
+    "stt": {
+      "title": "음성 인식"
+    },
+    "llm": {
+      "title": "텍스트 정리"
     }
   },
   "dashboard": {
