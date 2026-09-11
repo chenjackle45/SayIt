@@ -4,7 +4,7 @@
 > 病根：拍板後排到「之後」就蒸發（#56、#10 都發生過；#66 的返工指引草稿曾空等 58 天）。
 > 判準：承諾前先驗前提；公開留言不寫機制，只寫「確認了／方向找到／排在哪之後／過渡方法」。
 
-更新：2026-09-11（v0.12.0 已發佈；#76 已實作、#67 已留言）
+更新：2026-09-11（v0.12.1 已發佈：Windows 左 Ctrl 觸發鍵修復＋#76；#67 已留言）
 
 ## 🔴 未交付
 
@@ -14,8 +14,8 @@
 | #70 問題 2 Groq 沒 AI 整理 | 「還在查」，請換 GPT OSS 120B 試 | 假設是語意守衛退回逐字稿 | 等回報者結果；日誌可查 `enhancement rejected ... drift=true` |
 | #73 HackMD 誤讀 | Windows 換新讀取方式仍在計劃、短期還會在 | 需 Windows 實機 | 與 #30 同批 |
 | #74 廣東話選項 | 「排在修完 Windows 貼上之後」 | v0.13（與 ElevenLabs 同批；ElevenLabs 明列支援 `yue`，Groq 未驗） | 開 v0.13 |
-| #76 啟動時隱藏主視窗 | 「排在修完 Windows 貼上之後」 | 已實作（12e4147，2026-09-11），隨 v0.12.1 hotfix 出 | v0.12.1 發版後回串通知 |
-| Windows 左 Ctrl 觸發鍵（LINE 回報，無 issue） | 對回報者說會修 | v0.12.1 修復（`docs/plan-windows-injected-key-guard.md`），發版後請回報者實測 Ctrl Hold／Toggle、順便試自訂鍵（#30） | 發版後私訊；#70／#72 串補一句 |
+| #76 啟動時隱藏主視窗 | 「排在修完 Windows 貼上之後」 | **v0.12.1 已交付（2026-09-11 公開）**，已回串通知 | 等回報者回音後關 |
+| Windows 左 Ctrl 觸發鍵（LINE 回報，無 issue） | 對回報者說會修 | **v0.12.1 已交付**（`docs/plan-windows-injected-key-guard.md`）；#70／#72 已補一句 | 私訊請實測 Ctrl Hold／Toggle、編輯模式、自訂鍵（#30） |
 | #71 模型清單標「需付費」 | 「之後會標更清楚」 | v0.13 設定頁重排時一併 | — |
 | #30 Windows 自訂觸發鍵、右 Alt／右 Ctrl | 兩次誠實進度留言 | 需 Windows 實機 | — |
 | #66 lettucebo Azure | 9/24 無回音就接手（rebase 到最新 main、Azure 拿掉 temperature），併入後通知 #45 | 等作者 | 9/24 檢查 |
