@@ -441,8 +441,7 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Windows custom trigger key is fixed: while recording, Ctrl+C used to capture only C and a lone Right Ctrl always timed out — the modifier check was reading a stale key state. Recording now follows the actual key events, so what you press is what gets saved",
-      "item2": "Two modifier keys can now be a trigger: for example Right Alt+Right Ctrl (Right Option+Right Control on Mac). Press both while recording and release — both down starts, releasing either stops, and left/right keys are told apart",
+      "item1": "Recording a custom trigger key on Windows no longer requires clicking another window first — with the SayIt window in front, nothing used to register; now you can press the key right in SayIt",
       "dismiss": "Got it"
     }
   },
