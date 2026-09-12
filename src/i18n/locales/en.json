@@ -20,6 +20,7 @@
       "custom": "Custom",
       "triggerKey": "Trigger Key",
       "customTriggerKey": "Custom Trigger Key",
+      "releaseAllHint": "Release all keys first, then press the combination you want",
       "notSet": "Not Set",
       "pressKey": "Press a key...",
       "record": "Record",

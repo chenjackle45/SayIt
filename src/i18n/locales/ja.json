@@ -20,6 +20,7 @@
       "custom": "カスタム",
       "triggerKey": "トリガーキー",
       "customTriggerKey": "カスタムトリガーキー",
+      "releaseAllHint": "すべてのキーを離してから、設定したい組み合わせを押してください",
       "notSet": "未設定",
       "pressKey": "キーを押してください...",
       "record": "録音",

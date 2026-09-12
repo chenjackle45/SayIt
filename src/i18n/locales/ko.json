@@ -20,6 +20,7 @@
       "custom": "사용자 정의",
       "triggerKey": "트리거 키",
       "customTriggerKey": "사용자 정의 트리거 키",
+      "releaseAllHint": "모든 키를 뗀 뒤 설정할 조합을 눌러 주세요",
       "notSet": "미설정",
       "pressKey": "키를 눌러주세요...",
       "record": "녹화",

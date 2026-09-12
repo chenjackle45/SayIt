@@ -492,7 +492,7 @@ const MAC_KEYCODE_COLLISION_KEYS: Set<string> = new Set([
 
 // ─── Modifier display symbols ───────────────────────────────
 
-import type { ComboTriggerKey, ModifierFlag } from "../types/settings";
+import type { ChordTriggerKey, ComboTriggerKey, ModifierFlag } from "../types/settings";
 
 const MODIFIER_DISPLAY_SYMBOLS: Record<ModifierFlag, string> = {
   command: "⌘",
@@ -511,6 +511,11 @@ export function getComboTriggerKeyDisplayName(
   // Look up the primary key display name by finding its DOM code from the keycode
   const primaryKeyDisplayName = getKeyDisplayNameByKeycode(combo.combo.keycode);
   return modSymbols ? `${modSymbols}+${primaryKeyDisplayName}` : primaryKeyDisplayName;
+}
+
+/** gh-30：和弦以每顆實體鍵的名稱串接（左右分開，例：Right Alt/Option+Right Control） */
+export function getChordTriggerKeyDisplayName(chord: ChordTriggerKey): string {
+  return chord.chord.keycodes.map((kc) => getKeyDisplayNameByKeycode(kc)).join("+");
 }
 
 /** Reverse lookup: find DOM code from platform keycode */

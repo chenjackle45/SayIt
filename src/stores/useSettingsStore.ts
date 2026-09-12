@@ -9,16 +9,20 @@ import {
   type TriggerKey,
   type CustomTriggerKey,
   type ComboTriggerKey,
+  type ChordTriggerKey,
   type PromptMode,
   PROMPT_MODE_VALUES,
   type ThemeMode,
   isCustomTriggerKey,
   isComboTriggerKey,
+  isChordTriggerKey,
+  isRecordedTriggerKey,
   isPresetTriggerKey,
 } from "../types/settings";
 import {
   getKeyDisplayName,
   getComboTriggerKeyDisplayName,
+  getChordTriggerKeyDisplayName,
   getPlatformKeycode,
   isPresetEquivalentKey,
   getDangerousKeyWarning,
@@ -138,7 +142,7 @@ export const useSettingsStore = defineStore("settings", () => {
         return false;
     }
   });
-  const customTriggerKey = ref<CustomTriggerKey | ComboTriggerKey | null>(null);
+  const customTriggerKey = ref<CustomTriggerKey | ComboTriggerKey | ChordTriggerKey | null>(null);
   const isMuteOnRecordingEnabled = ref<boolean>(DEFAULT_MUTE_ON_RECORDING);
   const isSmartDictionaryEnabled = ref<boolean>(
     DEFAULT_SMART_DICTIONARY_ENABLED,
@@ -229,8 +233,7 @@ export const useSettingsStore = defineStore("settings", () => {
       if (
         savedCustomKey &&
         typeof savedCustomKey === "object" &&
-        (isCustomTriggerKey(savedCustomKey) ||
-          isComboTriggerKey(savedCustomKey))
+        isRecordedTriggerKey(savedCustomKey)
       ) {
         customTriggerKey.value = savedCustomKey;
         customTriggerKeyDomCode.value = savedCustomDomCode ?? "";
@@ -497,8 +500,9 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  /** Combo（修飾鍵＋主鍵）與 Chord（純修飾鍵和弦，gh-30）共用同一儲存入口 */
   async function saveComboTriggerKey(
-    comboKey: ComboTriggerKey,
+    comboKey: ComboTriggerKey | ChordTriggerKey,
     domCode: string,
     mode: TriggerMode,
   ) {
@@ -514,7 +518,7 @@ export const useSettingsStore = defineStore("settings", () => {
       await saveHotkeyConfig(comboKey, mode);
 
       console.log(
-        `[useSettingsStore] Combo trigger key saved: modifiers=${JSON.stringify(comboKey.combo.modifiers)}, keycode=${comboKey.combo.keycode}, domCode=${domCode}, mode=${mode}`,
+        `[useSettingsStore] Combo/Chord trigger key saved: ${JSON.stringify(comboKey)}, domCode=${domCode}, mode=${mode}`,
       );
     } catch (err) {
       console.error(
@@ -542,6 +546,9 @@ export const useSettingsStore = defineStore("settings", () => {
     }
     if (isComboTriggerKey(key)) {
       return getComboTriggerKeyDisplayName(key);
+    }
+    if (isChordTriggerKey(key)) {
+      return getChordTriggerKeyDisplayName(key);
     }
     if (isCustomTriggerKey(key)) {
       // For custom keys, use saved DOM code to look up display name
@@ -1403,8 +1410,7 @@ export const useSettingsStore = defineStore("settings", () => {
       const isValidCustomOrCombo =
         savedCustomKey &&
         typeof savedCustomKey === "object" &&
-        (isCustomTriggerKey(savedCustomKey) ||
-          isComboTriggerKey(savedCustomKey));
+        isRecordedTriggerKey(savedCustomKey);
       customTriggerKey.value = isValidCustomOrCombo ? savedCustomKey : null;
       customTriggerKeyDomCode.value = isValidCustomOrCombo
         ? (savedCustomDomCode ?? "")

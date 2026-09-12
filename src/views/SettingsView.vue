@@ -26,8 +26,10 @@ import {
 import {
   type PresetTriggerKey,
   type ComboTriggerKey,
-  isCustomTriggerKey,
+  type ChordTriggerKey,
   isComboTriggerKey,
+  isChordTriggerKey,
+  isRecordedTriggerKey,
 } from "../types/settings";
 import type {
   RecordingCapturedPayload,
@@ -198,7 +200,7 @@ async function handleCopyDiagnostics() {
 
 const currentCustomKeyDisplay = computed(() => {
   const key = settingsStore.hotkeyConfig?.triggerKey;
-  if (key && isComboTriggerKey(key)) {
+  if (key && (isComboTriggerKey(key) || isChordTriggerKey(key))) {
     return settingsStore.getTriggerKeyDisplayName(key);
   }
   if (!settingsStore.customTriggerKeyDomCode) return "";
@@ -209,7 +211,7 @@ const hasCustomKey = computed(() => settingsStore.customTriggerKey !== null);
 
 const currentPresetKey = computed(() => {
   const key = settingsStore.hotkeyConfig?.triggerKey;
-  if (!key || isCustomTriggerKey(key) || isComboTriggerKey(key)) return isMac ? "fn" : "rightAlt";
+  if (!key || isRecordedTriggerKey(key)) return isMac ? "fn" : "rightAlt";
   return key;
 });
 
@@ -218,7 +220,7 @@ let recordingUnlisteners: UnlistenFn[] = [];
 let recordingRequestSeq = 0;
 
 async function handleRecordingCaptured(payload: RecordingCapturedPayload) {
-  const { keycode, modifiers } = payload;
+  const { keycode, modifiers, chordKeycodes } = payload;
   recordingWarning.value = "";
   recordingHint.value = "";
 
@@ -227,7 +229,19 @@ async function handleRecordingCaptured(payload: RecordingCapturedPayload) {
 
   const domCode = getDomCodeByKeycode(keycode);
 
-  if (modifiers.length > 0) {
+  if (chordKeycodes.length >= 2) {
+    // gh-30：純修飾鍵和弦（例：右 Alt＋右 Ctrl）
+    const chordKey: ChordTriggerKey = { chord: { keycodes: chordKeycodes } };
+    try {
+      await settingsStore.saveComboTriggerKey(chordKey, domCode ?? "", currentMode);
+      hotkeyFeedback.show(
+        "success",
+        t("settings.hotkey.keySet", { key: settingsStore.getTriggerKeyDisplayName(chordKey) }),
+      );
+    } catch (err) {
+      hotkeyFeedback.show("error", extractErrorMessage(err));
+    }
+  } else if (modifiers.length > 0) {
     // Combo key: modifier(s) + primary key
     if (domCode) {
       const dangerWarning = settingsStore.getDangerousKeyWarning(domCode);
@@ -1021,7 +1035,7 @@ onMounted(async () => {
 
   // Detect if current key is custom or combo
   const currentKey = settingsStore.hotkeyConfig?.triggerKey;
-  if (currentKey && (isCustomTriggerKey(currentKey) || isComboTriggerKey(currentKey))) {
+  if (currentKey && isRecordedTriggerKey(currentKey)) {
     isCustomMode.value = true;
   }
 });
@@ -1186,6 +1200,10 @@ onBeforeUnmount(() => {
           </div>
           <p class="text-xs text-muted-foreground">
             {{ $t("settings.hotkey.systemKeyHint") }}
+          </p>
+          <!-- gh-30：錄製從空集合起算，錄製前就按住的鍵不算 -->
+          <p v-if="isRecording" class="text-xs text-muted-foreground">
+            {{ $t("settings.hotkey.releaseAllHint") }}
           </p>
 
           <!-- 警告訊息（黃色） -->

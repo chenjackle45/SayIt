@@ -20,6 +20,7 @@
       "custom": "自訂",
       "triggerKey": "觸發鍵",
       "customTriggerKey": "自訂觸發鍵",
+      "releaseAllHint": "請先放開所有按鍵，再按下想設定的組合",
       "notSet": "未設定",
       "pressKey": "請按下按鍵...",
       "record": "錄製",

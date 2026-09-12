@@ -20,6 +20,7 @@
       "custom": "自定义",
       "triggerKey": "触发键",
       "customTriggerKey": "自定义触发键",
+      "releaseAllHint": "请先松开所有按键，再按下想设置的组合",
       "notSet": "未设置",
       "pressKey": "请按下按键...",
       "record": "录制",

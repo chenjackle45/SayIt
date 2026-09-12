@@ -63,7 +63,7 @@ paths:
 | `hotkey:error` | hotkey_listener.rs | `HOTKEY_ERROR` | `HotkeyErrorPayload` |
 | `hotkey:mode-toggle` | hotkey_listener.rs | `HOTKEY_MODE_TOGGLE` | `()` |
 | `escape:pressed` | hotkey_listener.rs | `ESCAPE_PRESSED` | `()` |
-| `hotkey:recording-captured` | hotkey_listener.rs | `HOTKEY_RECORDING_CAPTURED` | `RecordingCapturedPayload` |
+| `hotkey:recording-captured` | hotkey_listener.rs | `HOTKEY_RECORDING_CAPTURED` | `RecordingCapturedPayload`（`keycode`、`modifiers`、`chordKeycodes`：≥2 顆＝純修飾鍵和弦，對應 `TriggerKey::Chord { keycodes }`；gh-30） |
 | `hotkey:recording-rejected` | hotkey_listener.rs | `HOTKEY_RECORDING_REJECTED` | `RecordingRejectedPayload` |
 | `quality-monitor:result` | keyboard_monitor.rs | `QUALITY_MONITOR_RESULT` | `QualityMonitorResultPayload` |
 | `correction-monitor:result` | keyboard_monitor.rs | `CORRECTION_MONITOR_RESULT` | `CorrectionMonitorResultPayload` |
