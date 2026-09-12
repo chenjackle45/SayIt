@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { invoke } from "@tauri-apps/api/core";
-import type { UnlistenFn } from "@tauri-apps/api/event";
 import {
   useSettingsStore,
   DEFAULT_ENHANCEMENT_THRESHOLD_ENABLED,
@@ -18,11 +17,7 @@ import {
 } from "../composables/useHotkeyDiagnostics";
 import { open as openExternalUrl } from "@tauri-apps/plugin-shell";
 import { useHistoryStore } from "../stores/useHistoryStore";
-import {
-  listenToEvent,
-  HOTKEY_RECORDING_CAPTURED,
-  HOTKEY_RECORDING_REJECTED,
-} from "../composables/useTauriEvents";
+import { useHotkeyRecordingSession } from "../composables/useHotkeyRecordingSession";
 import {
   type PresetTriggerKey,
   type ComboTriggerKey,
@@ -141,12 +136,8 @@ const hotkeyFeedback = useFeedbackMessage();
 
 // ── 兩層模式切換 ──────────────────────────────────────────
 const isCustomMode = ref(false);
-const isRecording = ref(false);
 const recordingWarning = ref("");
 const recordingHint = ref("");
-let recordingTimeoutId: ReturnType<typeof setTimeout> | undefined;
-
-const RECORDING_TIMEOUT_MS = 10_000;
 
 // ── 錄製失敗一鍵回報（gh-30）──
 declare const __APP_VERSION__: string;
@@ -215,17 +206,13 @@ const currentPresetKey = computed(() => {
   return key;
 });
 
-let recordingUnlisteners: UnlistenFn[] = [];
-// gh-30：listener 註冊是非同步的，期間若使用者取消（或重新開始），舊請求不得再啟動 Rust 錄製
-let recordingRequestSeq = 0;
-
+// 錄製流程（listener／DOM 第二來源／逾時／終態去重）在 session 裡；這裡只負責保存與提示
 async function handleRecordingCaptured(payload: RecordingCapturedPayload) {
   const { keycode, modifiers, chordKeycodes } = payload;
   recordingWarning.value = "";
   recordingHint.value = "";
 
   const currentMode = settingsStore.triggerMode;
-  stopKeyRecording();
 
   const domCode = getDomCodeByKeycode(keycode);
 
@@ -293,77 +280,36 @@ async function handleRecordingCaptured(payload: RecordingCapturedPayload) {
 }
 
 function handleRecordingRejected(payload: RecordingRejectedPayload) {
-  console.info(`[SettingsView] hotkey recording: rejected reason=${payload.reason}`);
-  stopKeyRecording();
   recordingFailure.value = { kind: "rejected", reason: payload.reason };
   if (payload.reason === "esc_reserved") {
     hotkeyFeedback.show("error", settingsStore.getEscapeReservedMessage());
   }
 }
 
-async function startRecording() {
-  isRecording.value = true;
+const recordingSession = useHotkeyRecordingSession({
+  enableDomSource: !isMac, // gh-78：Windows 上視窗有焦點時 hook 收不到鍵
+  onCaptured: (payload) => void handleRecordingCaptured(payload),
+  onRejected: handleRecordingRejected,
+  onTimeout: () => {
+    hotkeyFeedback.show("error", settingsStore.getHotkeyRecordingTimeoutMessage());
+    recordingFailure.value = { kind: "timeout" };
+  },
+  onStartFailed: (err) => {
+    hotkeyFeedback.show("error", extractErrorMessage(err));
+    recordingFailure.value = { kind: "start-failed" };
+  },
+});
+const isRecording = recordingSession.isRecording;
+
+function startRecording() {
   recordingWarning.value = "";
   recordingHint.value = "";
   recordingFailure.value = null;
-  const requestId = ++recordingRequestSeq;
-
-  // gh-30：先掛好 listener 再叫 Rust 進錄製模式，否則中間發出的 captured 會漏接（Tauri 不補播）
-  const [unlistenCaptured, unlistenRejected] = await Promise.all([
-    listenToEvent<RecordingCapturedPayload>(
-      HOTKEY_RECORDING_CAPTURED,
-      (event) => {
-        console.info(`[SettingsView] hotkey recording: captured received keycode=0x${event.payload.keycode.toString(16)}`);
-        void handleRecordingCaptured(event.payload);
-      },
-    ),
-    listenToEvent<RecordingRejectedPayload>(
-      HOTKEY_RECORDING_REJECTED,
-      (event) => handleRecordingRejected(event.payload),
-    ),
-  ]);
-  if (!isRecording.value || requestId !== recordingRequestSeq) {
-    // 註冊期間已取消或已被新的一次錄製取代：只收掉剛建的 listener，不啟動 Rust
-    unlistenCaptured();
-    unlistenRejected();
-    return;
-  }
-  recordingUnlisteners = [unlistenCaptured, unlistenRejected];
-  console.info("[SettingsView] hotkey recording: listeners ready");
-
-  // Tell Rust to enter recording mode
-  try {
-    await invoke("start_hotkey_recording");
-  } catch (err) {
-    console.info("[SettingsView] hotkey recording: start failed");
-    hotkeyFeedback.show("error", extractErrorMessage(err));
-    stopKeyRecording();
-    recordingFailure.value = { kind: "start-failed" };
-    return;
-  }
-
-  // 10s timeout
-  recordingTimeoutId = setTimeout(() => {
-    if (isRecording.value) {
-      console.info("[SettingsView] hotkey recording: timeout fired");
-      hotkeyFeedback.show("error", settingsStore.getHotkeyRecordingTimeoutMessage());
-      stopKeyRecording();
-      recordingFailure.value = { kind: "timeout" };
-    }
-  }, RECORDING_TIMEOUT_MS);
+  void recordingSession.start();
 }
 
 function stopKeyRecording() {
-  if (!isRecording.value) return;
-  isRecording.value = false;
-  clearTimeout(recordingTimeoutId);
-  // Cancel Rust recording mode
-  void invoke("cancel_hotkey_recording").catch(() => {});
-  // Clean up event listeners
-  for (const unlisten of recordingUnlisteners) {
-    unlisten();
-  }
-  recordingUnlisteners = [];
+  recordingSession.stop();
 }
 
 function switchToCustom() {
