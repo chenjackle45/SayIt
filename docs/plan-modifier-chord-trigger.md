@@ -1,6 +1,6 @@
 # 計畫：修飾鍵逐鍵追蹤 ＋ 兩顆修飾鍵組合觸發（#30 根因修復，v0.14.0）
 
-> 建立：2026-09-12 · 狀態：codex 計劃閘一輪（1 HIGH、5 MED、1 LOW）＋二輪（1 HIGH、1 MED、1 LOW），全收、設計改兩次）＋三輪（0 HIGH、2 MED、1 LOW，全收）→ 實作完成 → 實作閘一輪（1 HIGH、3 MED、1 LOW，全收）＋二輪（0 HIGH、2 MED：1 收、1 明示跳過）→ **可建議 commit** · 排程：v0.14.0（功能版；ElevenLabs 順延 v0.15，待使用者確認）
+> 建立：2026-09-12 · 狀態：codex 計劃閘一輪（1 HIGH、5 MED、1 LOW）＋二輪（1 HIGH、1 MED、1 LOW），全收、設計改兩次）＋三輪（0 HIGH、2 MED、1 LOW，全收）→ 實作完成 → 實作閘一輪（1 HIGH、3 MED、1 LOW，全收）＋二輪（0 HIGH、2 MED：1 收、1 明示跳過）→ 已 commit（bc2a5f2）→ **macOS 實機驗收 9 項全過（2026-09-12，dev 版；和弦 [61,62]／[63,59]、⌘+/ Combo、單鍵、ESC、持久化）** → 待發 v0.14.0 · 排程：v0.14.0（功能版；ElevenLabs 順延 v0.15，待使用者確認）
 > 使用者 2026-09-12 拍板：**乙、一次到位**——修 Windows 錄製根因，並支援「右 Alt＋右 Ctrl」這類純修飾鍵組合當觸發鍵；不拆成先出 v0.13.2。
 > 根因與 codex 覆核結論見 `~/Documents/claude-html/2026-09/sayit-issue-30-root-cause-2026-09-12.html` 與 memory `windows-hotkey-recording-focus-bug`。
 
