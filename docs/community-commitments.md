@@ -17,8 +17,8 @@
 | #76 啟動時隱藏主視窗 | 「排在修完 Windows 貼上之後」 | **v0.12.1 已交付（2026-09-11 公開）**，已回串通知 | 等回報者回音後關 |
 | Windows 左 Ctrl 觸發鍵（LINE 回報，無 issue） | 對回報者說會修 | **v0.12.1 已交付**（`docs/plan-windows-injected-key-guard.md`）；#70／#72 已補一句 | 私訊請實測 Ctrl Hold／Toggle、編輯模式、自訂鍵（#30） |
 | #71 模型清單標「需付費」 | 「之後會標更清楚」 | **v0.13.0 已交付（2026-09-11 公開）** | 回串（稿已擬，等使用者放行） |
-| #30 Windows 自訂觸發鍵、右 Alt／右 Ctrl | 兩次誠實進度留言 | **v0.14.0（2026-09-12）**：根因＝錄製靠 `GetKeyState` 讀到事件前狀態（回報者 2026-09-12 一鍵回報實證），改事件自追蹤；右 Alt＋右 Ctrl 以新「和弦」型態支援（`docs/plan-modifier-chord-trigger.md`）；macOS 實機 9 項過 | 已回串（2026-09-12）；同事＋回報者 Windows 實測 Ctrl＋C／單右 Ctrl／右 Alt＋右 Ctrl；失敗出 v0.14.1 |
-| #78 AmberCTW、#70（9/11 留言）錄製時視窗在前景錄不到 | 未留言（拍板直接修） | **v0.14.1 已交付（2026-09-12）**（`docs/plan-hotkey-recording-focus-fallback.md`；DOM 補錄限 Windows） | 發版後各回串一則；Windows 實測 Alt+Z、右 Alt＋右 Ctrl |
+| #30 Windows 自訂觸發鍵、右 Alt／右 Ctrl | 兩次誠實進度留言 | **v0.14.0（2026-09-12）**：根因＝錄製靠 `GetKeyState` 讀到事件前狀態（回報者 2026-09-12 一鍵回報實證），改事件自追蹤；右 Alt＋右 Ctrl 以新「和弦」型態支援（`docs/plan-modifier-chord-trigger.md`）；macOS 實機 9 項過 | 已回串（2026-09-12）；同事＋回報者 Windows 實測 Ctrl＋C／單右 Ctrl／右 Alt＋右 Ctrl（v0.14.1 另修焦點病，見 #78 行） |
+| #78 AmberCTW、#70（9/11 留言）錄製時視窗在前景錄不到 | 未留言（拍板直接修） | **v0.14.1 已交付（2026-09-12 公開）**（`docs/plan-hotkey-recording-focus-fallback.md`；DOM 補錄限 Windows）；已回串 #78（issuecomment-5646012475）、#70（issuecomment-5646012983） | 等回報者 Windows 實測 Alt+Z、右 Alt＋右 Ctrl 回音 |
 | #66 lettucebo Azure | 9/24 無回音就接手（rebase 到最新 main、Azure 拿掉 temperature），併入後通知 #45 | 等作者 | 9/24 檢查 |
 | #67 lettucebo 設定備份 | 2026-09-11 已留言請作者 rebase 到 v0.12.0、剝掉字典半邊；CI 綠後單獨審 file_transfer | 等作者 | 作者回音後審；與 #66 同人，9/24 一起看 |
 
@@ -34,6 +34,7 @@
 
 ## ✅ 已銷帳
 
+- 2026-09-12 v0.14.1：#78／#70 回串（焦點時錄不到已修）
 - 2026-09-10 v0.12.0：#61／#60／#58／#41 併入通知並關閉；#40／#5／#42／#75 交付通知；#70／#72 請實測
 - 2026-09-10：#70/#72/#73/#74/#75/#76/#71/#77/#30/#36/#41/#66/#60/#58 共 14 則進度留言；#36 關閉
 - 2026-07-12 v0.11.0：#43/#39/#37/#38/#24/#36/#56/#10 九串通知

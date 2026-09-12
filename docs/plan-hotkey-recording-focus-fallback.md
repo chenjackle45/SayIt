@@ -1,6 +1,6 @@
 # 計畫：錄製自訂鍵時 SayIt 視窗有焦點 → 前端鍵盤事件當第二來源（#78、#70，v0.14.1）
 
-> 建立：2026-09-12 · 狀態：codex 計劃閘一輪（2 HIGH、4 MED、1 LOW：HIGH 全收、MED 3 收 1 明示跳過、LOW 收）＋二輪（1 HIGH、4 MED、1 LOW：HIGH 收、MED 2 收 1 明示跳過 1 因 HIGH 處置消失、LOW 收）＋三輪（1 HIGH、3 MED、1 LOW，全收）＋四輪（0 HIGH、2 MED，全收）→ 實作完成 → 實作閘一輪（1 HIGH、2 MED，全收）＋二輪（0 HIGH、0 MED，可建議 commit）→ **macOS dev 驗證通過（2026-09-12，強開兩源：去重、單鍵、和弦、ESC、失焦交回 hook、連錄兩次皆正常；日誌每輪皆 hook 先到、無 dom captured）** → 等 commit 授權；Windows 實測待發版後 · 排程：v0.14.1（patch）
+> 建立：2026-09-12 · 狀態：codex 計劃閘一輪（2 HIGH、4 MED、1 LOW：HIGH 全收、MED 3 收 1 明示跳過、LOW 收）＋二輪（1 HIGH、4 MED、1 LOW：HIGH 收、MED 2 收 1 明示跳過 1 因 HIGH 處置消失、LOW 收）＋三輪（1 HIGH、3 MED、1 LOW，全收）＋四輪（0 HIGH、2 MED，全收）→ 實作完成 → 實作閘一輪（1 HIGH、2 MED，全收）＋二輪（0 HIGH、0 MED，可建議 commit）→ **macOS dev 驗證通過（2026-09-12，強開兩源：去重、單鍵、和弦、ESC、失焦交回 hook、連錄兩次皆正常；日誌每輪皆 hook 先到、無 dom captured）** → **已交付 v0.14.1（2026-09-12 公開；tag d3565c8）**，#78／#70 已回串，Windows 實測待回報 · 排程：v0.14.1（patch）
 > 使用者 2026-09-12 拍板：直接修、不先在 issue 留言；發版後一次回串 #78 與 #70。
 
 ## 計劃閘結果（2026-09-12，codex 唯讀審查，一輪）
