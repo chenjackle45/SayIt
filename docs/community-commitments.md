@@ -27,7 +27,7 @@
 
 | 串 | 條件 |
 |---|---|
-| #24 cocomanbo Obsidian（7/14 後 61 天未回） | 2026-09-13：Heptabase 句中觸發**不重現**（未進編輯模式、直接貼上）；路徑與 Obsidian 不同（Obsidian 走 AX selection→LLM 失敗）。下一步待拍板：請回報者更新 v0.14.1 開除錯日誌重現並附上（稿待過目）／自行裝 Obsidian 重現 |
+| #24 cocomanbo Obsidian（7/14 後 61 天未回） | 2026-09-13：Heptabase 句中觸發**不重現**（未進編輯模式、直接貼上）；路徑與 Obsidian 不同（Obsidian 走 AX selection→LLM 失敗）。2026-09-13 已回串請回報者更新 v0.14.1、開除錯記錄重現並附上（issuecomment-5653367327）；等記錄 |
 
 ## ⚪ 等外部、無行動項
 
