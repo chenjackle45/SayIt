@@ -66,7 +66,7 @@ export interface EnhancementAnomalyResult {
  * 增強後語意偏移偵測 — 檢查 LLM 增強是否產生異常結果。
  *
  * 目前只做一層「長度爆炸」偵測：校對工具只改錯字和加標點，
- * 產出不應比輸入長 3 倍以上。若超過，代表 LLM 在回答問題或產生幻覺。
+ * 產出不應達到輸入的 2 倍。若達到，代表 LLM 在回答問題或產生幻覺。
  */
 export function detectEnhancementAnomaly(
   params: EnhancementAnomalyParams,

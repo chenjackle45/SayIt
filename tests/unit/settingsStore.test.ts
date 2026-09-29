@@ -37,6 +37,8 @@ vi.mock("../../src/i18n/prompts", async () => {
     getMinimalPromptForLocale: () => MINIMAL_PROMPT,
     getPromptForModeAndLocale: (mode: string) =>
       mode === "active" ? ACTIVE_PROMPT : MINIMAL_PROMPT,
+    getAutoLanguagePrompt: (mode: string, uiLocale: string) =>
+      `AUTO:${mode}:${uiLocale}`,
     isKnownDefaultPrompt: (prompt: string) => {
       const trimmed = prompt.trim();
       return trimmed === LEGACY_PROMPT || trimmed === MINIMAL_PROMPT;
@@ -196,6 +198,31 @@ describe("useSettingsStore — prompt mode 遷移", () => {
     setupStoreGetMock({
       promptMode: "custom",
       aiPrompt: customPrompt,
+    });
+    const store = await createStore();
+    await store.loadSettings();
+
+    expect(store.getAiPrompt()).toBe(customPrompt);
+  });
+
+  it("[P0] #83 辨識語言自動 → getAiPrompt 改用自動版，帶介面語系", async () => {
+    setupStoreGetMock({
+      promptMode: "active",
+      selectedLocale: "en",
+      selectedTranscriptionLocale: "auto",
+    });
+    const store = await createStore();
+    await store.loadSettings();
+
+    expect(store.getAiPrompt()).toBe("AUTO:active:en");
+  });
+
+  it("[P0] #83 辨識語言自動＋自訂指示 → 仍原樣回傳自訂指示", async () => {
+    const customPrompt = "完全自訂的 prompt";
+    setupStoreGetMock({
+      promptMode: "custom",
+      aiPrompt: customPrompt,
+      selectedTranscriptionLocale: "auto",
     });
     const store = await createStore();
     await store.loadSettings();

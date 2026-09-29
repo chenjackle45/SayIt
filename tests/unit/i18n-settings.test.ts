@@ -377,17 +377,18 @@ describe("i18n 設定功能", () => {
       const store = useSettingsStore();
       await store.loadSettings();
 
-      const { getMinimalPromptForLocale } = await import(
+      // #83：auto 時用「保持輸入語言、不翻譯」的自動版，而非介面語言的明確版
+      const { getAutoLanguagePrompt } = await import(
         "../../src/i18n/prompts"
       );
-      const zhDefault = getMinimalPromptForLocale("zh-TW");
+      const zhDefault = getAutoLanguagePrompt("minimal", "zh-TW");
       expect(store.getAiPrompt()).toBe(zhDefault);
 
       // 轉錄語言為 auto，切換 UI 語言 → prompt 跟著切換
       mockStoreSet.mockClear();
       await store.saveLocale("en");
 
-      const enDefault = getMinimalPromptForLocale("en");
+      const enDefault = getAutoLanguagePrompt("minimal", "en");
       expect(store.getAiPrompt()).toBe(enDefault);
 
       // prompt 不應被自動寫入 store

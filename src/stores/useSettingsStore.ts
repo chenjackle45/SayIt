@@ -39,6 +39,7 @@ import { openLogFolder, setFileLoggingEnabled } from "../lib/logger";
 import { getDefaultSystemPrompt } from "../lib/enhancer";
 import {
   type PromptLocale,
+  getAutoLanguagePrompt,
   getMinimalPromptForLocale,
   getPromptForModeAndLocale,
   isKnownDefaultPrompt,
@@ -626,6 +627,10 @@ export const useSettingsStore = defineStore("settings", () => {
 
   function getAiPrompt(): string {
     if (promptMode.value === "custom") return aiPrompt.value;
+    // #83：辨識語言「自動」時不再退回介面語言的輸出要求（那會把整理變成翻譯）
+    if (selectedTranscriptionLocale.value === "auto") {
+      return getAutoLanguagePrompt(promptMode.value, selectedLocale.value);
+    }
     return getPromptForModeAndLocale(
       promptMode.value,
       getEffectivePromptLocale(),
