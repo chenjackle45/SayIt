@@ -1363,6 +1363,11 @@ mod windows_hook {
                     };
 
                     if matches {
+                        // #70：單顆 Alt 放開、放行之前送遮罩鍵，Windows 就不會把它當成
+                        // 「單獨按了 Alt」而啟動選單列（之後的 Ctrl+V 會被選單吃掉）
+                        if is_key_up && (kbd.vkCode == VK_LMENU || kbd.vkCode == VK_RMENU) {
+                            crate::plugins::clipboard_paste::send_alt_menu_mask_key();
+                        }
                         (ctx.key_handler)(is_key_down, &mode);
                     }
                 }

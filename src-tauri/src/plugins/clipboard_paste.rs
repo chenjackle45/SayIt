@@ -136,8 +136,42 @@ fn simulate_copy_via_cgevent() -> Result<(), String> {
 /// 低階鍵盤 hook 會在 `KBDLLHOOKSTRUCT.dwExtraInfo` 原樣收到，藉此放行自家事件，
 /// 避免模擬的 Ctrl↓／Ctrl↑ 被當成觸發鍵動作（v0.12.0 左 Ctrl 觸發鍵錄音立刻停止）。
 /// 只認這個記號、不認 `LLKHF_INJECTED`，讓改鍵工具注入的按鍵仍能當觸發鍵。
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", test))]
 pub const SAYIT_INJECTED_EXTRA_INFO: usize = 0x5341_5949; // "SAYI"
+
+/// 右 Alt 選單列遮罩鍵（#70）：Microsoft 列為 Unassigned、AutoHotkey 推薦的無作用候選。
+#[cfg(any(target_os = "windows", test))]
+const ALT_MENU_MASK_VK: u8 = 0xE8;
+/// `KEYEVENTF_KEYUP`（`windows` crate 只在 Windows 編譯，這裡寫數值；Windows 測試核對）。
+#[cfg(any(target_os = "windows", test))]
+const KEYEVENTF_KEYUP_BITS: u32 = 0x0002;
+
+/// 遮罩鍵要送的兩次 `keybd_event` 參數：(vk, flags, extra_info)＝按下、放開，都帶自家記號。
+/// `send_alt_menu_mask_key` 直接照這份資料送，測試驗的就是實際送出的內容。
+#[cfg(any(target_os = "windows", test))]
+fn build_alt_menu_mask_calls() -> [(u8, u32, usize); 2] {
+    [
+        (ALT_MENU_MASK_VK, 0, SAYIT_INJECTED_EXTRA_INFO),
+        (
+            ALT_MENU_MASK_VK,
+            KEYEVENTF_KEYUP_BITS,
+            SAYIT_INJECTED_EXTRA_INFO,
+        ),
+    ]
+}
+
+/// 單顆 Alt 觸發鍵放開、放行之前送一顆無作用鍵，讓 Windows 不把它當成「單獨按了 Alt」
+/// 而啟動視窗選單列（#70：之後的 Ctrl+V 會被選單吃掉）。時點與 API 照 AutoHotkey
+/// `A_MenuMaskKey`：在 hook 的放開事件放行前用 `keybd_event` 送，不用 SendInput。
+/// 計畫：docs/plan-windows-alt-menu-mask.md
+#[cfg(target_os = "windows")]
+pub fn send_alt_menu_mask_key() {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{keybd_event, KEYBD_EVENT_FLAGS};
+
+    for (vk, flags, extra_info) in build_alt_menu_mask_calls() {
+        unsafe { keybd_event(vk, 0, KEYBD_EVENT_FLAGS(flags), extra_info) };
+    }
+}
 
 /// 組 Ctrl↓ key↓ key↑ Ctrl↑ 四個 INPUT，每個都帶 SayIt 記號。
 #[cfg(target_os = "windows")]
@@ -539,6 +573,26 @@ mod tests {
             (50..=1000).contains(&RESTORE_DELAY_MS),
             "RESTORE_DELAY_MS={RESTORE_DELAY_MS} 應落在 50ms..=1000ms 之間"
         );
+    }
+
+    /// #70 遮罩鍵：恰好一次按下、一次放開，同一顆 0xE8，兩次都帶自家記號
+    /// （漏標會讓遮罩鍵被自家 hook 當成使用者按鍵處理）。
+    #[test]
+    fn test_alt_menu_mask_calls_are_paired_and_marked() {
+        let calls = build_alt_menu_mask_calls();
+        assert_eq!(calls[0], (0xE8, 0, SAYIT_INJECTED_EXTRA_INFO));
+        assert_eq!(
+            calls[1],
+            (0xE8, KEYEVENTF_KEYUP_BITS, SAYIT_INJECTED_EXTRA_INFO)
+        );
+    }
+
+    /// 手寫的放開旗標必須等於 Windows 官方常數。
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_keyup_bits_match_windows_constant() {
+        use windows::Win32::UI::Input::KeyboardAndMouse::KEYEVENTF_KEYUP;
+        assert_eq!(KEYEVENTF_KEYUP_BITS, KEYEVENTF_KEYUP.0);
     }
 
     /// 自家注入記號必須非零（避免與未標記事件的預設值混淆），且 Ctrl+C／Ctrl+V 四個事件都要帶：
