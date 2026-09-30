@@ -103,6 +103,11 @@ function applyTranscriptTextTransforms(rawText: string): string {
 
 const MONITOR_POLL_INTERVAL_MS = 250;
 
+// 呼叫當下才讀：測試以 stub userAgent 切換平台。WebView2 的 UA 含「Windows NT」
+function isWindowsPlatform(): boolean {
+  return navigator.userAgent.includes("Windows");
+}
+
 export const useVoiceFlowStore = defineStore("voice-flow", () => {
   const status = ref<HudStatus>("idle");
   const message = ref("");
@@ -142,6 +147,13 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   // 等按鍵完全放開的緩衝：toggle 模式的「停止」由第二次按下觸發，
   // 該瞬間按鍵仍壓著，立刻模擬 Cmd+C 會重演 #25 的字元污染
   const CLIPBOARD_FALLBACK_KEY_RELEASE_DELAY_MS = 250;
+  // Windows 選取探測（UIA，#79/#80）：自發出起的總期限，逾時就不進編輯模式。
+  // 後端本身 250ms（含首次初始化），多留 IPC 餘裕
+  const WINDOWS_SELECTION_PROBE_BUDGET_MS = 500;
+  let windowsSelectionProbe: Promise<void> | null = null;
+  let windowsSelectionProbeIssuedAt = 0;
+  // 本世代的編輯模式已判定：之後才落地的探測結果不得再改寫（拒收晚到）
+  let windowsSelectionDecidedEpoch = -1;
   const isRetryAttempt = ref<boolean>(false);
   const canRetry = computed<boolean>(
     () =>
@@ -1053,10 +1065,21 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     pendingSelectionCapture = null;
     recordingEpoch += 1;
     const probeEpoch = recordingEpoch;
-    invoke<{ kind: string; text: string | null }>("read_selection_state")
+    const probeIssuedAt = Date.now();
+    windowsSelectionProbeIssuedAt = probeIssuedAt;
+    windowsSelectionProbe = invoke<{ kind: string; text: string | null }>(
+      "read_selection_state",
+    )
       .then((state) => {
         // 過期回呼（下一輪錄音已開始）直接失效，防止跨錄音狀態污染
         if (probeEpoch !== recordingEpoch || !state) return;
+        // Windows：超過總期限、或編輯模式已判定後才落地的結果，一律不寫入（拒收晚到）
+        if (
+          isWindowsPlatform() &&
+          (windowsSelectionDecidedEpoch === probeEpoch ||
+            Date.now() - probeIssuedAt > WINDOWS_SELECTION_PROBE_BUDGET_MS)
+        )
+          return;
         selectionProbeSettledEpoch = probeEpoch;
         if (state.kind === "selection" && state.text && state.text.trim().length > 0) {
           editSourceText.value = state.text;
@@ -1127,10 +1150,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     // AX 不可見 App 的剪貼簿後備：延遲等按鍵完全放開後才模擬 Cmd+C。
     // 包成 Promise：轉錄若比後備先完成，編輯模式判定前要能 await 它。
     // AX 到停止時還沒回覆（慢速 App）也保守走後備——等同舊行為，
-    // 避免編輯模式在這種時序下靜默消失
+    // 避免編輯模式在這種時序下靜默消失。
+    // Windows 不走後備（#79/#80）：後備就是模擬 Ctrl+C，改由判定前有界等待 UIA 探測
     if (
-      pendingClipboardSelectionCheck ||
-      selectionProbeSettledEpoch !== recordingEpoch
+      !isWindowsPlatform() &&
+      (pendingClipboardSelectionCheck ||
+        selectionProbeSettledEpoch !== recordingEpoch)
     ) {
       pendingClipboardSelectionCheck = false;
       const fallbackEpoch = recordingEpoch;
@@ -1327,6 +1352,25 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       if (pendingSelectionCapture) {
         await pendingSelectionCapture;
         pendingSelectionCapture = null;
+      }
+
+      // Windows：探測還沒落地就等到總期限用完為止（自發出起算，通常早已用完＝不等）；
+      // 逾時即不進編輯模式，並鎖定本世代，之後落地的結果不得再改寫
+      if (isWindowsPlatform()) {
+        const decisionEpoch = recordingEpoch;
+        if (selectionProbeSettledEpoch !== decisionEpoch && windowsSelectionProbe) {
+          const remainingMs = Math.max(
+            0,
+            WINDOWS_SELECTION_PROBE_BUDGET_MS -
+              (Date.now() - windowsSelectionProbeIssuedAt),
+          );
+          await Promise.race([
+            windowsSelectionProbe,
+            new Promise<void>((resolve) => setTimeout(resolve, remainingMs)),
+          ]);
+          if (isAborted.value || decisionEpoch !== recordingEpoch) return;
+        }
+        windowsSelectionDecidedEpoch = decisionEpoch;
       }
 
       // 編輯模式：語音是指令，選取文字是待處理內容

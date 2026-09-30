@@ -65,6 +65,15 @@ impl SelectionState {
     }
 }
 
+/// Windows UIA 選取範圍是否算「有選取」（#79/#80）：恰好一段、且起點不等於終點。
+/// 零段、退化範圍（起點＝終點，UIA 無選取時回傳游標位置）、多段（本版不支援編輯）
+/// 一律不算。`start_vs_end` 是該段起點相對終點的比較結果（`CompareEndpoints`），
+/// 讀不到時為 `None`。與平台無關的判定抽出來，讓 macOS 也能跑測試。
+#[cfg(any(target_os = "windows", test))]
+fn is_single_non_degenerate_range(range_count: i32, start_vs_end: Option<i32>) -> bool {
+    range_count == 1 && matches!(start_vs_end, Some(cmp) if cmp != 0)
+}
+
 /// 讀取聚焦文字欄位的選取狀態——編輯模式判定的主路徑。
 /// macOS：AX 被動查詢（零按鍵模擬，#25 的字元污染在此路徑不可能發生）。三態：
 ///   selection    — 確定有選取，text 為選取內容 → 前端直接進編輯模式
@@ -72,11 +81,11 @@ impl SelectionState {
 ///                  CodeMirror 類編輯器的「無選取複製整行」誤判（#24）在此被排除
 ///   unavailable  — AX 不可見或讀值失真（Heptabase/LINE 類）→ 前端在錄音停止、
 ///                  按鍵放開後改走剪貼簿後備（read_selected_text）
-/// Windows：錄音開始時當場走剪貼簿擷取（Ctrl+C）並回 selection / noSelection，
-///   即 v0.10.0 的時序。回 unavailable 會讓前端改在「觸發鍵放開後」才送 Ctrl+C，
-///   瀏覽器把單獨放開的 Alt 當成選單鍵、之後的貼上失焦（#70/#72 回歸）。
-///   擷取失敗或沒抓到文字一律回 noSelection＝本輪不進編輯模式（與 v0.10.0 相同），
-///   不回 unavailable 以免重新排程停止後的擷取。選取讀取待 UIA 版補上。
+/// Windows：UIA 被動讀取選取（#79/#80），**不模擬任何按鍵**——舊做法在錄音開始時
+///   送 Ctrl+C，按住 Alt／Shift 觸發時目標程式收到的是 Alt+Ctrl+C，讀不到選取還會
+///   多打字元。只回 selection / noSelection：讀不到、不支援、逾時都是 noSelection，
+///   本輪不進編輯模式；**不回 unavailable**，前端在 Windows 也不排程剪貼簿後備。
+///   計畫：docs/plan-windows-uia-selection.md
 /// 其他平台：一律 unavailable。
 #[tauri::command]
 pub fn read_selection_state() -> SelectionState {
@@ -87,9 +96,9 @@ pub fn read_selection_state() -> SelectionState {
 
     #[cfg(target_os = "windows")]
     {
-        match super::clipboard_paste::capture_selected_text_via_clipboard() {
-            Ok(Some(text)) => SelectionState::selection(text),
-            _ => SelectionState::no_selection(),
+        match windows_impl::read_selection_impl() {
+            Some(text) => SelectionState::selection(text),
+            None => SelectionState::no_selection(),
         }
     }
 
@@ -577,12 +586,20 @@ mod windows_impl {
     /// ValuePattern 整欄值 fallback 的字元上限（隱私 / 成本保護）。
     const MAX_VALUE_CHARS: usize = 600;
     /// 單次 UIA 讀取 timeout，需小於前端輪詢間隔（500ms），避免阻塞 command thread。
+    /// 首次呼叫的 COM／UIA 初始化也在這個期限內（worker 不再同步回報就緒）。
     const READ_TIMEOUT_MS: u64 = 250;
 
     type RespTx = SyncSender<Option<String>>;
 
+    /// 送給 UIA worker 的請求：游標附近摘錄（欄位輪詢）或目前選取（編輯模式判定，#79/#80）。
+    enum Request {
+        Excerpt(RespTx),
+        Selection(RespTx),
+    }
+
+    /// 只管欄位輪詢的 single-flight；選取讀取不受它拒絕，免得被每 500ms 的輪詢擠掉。
     static IN_FLIGHT: AtomicBool = AtomicBool::new(false);
-    static WORKER: OnceLock<Option<Mutex<SyncSender<RespTx>>>> = OnceLock::new();
+    static WORKER: OnceLock<Option<Mutex<SyncSender<Request>>>> = OnceLock::new();
 
     /// 入口：把讀取請求送到專用 UIA 執行緒，最多等 `READ_TIMEOUT_MS`。
     /// 任何失敗 / 逾時 / 忙碌一律回 `Ok(None)`（與 macOS 一致，靜默降級）。
@@ -604,23 +621,43 @@ mod windows_impl {
         // 不依賴 worker 清旗標：若某次 UIA 呼叫永久卡死、worker 回不來，
         // 旗標才不會永久卡 true 而使功能靜默失效。每次呼叫各有獨立 oneshot
         // channel，卡死 worker 的遲到結果只會送進已 drop 的 receiver 而被丟棄。
-        let outcome = read_once(&sender);
+        let outcome = read_once(
+            &sender,
+            Request::Excerpt,
+            Duration::from_millis(READ_TIMEOUT_MS),
+        );
         IN_FLIGHT.store(false, Ordering::Release);
         Ok(outcome)
     }
 
-    /// 送一次讀取請求並等 `READ_TIMEOUT_MS`；逾時 / 送出失敗一律回 `None`。
-    fn read_once(sender: &SyncSender<RespTx>) -> Option<String> {
-        let (resp_tx, resp_rx) = sync_channel::<Option<String>>(1);
-        if sender.try_send(resp_tx).is_err() {
-            return None;
-        }
-        resp_rx
-            .recv_timeout(Duration::from_millis(READ_TIMEOUT_MS))
-            .unwrap_or(None)
+    /// 讀取目前聚焦欄位中被選取的文字（#79/#80：取代模擬 Ctrl+C 的剪貼簿探測）。
+    /// 恰好一段、且非退化的選取才回 `Some`；其餘（無選取、多段、不支援、錯誤、
+    /// 逾時、佇列已滿）一律 `None`——呼叫端視為無選取，**不退回複製**。
+    pub fn read_selection_impl() -> Option<String> {
+        let sender = worker_sender()?;
+        read_once(
+            &sender,
+            Request::Selection,
+            Duration::from_millis(READ_TIMEOUT_MS),
+        )
     }
 
-    fn worker_sender() -> Option<SyncSender<RespTx>> {
+    /// 送一次讀取請求並最多等 `timeout`（正式呼叫一律 `READ_TIMEOUT_MS`，參數化是為了
+    /// 讓測試用寬鬆期限驗證「立即返回」而不依賴 CI 排程）；逾時 / 送出失敗 /
+    /// worker 已退出一律回 `None`。
+    fn read_once(
+        sender: &SyncSender<Request>,
+        make_request: fn(RespTx) -> Request,
+        timeout: Duration,
+    ) -> Option<String> {
+        let (resp_tx, resp_rx) = sync_channel::<Option<String>>(1);
+        if sender.try_send(make_request(resp_tx)).is_err() {
+            return None;
+        }
+        resp_rx.recv_timeout(timeout).unwrap_or(None)
+    }
+
+    fn worker_sender() -> Option<SyncSender<Request>> {
         let cell = WORKER.get_or_init(spawn_worker);
         let mutex = cell.as_ref()?;
         let guard = mutex.lock().ok()?;
@@ -628,23 +665,25 @@ mod windows_impl {
     }
 
     /// 啟動長壽 MTA 執行緒，內含快取的 `IUIAutomation`。
-    /// 回傳 `None` 代表 COM / UIA 初始化失敗（此平台功能等同 no-op）。
-    fn spawn_worker() -> Option<Mutex<SyncSender<RespTx>>> {
-        let (req_tx, req_rx) = sync_channel::<RespTx>(1);
-        let (ready_tx, ready_rx) = sync_channel::<bool>(0);
+    /// 不同步等待就緒：初始化時間由第一個請求的 `READ_TIMEOUT_MS` 涵蓋；
+    /// 初始化失敗時 worker 直接結束、佇列斷開，之後的請求立即回 `None`。
+    fn spawn_worker() -> Option<Mutex<SyncSender<Request>>> {
+        spawn_worker_with(worker_loop)
+    }
+
+    /// `spawn_worker` 的本體；worker 函式可注入，讓測試模擬初始化卡住。
+    fn spawn_worker_with(worker: fn(Receiver<Request>)) -> Option<Mutex<SyncSender<Request>>> {
+        let (req_tx, req_rx) = sync_channel::<Request>(1);
 
         std::thread::Builder::new()
             .name("uia-reader".into())
-            .spawn(move || worker_loop(req_rx, ready_tx))
+            .spawn(move || worker(req_rx))
             .ok()?;
 
-        match ready_rx.recv() {
-            Ok(true) => Some(Mutex::new(req_tx)),
-            _ => None,
-        }
+        Some(Mutex::new(req_tx))
     }
 
-    fn worker_loop(req_rx: Receiver<RespTx>, ready_tx: SyncSender<bool>) {
+    fn worker_loop(req_rx: Receiver<Request>) {
         // 此執行緒專用 MTA COM，存活整個 process 生命週期；COM 物件不跨執行緒傳遞。
         unsafe {
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -654,21 +693,65 @@ mod windows_impl {
             match unsafe { CoCreateInstance(&CUIAutomation, None, CLSCTX_ALL) } {
                 Ok(a) => a,
                 Err(_) => {
-                    let _ = ready_tx.send(false);
+                    // 結束執行緒＝req_rx 被 drop：已排入的請求隨之斷開，呼叫端立即拿到 None
                     unsafe { CoUninitialize() };
                     return;
                 }
             };
 
-        let _ = ready_tx.send(true);
-
-        while let Ok(resp_tx) = req_rx.recv() {
-            let result = read_excerpt(&automation);
+        while let Ok(request) = req_rx.recv() {
+            let (resp_tx, result) = match request {
+                Request::Excerpt(tx) => (tx, read_excerpt(&automation)),
+                Request::Selection(tx) => (tx, read_selection(&automation)),
+            };
             // 即使呼叫端已逾時離開（receiver 被 drop）也不阻塞；IN_FLIGHT 由呼叫端清。
             let _ = resp_tx.try_send(result);
         }
 
         unsafe { CoUninitialize() };
+    }
+
+    /// 讀取目前聚焦元素的選取文字。全程在 worker 執行緒上跑。
+    /// 只收恰好一段、起點≠終點的選取，讀該範圍原文——不擴張、不讀整欄、不截斷
+    /// （與 macOS 的 AXSelectedText 一致，選取讀取不設長度上限）。
+    fn read_selection(automation: &IUIAutomation) -> Option<String> {
+        let element = unsafe { automation.GetFocusedElement() }.ok()?;
+
+        // 隱私保護：與欄位摘錄同一規則，密碼 / 受保護欄位不讀。
+        if is_password_element(&element) {
+            return None;
+        }
+
+        unsafe {
+            let text_pattern = element
+                .GetCurrentPatternAs::<IUIAutomationTextPattern>(UIA_TextPatternId)
+                .ok()?;
+            let ranges = text_pattern.GetSelection().ok()?;
+            let range_count = ranges.Length().ok()?;
+            let first = if range_count >= 1 {
+                ranges.GetElement(0).ok()
+            } else {
+                None
+            };
+            let start_vs_end = first.as_ref().and_then(|range| {
+                range
+                    .CompareEndpoints(
+                        TextPatternRangeEndpoint_Start,
+                        range,
+                        TextPatternRangeEndpoint_End,
+                    )
+                    .ok()
+            });
+            if !super::is_single_non_degenerate_range(range_count, start_vs_end) {
+                return None;
+            }
+            let text = first?.GetText(-1).ok()?.to_string();
+            // 沿用既有政策：純空白不算選取（與 macOS classify_selection 一致）
+            if text.trim().is_empty() {
+                return None;
+            }
+            Some(text)
+        }
     }
 
     /// 讀取目前聚焦元素游標附近文字。全程在 worker 執行緒上跑。
@@ -776,6 +859,82 @@ mod windows_impl {
     #[cfg(test)]
     mod tests {
         use super::cap_tail;
+        use super::{read_once, spawn_worker_with, Request};
+        use std::sync::mpsc::{sync_channel, Receiver};
+        use std::time::{Duration, Instant};
+
+        // 時間判定只用寬鬆上限（相對 10 秒期限），不以 wall-clock 精準值判對錯：
+        // CI runner 暫停執行緒不會讓正確的程式變紅。
+        const LONG_TIMEOUT: Duration = Duration::from_secs(10);
+        const RETURNED_PROMPTLY: Duration = Duration::from_secs(5);
+
+        /// AC1：worker 有空時，選取請求照常送達並拿到結果
+        #[test]
+        fn test_read_once_selection_gets_worker_reply() {
+            let (tx, rx) = sync_channel::<Request>(1);
+            let worker = std::thread::spawn(move || {
+                if let Ok(Request::Selection(resp)) = rx.recv() {
+                    let _ = resp.try_send(Some("選取".to_string()));
+                }
+            });
+            assert_eq!(
+                read_once(&tx, Request::Selection, LONG_TIMEOUT),
+                Some("選取".to_string())
+            );
+            assert!(worker.join().is_ok());
+        }
+
+        /// AC3：worker 卡住（初始化或上一個 UIA 呼叫沒回來）時，到期回 None、不阻塞呼叫端
+        #[test]
+        fn test_read_once_times_out_when_worker_stuck() {
+            let (tx, _rx) = sync_channel::<Request>(1); // 有接收端、但沒人處理
+            let started = Instant::now();
+            assert_eq!(
+                read_once(&tx, Request::Selection, Duration::from_millis(20)),
+                None
+            );
+            assert!(started.elapsed() < RETURNED_PROMPTLY);
+        }
+
+        /// AC1：佇列已滿時立即回 None（忙碌就降級，不排隊等）
+        #[test]
+        fn test_read_once_returns_immediately_when_queue_full() {
+            let (tx, _rx) = sync_channel::<Request>(1);
+            let (filler, _filler_rx) = sync_channel::<Option<String>>(1);
+            assert!(tx.try_send(Request::Excerpt(filler)).is_ok());
+            let started = Instant::now();
+            assert_eq!(read_once(&tx, Request::Selection, LONG_TIMEOUT), None);
+            assert!(started.elapsed() < RETURNED_PROMPTLY);
+        }
+
+        /// AC3：worker 初始化失敗已結束（接收端被 drop）時立即回 None
+        #[test]
+        fn test_read_once_returns_immediately_when_worker_gone() {
+            let (tx, rx) = sync_channel::<Request>(1);
+            drop(rx);
+            let started = Instant::now();
+            assert_eq!(read_once(&tx, Request::Selection, LONG_TIMEOUT), None);
+            assert!(started.elapsed() < RETURNED_PROMPTLY);
+        }
+
+        /// AC3：UIA 初始化卡住時，啟動不等它就緒、第一個請求到期回 None。
+        /// 若有人加回同步等待就緒，這條會卡住直到 CI 逾時（不是斷言變紅）。
+        #[test]
+        fn test_spawn_worker_does_not_wait_for_stuck_init() {
+            fn stuck_init(_rx: Receiver<Request>) {
+                loop {
+                    std::thread::park();
+                }
+            }
+            let started = Instant::now();
+            let worker = spawn_worker_with(stuck_init).expect("worker thread should spawn");
+            let sender = worker.lock().expect("sender lock").clone();
+            assert_eq!(
+                read_once(&sender, Request::Selection, Duration::from_millis(20)),
+                None
+            );
+            assert!(started.elapsed() < RETURNED_PROMPTLY);
+        }
 
         #[test]
         fn test_cap_tail_shorter_than_max() {
@@ -803,5 +962,34 @@ mod windows_impl {
         fn test_cap_tail_empty() {
             assert_eq!(cap_tail("", 5), "");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_single_non_degenerate_range;
+
+    #[test]
+    fn test_single_range_with_distinct_endpoints_is_selection() {
+        assert!(is_single_non_degenerate_range(1, Some(-1)));
+        assert!(is_single_non_degenerate_range(1, Some(1)));
+    }
+
+    #[test]
+    fn test_degenerate_range_is_not_selection() {
+        // UIA 無選取時回傳游標位置的退化範圍（起點＝終點）
+        assert!(!is_single_non_degenerate_range(1, Some(0)));
+    }
+
+    #[test]
+    fn test_zero_or_multiple_ranges_are_not_selection() {
+        assert!(!is_single_non_degenerate_range(0, Some(-1)));
+        // 多段選取本版不支援編輯，降級為無選取
+        assert!(!is_single_non_degenerate_range(2, Some(-1)));
+    }
+
+    #[test]
+    fn test_unreadable_endpoints_are_not_selection() {
+        assert!(!is_single_non_degenerate_range(1, None));
     }
 }
