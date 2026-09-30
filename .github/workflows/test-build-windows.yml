@@ -1,0 +1,66 @@
+name: Windows 測試建置（不發布）
+
+# 只能手動觸發：在 Windows 建出 NSIS 安裝檔、上傳成工作產物，給實機試作用。
+# 不建 tag、不建 release、不產更新簽章；版號只在建置時覆寫，不提交進 repo。
+# 版號必須是 X.Y.Z-test.N：比目前正式版新（不會被拉回舊版）、比下一個正式版舊
+# （正式版發布時照常提示更新）。MSI 不接受非數字的預發行識別，所以只產 NSIS。
+# 更新端點與公鑰沿用 tauri.conf.json，試用者之後收得到正式版。
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "測試版號（例：0.14.2-test.1）"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate version
+        shell: bash
+        env:
+          TEST_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$TEST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-test\.[0-9]+$ ]]; then
+            echo "::error::版號必須是 X.Y.Z-test.N，收到：$TEST_VERSION"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build NSIS installer
+        shell: bash
+        env:
+          TEST_VERSION: ${{ inputs.version }}
+        run: |
+          # 前端顯示與一鍵回報用的版號讀 package.json；只在 runner 內改，不提交
+          npm pkg set version="$TEST_VERSION"
+          pnpm tauri build --config "{\"version\":\"$TEST_VERSION\",\"bundle\":{\"targets\":[\"nsis\"],\"createUpdaterArtifacts\":false}}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SayIt-${{ inputs.version }}-windows-x64-setup
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 14
