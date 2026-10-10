@@ -100,10 +100,13 @@ struct WhisperSegment {
 
 // ========== Helpers ==========
 
+/// `term_list` 依優先度由高到低。Whisper 的 prompt 只看尾端（OpenAI 文件：最後 224 token），
+/// 前段會被捨棄，所以取完名額後反轉，讓優先度最高的詞落在尾端（#84）。
 fn format_whisper_prompt(term_list: &[String]) -> String {
     let terms: Vec<&str> = term_list
         .iter()
         .take(MAX_WHISPER_PROMPT_TERMS)
+        .rev()
         .map(|s| s.as_str())
         .collect();
     format!("Important Vocabulary: {}", terms.join(", "))
@@ -524,7 +527,7 @@ mod tests {
     fn test_format_whisper_prompt_basic() {
         let terms = vec!["Tauri".to_string(), "Rust".to_string(), "Vue".to_string()];
         let result = format_whisper_prompt(&terms);
-        assert_eq!(result, "Important Vocabulary: Tauri, Rust, Vue");
+        assert_eq!(result, "Important Vocabulary: Vue, Rust, Tauri");
     }
 
     #[test]
@@ -538,15 +541,15 @@ mod tests {
     fn test_format_whisper_prompt_exceeds_max() {
         let terms: Vec<String> = (0..100).map(|i| format!("term{i}")).collect();
         let result = format_whisper_prompt(&terms);
-        // Should only include first 30 terms
+        // 只取優先度最高的前 MAX 個，反轉後最高優先度在尾端
         let parts: Vec<&str> = result
             .strip_prefix("Important Vocabulary: ")
             .unwrap()
             .split(", ")
             .collect();
         assert_eq!(parts.len(), MAX_WHISPER_PROMPT_TERMS);
-        assert_eq!(parts[0], "term0");
-        assert_eq!(parts[29], "term29");
+        assert_eq!(parts[0], format!("term{}", MAX_WHISPER_PROMPT_TERMS - 1));
+        assert_eq!(parts[MAX_WHISPER_PROMPT_TERMS - 1], "term0");
     }
 
     #[test]

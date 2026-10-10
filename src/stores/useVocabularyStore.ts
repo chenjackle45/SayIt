@@ -26,6 +26,13 @@ const IMPORT_BATCH_SIZE = 500;
 export const DICTIONARY_IMPORT_MAX_FILE_BYTES = MAX_IMPORT_FILE_BYTES;
 export const DICTIONARY_IMPORT_MAX_ENTRIES = MAX_IMPORT_ENTRIES;
 
+/**
+ * 送進語音辨識與 AI 整理提示的字典詞：手動加的詞優先（含匯入的詞），
+ * 同類內照權重、再照新舊。名額有限，被聽錯的手動詞很難靠權重排進去（#84）。
+ */
+export const TOP_TERM_LIST_SQL =
+  "SELECT term FROM vocabulary ORDER BY CASE WHEN source = 'manual' THEN 0 ELSE 1 END, weight DESC, created_at DESC LIMIT $1";
+
 interface RawVocabularyRow {
   id: string;
   term: string;
@@ -330,10 +337,9 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
   async function getTopTermListByWeight(limit: number): Promise<string[]> {
     try {
       const db = getDatabase();
-      const rows = await db.select<{ term: string }[]>(
-        "SELECT term FROM vocabulary ORDER BY weight DESC, created_at DESC LIMIT $1",
-        [limit],
-      );
+      const rows = await db.select<{ term: string }[]>(TOP_TERM_LIST_SQL, [
+        limit,
+      ]);
       return rows.map((row) => row.term);
     } catch (error) {
       console.error(
