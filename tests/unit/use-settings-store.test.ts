@@ -32,11 +32,6 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: mockEmit,
 }));
 
-const mockSetDockVisibility = vi.fn().mockResolvedValue(undefined);
-vi.mock("@tauri-apps/api/app", () => ({
-  setDockVisibility: mockSetDockVisibility,
-}));
-
 describe("useSettingsStore", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -47,7 +42,6 @@ describe("useSettingsStore", () => {
     mockStoreSave.mockClear();
     mockInvoke.mockClear().mockResolvedValue(undefined);
     mockEmit.mockClear().mockResolvedValue(undefined);
-    mockSetDockVisibility.mockClear().mockResolvedValue(undefined);
     vi.resetModules();
   });
 
@@ -444,7 +438,7 @@ describe("useSettingsStore", () => {
       });
     });
 
-    it("[P1] macOS 上啟用隱藏應呼叫 setDockVisibility(false)", async () => {
+    it("[P1] macOS 上切換隱藏應呼叫 set_dock_icon_hidden（gh-82）", async () => {
       stubMacUserAgent();
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
@@ -452,13 +446,33 @@ describe("useSettingsStore", () => {
       const store = useSettingsStore();
 
       await store.saveHideDockIcon(true);
+      expect(mockInvoke).toHaveBeenLastCalledWith("set_dock_icon_hidden", {
+        hidden: true,
+      });
 
-      expect(mockSetDockVisibility).toHaveBeenCalledWith(false);
+      await store.saveHideDockIcon(false);
+      expect(mockInvoke).toHaveBeenLastCalledWith("set_dock_icon_hidden", {
+        hidden: false,
+      });
     });
 
-    it("[P2] setDockVisibility 失敗不應讓儲存失敗", async () => {
+    it("[P2] 非 macOS 不呼叫 set_dock_icon_hidden", async () => {
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+
+      await store.saveHideDockIcon(true);
+
+      expect(mockInvoke).not.toHaveBeenCalledWith(
+        "set_dock_icon_hidden",
+        expect.anything(),
+      );
+    });
+
+    it("[P2] set_dock_icon_hidden 失敗不應讓儲存失敗", async () => {
       stubMacUserAgent();
-      mockSetDockVisibility.mockRejectedValueOnce(new Error("boom"));
+      mockInvoke.mockRejectedValueOnce(new Error("boom"));
       const { useSettingsStore } = await import(
         "../../src/stores/useSettingsStore"
       );
@@ -541,6 +555,35 @@ describe("useSettingsStore", () => {
       mockStoreData.set("startHidden", true);
       await store.refreshCrossWindowSettings();
       expect(store.isStartHiddenEnabled).toBe(true);
+    });
+  });
+
+  describe("hideDockIcon 跨視窗同步（gh-82）", () => {
+    let uaSpy: ReturnType<typeof vi.spyOn> | null = null;
+
+    afterEach(() => {
+      uaSpy?.mockRestore();
+      uaSpy = null;
+    });
+
+    it("[P1] macOS 上另一視窗改了 hideDockIcon，應呼叫 set_dock_icon_hidden", async () => {
+      uaSpy = vi
+        .spyOn(window.navigator, "userAgent", "get")
+        .mockReturnValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)");
+      const { useSettingsStore } = await import(
+        "../../src/stores/useSettingsStore"
+      );
+      const store = useSettingsStore();
+      await store.loadSettings();
+      mockInvoke.mockClear();
+
+      mockStoreData.set("hideDockIcon", true);
+      await store.refreshCrossWindowSettings();
+      await vi.waitFor(() =>
+        expect(mockInvoke).toHaveBeenCalledWith("set_dock_icon_hidden", {
+          hidden: true,
+        }),
+      );
     });
   });
 
