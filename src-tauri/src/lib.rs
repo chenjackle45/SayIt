@@ -136,6 +136,31 @@ fn current_os_theme_is_dark() -> Option<bool> {
     None
 }
 
+/// gh-82：隱藏 Dock 圖示改走啟用策略（Accessory／Regular）。
+/// `set_dock_visibility` 底層是 `TransformProcessType`，叫出主視窗時會被系統轉回前景程式、
+/// 圖示跟著回來；Accessory 不會因為視窗喚醒而改變。非 macOS 不做事。
+fn apply_dock_icon_hidden<R: Runtime>(app: &AppHandle<R>, hidden: bool) -> tauri::Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let policy = if hidden {
+            tauri::ActivationPolicy::Accessory
+        } else {
+            tauri::ActivationPolicy::Regular
+        };
+        app.set_activation_policy(policy)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, hidden);
+        Ok(())
+    }
+}
+
+#[command]
+fn set_dock_icon_hidden<R: Runtime>(app: AppHandle<R>, hidden: bool) -> Result<(), String> {
+    apply_dock_icon_hidden(&app, hidden).map_err(|e| e.to_string())
+}
+
 /// 供前端在啟動/需要時查詢權威 OS 外觀（"dark" | "light"，未知回 null）。
 #[command]
 fn get_os_theme() -> Option<String> {
@@ -452,6 +477,7 @@ pub fn run() {
             update_hotkey_config,
             get_hud_target_position,
             get_os_theme,
+            set_dock_icon_hidden,
             plugins::audio_control::mute_system_audio,
             plugins::audio_control::restore_system_audio,
             plugins::clipboard_paste::capture_target_window,
@@ -519,7 +545,8 @@ pub fn run() {
                 )?;
             }
 
-            // gh-56：啟動時套用「隱藏 Dock 圖示」設定（讀取失敗一律視為未啟用，不影響啟動）
+            // gh-56：啟動時套用「隱藏 Dock 圖示」設定（讀取失敗一律視為未啟用，不影響啟動）；
+            // gh-82 起改走啟用策略，叫出主視窗後圖示不會回來
             #[cfg(target_os = "macos")]
             {
                 use tauri_plugin_store::StoreExt;
@@ -530,7 +557,7 @@ pub fn run() {
                     .and_then(|value| value.as_bool())
                     .unwrap_or(false);
                 if hide_dock_icon {
-                    let _ = app.handle().set_dock_visibility(false);
+                    let _ = apply_dock_icon_hidden(app.handle(), true);
                 }
             }
 

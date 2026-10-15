@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { setDockVisibility } from "@tauri-apps/api/app";
 import { load } from "@tauri-apps/plugin-store";
 import type { TriggerMode } from "../types";
 import {
@@ -1167,14 +1166,15 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
-  // 僅 macOS 生效；失敗不影響已持久化的設定，重啟後由 Rust 端套用
+  // 僅 macOS 生效；失敗不影響已持久化的設定，重啟後由 Rust 端套用。
+  // 走 Rust 的啟用策略指令而非前端 setDockVisibility：後者在叫出主視窗時圖示會回來（gh-82）
   async function applyDockVisibility(hidden: boolean) {
     if (!IS_MACOS) return;
     try {
-      await setDockVisibility(!hidden);
+      await invoke("set_dock_icon_hidden", { hidden });
     } catch (applyErr) {
       console.error(
-        "[useSettingsStore] setDockVisibility failed:",
+        "[useSettingsStore] set_dock_icon_hidden failed:",
         extractErrorMessage(applyErr),
       );
     }

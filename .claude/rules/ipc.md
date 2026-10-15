@@ -20,6 +20,7 @@ paths:
 | `update_hotkey_config` | `lib.rs` | useSettingsStore | `trigger_key: TriggerKey, trigger_mode: TriggerMode` | `Result<(), String>` |
 | `get_hud_target_position` | `lib.rs` | — | `app: AppHandle` | `Result<HudTargetPosition, String>` |
 | `get_os_theme` | `lib.rs` | lib/theme.ts | — | `Option<String>`（`"dark"` \| `"light"`，非 Windows 回 `null`） |
+| `set_dock_icon_hidden` | `lib.rs` | useSettingsStore | `hidden: bool` | `Result<(), String>`（macOS 切換啟用策略 Accessory／Regular，其他平台不做事；gh-82） |
 | `paste_text` | `plugins/clipboard_paste.rs` | useVoiceFlowStore | `text: String` | `Result<(), ClipboardError>` |
 | `copy_to_clipboard` | `plugins/clipboard_paste.rs` | HistoryView | `text: String` | `Result<(), ClipboardError>` |
 | `capture_target_window` | `plugins/clipboard_paste.rs` | useVoiceFlowStore | — | `()` |

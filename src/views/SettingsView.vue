@@ -698,8 +698,8 @@ async function handleToggleSoundFeedback(newValue: boolean) {
 
 // ── 隱藏 Dock 圖示 (gh-56，僅 macOS) ──────────────────────────
 const hideDockIconFeedback = useFeedbackMessage();
-// macOS 對「Dock 顯示後 1 秒內的隱藏請求」會靜默忽略（Tao 防重複圖示守衛），
 // 切換後短暫鎖住開關，避免快速連按造成 UI 與實際 Dock 狀態脫節
+// （原為 Tao 一秒守衛而設；gh-82 起改走啟用策略，鎖定保留作防連按）
 const isHideDockIconPending = ref(false);
 let hideDockIconPendingTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
