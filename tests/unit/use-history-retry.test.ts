@@ -340,6 +340,36 @@ describe("useHistoryStore retry", () => {
   });
 
   describe("reEnhanceRecord", () => {
+    it.each([
+      ["auto", "zh-TW", "zh-TW"],
+      ["en", "zh-TW", "en"],
+    ])(
+      "[P1] #83 辨識語言 %s、介面 %s → 整理選項帶有效語言 %s",
+      async (transcriptionLocale, uiLocale, expected) => {
+        h.settingsStub.selectedTranscriptionLocale = transcriptionLocale;
+        h.settingsStub.selectedLocale = uiLocale;
+        h.mockEnhanceGuard.mockResolvedValue({
+          text: "整理後內容",
+          usage: null,
+          wasAnomalous: false,
+          wasDrift: false,
+          wasEmptyResponse: false,
+          driftOverlapRatio: 1,
+        });
+        const store = useHistoryStore();
+        const record = createRecord({ status: "success", rawText: "原始口語內容" });
+        store.transcriptionList.push(record);
+
+        await store.reEnhanceRecord(record);
+
+        expect(h.mockEnhanceGuard).toHaveBeenCalledWith(
+          "原始口語內容",
+          expect.any(String),
+          expect.objectContaining({ transcriptLocale: expected }),
+        );
+      },
+    );
+
     it("[P2] LLM 空回應（wasEmptyResponse）→ 保留既有整理結果、不寫 DB", async () => {
       h.mockEnhanceGuard.mockResolvedValue({
         text: "原始口語內容",

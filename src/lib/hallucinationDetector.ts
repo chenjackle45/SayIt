@@ -6,6 +6,8 @@
  *  Layer 2: 無人聲偵測（靜音 / 低 RMS + 高 NSP 聯合判斷）
  */
 
+import { convertSimplifiedToTraditional } from "./simplifiedToTraditional";
+
 // ── 常數 ──
 
 /** Layer 1 錄音時長門檻（ms） */
@@ -100,9 +102,15 @@ export interface SemanticDriftResult {
   overlapRatio: number;
 }
 
-/** 正規化：小寫化、去除空白與標點，只留字母/數字/CJK 等文字字元。 */
+/**
+ * 正規化：小寫化、去除空白與標點，只留字母/數字/CJK 等文字字元。
+ * #83：兩側都先簡轉繁，避免「同內容、只差繁簡字形」被當成飄移
+ * （例：簡體舊紀錄重新整理成繁體、模型沒照提示詞輸出繁體）。
+ */
 function normalizeForOverlap(text: string): string {
-  return text.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  return convertSimplifiedToTraditional(text)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 function toBigramSet(text: string): Set<string> {

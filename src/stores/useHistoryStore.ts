@@ -211,6 +211,16 @@ const SELECT_RECENT_SQL = `
 
 const ASSUMED_TYPING_SPEED_CHARS_PER_MIN = 40;
 
+/** 有效轉譯語言：auto 回退到介面語言。重新辨識（原文轉換）與重新整理（#83）共用。 */
+function getEffectiveTranscriptLocale(
+  settingsStore: ReturnType<typeof useSettingsStore>,
+): string {
+  const transcriptionLocale = settingsStore.selectedTranscriptionLocale;
+  return transcriptionLocale === "auto"
+    ? settingsStore.selectedLocale
+    : transcriptionLocale;
+}
+
 interface DashboardStatsRow {
   total_count: number;
   total_characters: number;
@@ -747,14 +757,9 @@ export const useHistoryStore = defineStore("history", () => {
 
     // #39：轉譯語言為繁中時，把 Whisper 的簡體輸出轉成繁體（與即時流程一致，落地前一次到位）。
     // 與主路徑同樣在 raw_text 寫入 DB 前套用，涵蓋空轉錄/幻覺偵測、charCount 與本地更新。
-    const transcriptionLocale = settingsStore.selectedTranscriptionLocale;
-    const effectiveLocale =
-      transcriptionLocale === "auto"
-        ? settingsStore.selectedLocale
-        : transcriptionLocale;
     result.rawText = applyTranscriptTextTransforms(
       result.rawText,
-      effectiveLocale,
+      getEffectiveTranscriptLocale(settingsStore),
     );
 
     // HTTP 成功即計費（不論轉錄內容）→ 記錄 whisper 用量
@@ -861,6 +866,7 @@ export const useHistoryStore = defineStore("history", () => {
           systemPrompt: settingsStore.getAiPrompt(),
           vocabularyTermList: termList.length > 0 ? termList : undefined,
           modelId: settingsStore.selectedLlmModelId,
+          transcriptLocale: getEffectiveTranscriptLocale(settingsStore),
         },
       );
     } catch (err) {

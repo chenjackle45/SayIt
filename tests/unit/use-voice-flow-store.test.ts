@@ -93,6 +93,8 @@ const {
       isSmartDictionaryEnabled: false,
       isCopyTranscriptionToClipboardEnabled: true,
       whisperLanguageCode: "zh" as string | null,
+      selectedTranscriptionLocale: "auto" as string,
+      selectedLocale: "zh-TW" as string,
     },
     mockVocabularyState: {
       termList: [] as Array<{
@@ -208,6 +210,12 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
       return mockSettingsState.isCopyTranscriptionToClipboardEnabled;
     },
     getWhisperLanguageCode: () => mockSettingsState.whisperLanguageCode,
+    get selectedTranscriptionLocale() {
+      return mockSettingsState.selectedTranscriptionLocale;
+    },
+    get selectedLocale() {
+      return mockSettingsState.selectedLocale;
+    },
     selectedAudioInputDeviceName: "",
   }),
 }));
@@ -331,6 +339,8 @@ describe("useVoiceFlowStore", () => {
     mockSettingsState.isSoundEffectsEnabled = true;
     mockSettingsState.isSmartDictionaryEnabled = false;
     mockSettingsState.whisperLanguageCode = "zh";
+    mockSettingsState.selectedTranscriptionLocale = "auto";
+    mockSettingsState.selectedLocale = "zh-TW";
     mockVocabularyState.termList = [];
     mockVocabularyState.getTopTermListByWeight
       .mockClear()
@@ -601,6 +611,10 @@ describe("useVoiceFlowStore", () => {
         "選取的文字",
         expect.anything(),
         expect.anything(),
+      );
+      // #83：編輯模式可能要求「翻成簡體」，不可帶 transcriptLocale 強轉繁體
+      expect(mockEnhanceText.mock.calls[0][2]).not.toHaveProperty(
+        "transcriptLocale",
       );
       expect(mockInvoke).not.toHaveBeenCalledWith("read_selected_text");
     });
@@ -1130,6 +1144,47 @@ describe("useVoiceFlowStore", () => {
   // ==========================================================================
 
   describe("AI 文字整理", () => {
+    it.each([
+      ["auto", "zh-TW", "zh-TW"],
+      ["en", "zh-TW", "en"],
+    ])(
+      "[P1] #83 辨識語言 %s、介面 %s → 整理選項帶有效語言 %s",
+      async (transcriptionLocale, uiLocale, expected) => {
+        mockSettingsState.selectedTranscriptionLocale = transcriptionLocale;
+        mockSettingsState.selectedLocale = uiLocale;
+        const longText = "這是一段超過十個字的測試轉錄文字內容";
+        mockInvoke.mockImplementation(
+          createMockInvokeHandler({
+            transcribeResult: {
+              rawText: longText,
+              transcriptionDurationMs: 400,
+              noSpeechProbability: 0.01,
+            },
+          }),
+        );
+
+        const store = useVoiceFlowStore();
+        await store.initialize();
+
+        triggerHotkeyEvent("hotkey:pressed");
+        await vi.waitFor(() => {
+          expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+            deviceName: "",
+          });
+        });
+        triggerHotkeyEvent("hotkey:released");
+        await vi.waitFor(() => {
+          expect(mockEnhanceText).toHaveBeenCalledTimes(1);
+        });
+
+        expect(mockEnhanceText).toHaveBeenCalledWith(
+          longText,
+          "test-api-key-123",
+          expect.objectContaining({ transcriptLocale: expected }),
+        );
+      },
+    );
+
     it("[P0] >= 10 字應走 AI 整理流程：recording → transcribing → enhancing → success", async () => {
       const longText = "這是一段超過十個字的測試轉錄文字內容";
       mockInvoke.mockImplementation(
@@ -2362,6 +2417,35 @@ describe("useVoiceFlowStore", () => {
         mockUpdateTranscriptionOnRetrySuccess.mock.calls[0][0];
       expect(updateParams.rawText).toBe("重送成功的文字");
       expect(updateParams.processedText).toBeNull();
+    });
+
+    it("[P1] #83 重送成功進 AI 整理 → 整理選項帶有效語言", async () => {
+      mockSettingsState.selectedTranscriptionLocale = "en";
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      await setupFailedTranscription(store);
+
+      const longText = "這是一段超過十個字的重送轉錄文字內容";
+      mockInvoke.mockImplementation(
+        createMockInvokeHandler({
+          retranscribeResult: {
+            rawText: longText,
+            transcriptionDurationMs: 350,
+            noSpeechProbability: 0.02,
+          },
+        }),
+      );
+
+      await store.handleRetryTranscription();
+
+      await vi.waitFor(() => {
+        expect(mockEnhanceText).toHaveBeenCalledWith(
+          longText,
+          "test-api-key-123",
+          expect.objectContaining({ transcriptLocale: "en" }),
+        );
+      });
     });
 
     it("[P0] 重送失敗（空轉錄）不再提供重送按鈕", async () => {

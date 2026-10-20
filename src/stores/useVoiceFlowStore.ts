@@ -92,13 +92,19 @@ function t(key: string, params?: Record<string, unknown>): string {
  */
 function applyTranscriptTextTransforms(rawText: string): string {
   if (!rawText) return rawText;
+  return applySharedTranscriptTextTransforms(
+    rawText,
+    getEffectiveTranscriptLocale(),
+  );
+}
+
+/** 有效轉譯語言：auto 回退到介面語言。原文轉換與整理結果轉換（#83）共用。 */
+function getEffectiveTranscriptLocale(): string {
   const settingsStore = useSettingsStore();
   const transcriptionLocale = settingsStore.selectedTranscriptionLocale;
-  const effectiveLocale =
-    transcriptionLocale === "auto"
-      ? settingsStore.selectedLocale
-      : transcriptionLocale;
-  return applySharedTranscriptTextTransforms(rawText, effectiveLocale);
+  return transcriptionLocale === "auto"
+    ? settingsStore.selectedLocale
+    : transcriptionLocale;
 }
 
 const MONITOR_POLL_INTERVAL_MS = 250;
@@ -1408,6 +1414,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
             modelId: settingsStore.selectedLlmModelId,
             signal: abortController?.signal,
+            transcriptLocale: getEffectiveTranscriptLocale(),
           };
 
           let enhanceResult = await enhanceText(
@@ -1763,6 +1770,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
             modelId: settingsStore.selectedLlmModelId,
             signal: abortController?.signal,
+            transcriptLocale: getEffectiveTranscriptLocale(),
           });
           if (isAborted.value) return;
 

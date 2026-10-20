@@ -438,6 +438,45 @@ describe("enhancer.ts", () => {
     });
   });
 
+  describe("整理結果套用原文轉換（#83）", () => {
+    const SIMPLIFIED = "请帮我把这份报告寄给张经理，然后提醒他礼拜五之前要回信。";
+    const TRADITIONAL = "請幫我把這份報告寄給張經理，然後提醒他禮拜五之前要回信。";
+
+    it.each(["zh-TW", "yue"])(
+      "[P0] transcriptLocale=%s 時簡體輸出轉成繁體",
+      async (locale) => {
+        mockFetch.mockResolvedValue(createSuccessResponse(SIMPLIFIED));
+        const { enhanceText } = await import("../../src/lib/enhancer");
+        const result = await enhanceText("原文", TEST_API_KEY, {
+          transcriptLocale: locale,
+        });
+        expect(result.text).toBe(TRADITIONAL);
+      },
+    );
+
+    it.each([["en"], ["zh-CN"], [undefined]])(
+      "[P0] transcriptLocale=%s 時輸出原樣保留",
+      async (locale) => {
+        mockFetch.mockResolvedValue(createSuccessResponse(SIMPLIFIED));
+        const { enhanceText } = await import("../../src/lib/enhancer");
+        const result = await enhanceText("原文", TEST_API_KEY, {
+          transcriptLocale: locale,
+        });
+        expect(result.text).toBe(SIMPLIFIED);
+      },
+    );
+
+    it("[P1] 空回應退回原文時不轉換（isRawFallback）", async () => {
+      mockFetch.mockResolvedValue(createSuccessResponse(""));
+      const { enhanceText } = await import("../../src/lib/enhancer");
+      const result = await enhanceText(SIMPLIFIED, TEST_API_KEY, {
+        transcriptLocale: "zh-TW",
+      });
+      expect(result.isRawFallback).toBe(true);
+      expect(result.text).toBe(SIMPLIFIED);
+    });
+  });
+
   describe("Timeout 處理", () => {
     it("[P0] 超過 5 秒應拋出逾時錯誤", async () => {
       vi.useFakeTimers();
@@ -603,6 +642,24 @@ describe("enhanceWithAnomalyGuard", () => {
     expect(result.wasAnomalous).toBe(false);
     expect(result.wasDrift).toBe(true);
     expect(result.driftOverlapRatio).toBeLessThan(0.2);
+  });
+
+  it("[P0] #83 繁中原文＋模型輸出簡體 → wasDrift=false、結果轉成繁體", async () => {
+    mockFetch.mockResolvedValue(
+      createSuccessResponse(
+        "今天开会讨论了下个月的行销预算。业务部门希望增加广告费用，财务部门则认为应该先检视过去三个月的转换率。",
+      ),
+    );
+    const { enhanceWithAnomalyGuard } = await import("../../src/lib/enhancer");
+    const result = await enhanceWithAnomalyGuard(
+      "今天開會討論了下個月的行銷預算業務部門希望增加廣告費用財務部門則認為應該先檢視過去三個月的轉換率",
+      TEST_API_KEY,
+      { transcriptLocale: "zh-TW" },
+    );
+    expect(result.wasDrift).toBe(false);
+    expect(result.text).toBe(
+      "今天開會討論了下個月的行銷預算。業務部門希望增加廣告費用，財務部門則認為應該先檢視過去三個月的轉換率。",
+    );
   });
 
   it("[P1] 正常整理（高 bigram 重疊）→ wasDrift=false", async () => {

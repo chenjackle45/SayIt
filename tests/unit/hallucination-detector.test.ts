@@ -430,5 +430,28 @@ describe("hallucinationDetector.ts", () => {
         false,
       );
     });
+
+    // #83：同內容只差繁簡字形，不應被當成飄移（兩側都先簡轉繁再比）
+    const TRADITIONAL_TEXT =
+      "今天開會討論了下個月的行銷預算，業務部門希望增加廣告費用，財務部門則認為應該先檢視過去三個月的轉換率。";
+    const SIMPLIFIED_TEXT =
+      "今天开会讨论了下个月的行销预算，业务部门希望增加广告费用，财务部门则认为应该先检视过去三个月的转换率。";
+
+    it("[P0] #83 繁體原文＋簡體整理結果（模型沒照提示詞輸出繁體）不判定 drift", () => {
+      const r = detectSemanticDrift(TRADITIONAL_TEXT, SIMPLIFIED_TEXT);
+      expect(r.isDrift).toBe(false);
+      expect(r.overlapRatio).toBeGreaterThan(0.9);
+    });
+
+    it("[P0] #83 簡體原文（舊紀錄）＋繁體整理結果不判定 drift", () => {
+      const r = detectSemanticDrift(SIMPLIFIED_TEXT, TRADITIONAL_TEXT);
+      expect(r.isDrift).toBe(false);
+      expect(r.overlapRatio).toBeGreaterThan(0.9);
+    });
+
+    it("[P0] #83 簡體答非所問仍判定 drift", () => {
+      const r = detectSemanticDrift(TRADITIONAL_TEXT, "好的请问有什么可以帮您的吗");
+      expect(r.isDrift).toBe(true);
+    });
   });
 });

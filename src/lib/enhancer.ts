@@ -16,6 +16,7 @@ import {
   detectEnhancementAnomaly,
   detectSemanticDrift,
 } from "./hallucinationDetector";
+import { applyTranscriptTextTransforms } from "./transcriptTextTransforms";
 
 const MAX_VOCABULARY_TERMS = 50;
 const DEFAULT_ENHANCEMENT_RETRY_COUNT = 3;
@@ -41,6 +42,11 @@ export interface EnhanceOptions {
   modelId?: string;
   signal?: AbortSignal;
   maxTokens?: number;
+  /**
+   * 有效辨識語言（auto 已解析為介面語言）。有值時整理結果套用與原文相同的轉換
+   * （zh-TW／yue → 簡轉繁，#83）。編輯模式、連線測試不傳。
+   */
+  transcriptLocale?: string;
 }
 
 async function withTimeout<T>(
@@ -173,7 +179,12 @@ export async function enhanceText(
   if (!enhancedContent) {
     return { text: rawText, usage, isRawFallback: true };
   }
-  return { text: enhancedContent, usage };
+  return {
+    text: options?.transcriptLocale
+      ? applyTranscriptTextTransforms(enhancedContent, options.transcriptLocale)
+      : enhancedContent,
+    usage,
+  };
 }
 
 export interface EnhanceWithGuardResult {
