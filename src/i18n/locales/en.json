@@ -441,7 +441,9 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Recording a custom trigger key on Windows no longer requires clicking another window first — with the SayIt window in front, nothing used to register; now you can press the key right in SayIt",
+      "item1": "Alt/Shift triggers on Windows are more reliable — selecting text and holding to talk now enters Edit mode correctly without typing a stray character, and releasing a lone Alt no longer activates the menu bar, so text pastes straight into the input field",
+      "item2": "AI cleanup no longer fails for no clear reason — with the recognition language set to Auto Detect, it keeps the language you spoke instead of translating it, and with a Chinese interface the result is normalized to the same script so it isn't wrongly rejected as \"too different from the original\"",
+      "item3": "Words you add to the Dictionary come first — terms you added (or imported) yourself are now sent to recognition and cleanup ahead of terms the AI learned automatically, so they no longer get crowded out",
       "dismiss": "Got it"
     }
   },
