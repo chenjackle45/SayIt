@@ -77,7 +77,8 @@
       "anthropic": "Anthropic",
       "gemini": "Google Gemini（免費額度）",
       "groqNote": "使用語音轉錄的 Groq API Key（已設定）",
-      "groqNoteNotSet": "使用語音轉錄的 Groq API Key（尚未設定，請先到上方「語音轉錄」填入）"
+      "groqNoteNotSet": "使用語音轉錄的 Groq API Key（尚未設定，請先到上方「語音轉錄」填入）",
+      "custom": "自訂（OpenAI 相容）"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -226,6 +227,23 @@
     },
     "llm": {
       "title": "文字整理"
+    },
+    "sttProvider": {
+      "title": "語音服務",
+      "groq": "Groq（免費）",
+      "custom": "自訂（OpenAI 相容）",
+      "description": "選擇語音轉錄服務。自訂端點須相容 OpenAI（/audio/transcriptions）。",
+      "updated": "語音服務已更新"
+    },
+    "custom": {
+      "baseUrlLabel": "API 位址",
+      "baseUrlHint": "填寫主機或 base 路徑即可，會自動補全 /chat/completions 或 /audio/transcriptions。本機 http 服務請用 localhost。",
+      "apiKeyLabel": "API Key",
+      "apiKeyPlaceholder": "sk-...（本機無鑑權服務可隨便填）",
+      "apiKeyHint": "僅保存在本機。本機無鑑權服務可填寫任意內容。",
+      "modelLabel": "模型 ID",
+      "modelPlaceholder": "服務商提供的準確模型 ID",
+      "modelHint": "填寫服務商提供的準確模型 ID。"
     }
   },
   "dashboard": {

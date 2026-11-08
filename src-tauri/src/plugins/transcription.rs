@@ -90,11 +90,13 @@ pub struct TranscriptionResult {
 #[derive(serde::Deserialize)]
 struct WhisperVerboseResponse {
     text: String,
+    #[serde(default)]
     segments: Vec<WhisperSegment>,
 }
 
 #[derive(serde::Deserialize)]
 struct WhisperSegment {
+    #[serde(default)]
     no_speech_prob: f64,
 }
 
@@ -110,6 +112,73 @@ fn format_whisper_prompt(term_list: &[String]) -> String {
         .map(|s| s.as_str())
         .collect();
     format!("Important Vocabulary: {}", terms.join(", "))
+}
+
+// ========== Custom Endpoint URL ==========
+
+const TRANSCRIPTION_PATH_SUFFIX: &str = "/audio/transcriptions";
+
+/// Normalize a user-supplied transcription endpoint into a full request URL.
+/// - None => default Groq endpoint (existing behavior unchanged)
+/// - trims whitespace/trailing slashes; empty => RequestFailed
+/// - missing scheme => prepend https://
+/// - only https, or http on loopback (localhost/127.0.0.1/[::1]), is allowed
+/// - appends /audio/transcriptions when the suffix is missing so users may
+///   enter just a host or a versioned base (e.g. https://host/v1)
+fn resolve_transcription_url(
+    base_url: Option<&str>,
+) -> Result<String, TranscriptionError> {
+    let Some(raw) = base_url else {
+        return Ok(GROQ_API_URL.to_string());
+    };
+    let trimmed = raw.trim().trim_end_matches("/").to_string();
+    if trimmed.is_empty() {
+        return Err(TranscriptionError::RequestFailed(
+            "Custom STT base URL is empty".to_string(),
+        ));
+    }
+    let with_scheme = if trimmed.contains("://") {
+        trimmed
+    } else {
+        format!("https://{trimmed}")
+    };
+    let lower = with_scheme.to_ascii_lowercase();
+    let scheme_end = match lower.find("://") {
+        Some(idx) => idx,
+        None => {
+            return Err(TranscriptionError::RequestFailed(format!(
+                "Unsupported endpoint URL: {with_scheme}"
+            )))
+        }
+    };
+    let scheme = &lower[..scheme_end];
+    let rest = &with_scheme[scheme_end + 3..];
+    if scheme == "http" {
+        let host = rest.split("/").next().unwrap_or("").to_ascii_lowercase();
+        let host_no_port = if let Some(end) = host.find("]") {
+            &host[..end + 1]
+        } else {
+            host.split(":").next().unwrap_or("")
+        };
+        let is_loopback = host_no_port == "localhost"
+            || host_no_port == "127.0.0.1"
+            || host_no_port == "[::1]";
+        if !is_loopback {
+            return Err(TranscriptionError::RequestFailed(
+                "Plain http is only allowed for localhost".to_string(),
+            ));
+        }
+    } else if scheme != "https" {
+        return Err(TranscriptionError::RequestFailed(format!(
+            "Unsupported URL scheme in endpoint: {with_scheme}"
+        )));
+    }
+    let without_slash = with_scheme.trim_end_matches("/").to_string();
+    if without_slash.ends_with(TRANSCRIPTION_PATH_SUFFIX) {
+        Ok(without_slash)
+    } else {
+        Ok(format!("{without_slash}{TRANSCRIPTION_PATH_SUFFIX}"))
+    }
 }
 
 // ========== Retry Classification (gh-10) ==========
@@ -175,6 +244,7 @@ async fn attempt_transcription_request(
     vocabulary_term_list: Option<&[String]>,
     model: &str,
     language: Option<&str>,
+    url: &str,
 ) -> Result<(String, f64), AttemptFailure> {
     let no_retry = |error: TranscriptionError| AttemptFailure {
         error,
@@ -207,7 +277,7 @@ async fn attempt_transcription_request(
     // Send request (reuse shared client for connection pooling)
     let response = match transcription_state
         .client
-        .post(GROQ_API_URL)
+        .post(url)
         .bearer_auth(api_key)
         .multipart(form)
         .send()
@@ -267,9 +337,10 @@ async fn attempt_transcription_request(
         .iter()
         .map(|s| s.no_speech_prob)
         .fold(1.0_f64, f64::min);
-    // If no segments, treat as full silence
+    // No segments: custom OpenAI-compatible services often return only text.
+    // Non-empty text means speech was detected; empty text means silence.
     let no_speech_probability = if json.segments.is_empty() {
-        1.0
+        if raw_text.is_empty() { 1.0 } else { 0.0 }
     } else {
         no_speech_probability
     };
@@ -284,6 +355,7 @@ async fn send_transcription_request(
     vocabulary_term_list: Option<Vec<String>>,
     model_id: Option<String>,
     language: Option<String>,
+    base_url: Option<String>,
 ) -> Result<TranscriptionResult, TranscriptionError> {
     if wav_data.len() < MINIMUM_AUDIO_SIZE {
         return Err(TranscriptionError::AudioTooSmall(wav_data.len()));
@@ -296,11 +368,13 @@ async fn send_transcription_request(
     }
 
     let model = model_id.unwrap_or_else(|| DEFAULT_WHISPER_MODEL_ID.to_string());
+    let url = resolve_transcription_url(base_url.as_deref())?;
 
     log::info!(
-        "[transcription] Sending {} bytes WAV to Groq API (model={})",
+        "[transcription] Sending {} bytes WAV (model={}) to {}",
         wav_data.len(),
-        model
+        model,
+        url
     );
 
     // 計時涵蓋重試等待——維持「使用者感受時長」語意
@@ -322,6 +396,7 @@ async fn send_transcription_request(
             vocabulary_term_list.as_deref(),
             &model,
             language.as_deref(),
+            &url,
         )
         .await
         {
@@ -425,6 +500,7 @@ pub async fn transcribe_audio(
     vocabulary_term_list: Option<Vec<String>>,
     model_id: Option<String>,
     language: Option<String>,
+    base_url: Option<String>,
 ) -> Result<TranscriptionResult, TranscriptionError> {
     if api_key.trim().is_empty() {
         return Err(TranscriptionError::ApiKeyMissing);
@@ -446,6 +522,7 @@ pub async fn transcribe_audio(
         vocabulary_term_list,
         model_id,
         language,
+        base_url,
     )
     .await
 }
@@ -458,6 +535,7 @@ pub async fn retranscribe_from_file(
     vocabulary_term_list: Option<Vec<String>>,
     model_id: Option<String>,
     language: Option<String>,
+    base_url: Option<String>,
 ) -> Result<TranscriptionResult, TranscriptionError> {
     if api_key.trim().is_empty() {
         return Err(TranscriptionError::ApiKeyMissing);
@@ -486,6 +564,7 @@ pub async fn retranscribe_from_file(
         vocabulary_term_list,
         model_id,
         language,
+        base_url,
     )
     .await?;
     result.peak_energy_level = peak_energy_level;
@@ -498,6 +577,7 @@ pub async fn test_whisper_connection(
     transcription_state: State<'_, TranscriptionState>,
     api_key: String,
     model_id: Option<String>,
+    base_url: Option<String>,
 ) -> Result<(), TranscriptionError> {
     if api_key.trim().is_empty() {
         return Err(TranscriptionError::ApiKeyMissing);
@@ -509,9 +589,10 @@ pub async fn test_whisper_connection(
         .map_err(|e| TranscriptionError::RequestFailed(e.to_string()))?;
 
     let model = model_id.unwrap_or_else(|| DEFAULT_WHISPER_MODEL_ID.to_string());
+    let url = resolve_transcription_url(base_url.as_deref())?;
 
     // 連線測試走單次嘗試——要的就是即時真實結果，不重試
-    attempt_transcription_request(wav_data, &transcription_state, &api_key, None, &model, None)
+    attempt_transcription_request(wav_data, &transcription_state, &api_key, None, &model, None, &url)
         .await
         .map(|_| ())
         .map_err(|failure| failure.error)
@@ -683,5 +764,62 @@ mod tests {
             retry_wait_secs(&FailureKind::ServerError, 99),
             Some(RETRY_BACKOFF_SECS[RETRY_BACKOFF_SECS.len() - 1])
         );
+    }
+
+    // ========== Custom endpoint URL ==========
+
+    #[test]
+    fn test_resolve_transcription_url_default() {
+        assert_eq!(resolve_transcription_url(None).unwrap(), GROQ_API_URL);
+    }
+
+    #[test]
+    fn test_resolve_transcription_url_normalizes() {
+        assert_eq!(
+            resolve_transcription_url(Some("myhost.example.com")).unwrap(),
+            "https://myhost.example.com/audio/transcriptions"
+        );
+        assert_eq!(
+            resolve_transcription_url(Some("https://myhost.example.com/v1///")).unwrap(),
+            "https://myhost.example.com/v1/audio/transcriptions"
+        );
+        assert_eq!(
+            resolve_transcription_url(Some(
+                "https://myhost.example.com/openai/v1/audio/transcriptions"
+            ))
+            .unwrap(),
+            "https://myhost.example.com/openai/v1/audio/transcriptions"
+        );
+        assert_eq!(
+            resolve_transcription_url(Some("  https://h.example.com/v1  ")).unwrap(),
+            "https://h.example.com/v1/audio/transcriptions"
+        );
+    }
+
+    #[test]
+    fn test_resolve_transcription_url_rejects_bad_input() {
+        assert!(resolve_transcription_url(Some("   ")).is_err());
+        assert!(resolve_transcription_url(Some("http://evil.example.com/v1")).is_err());
+        assert!(resolve_transcription_url(Some("ftp://h.example.com/v1")).is_err());
+        assert_eq!(
+            resolve_transcription_url(Some("http://localhost:8080/v1")).unwrap(),
+            "http://localhost:8080/v1/audio/transcriptions"
+        );
+        assert_eq!(
+            resolve_transcription_url(Some("http://127.0.0.1:8080")).unwrap(),
+            "http://127.0.0.1:8080/audio/transcriptions"
+        );
+    }
+
+    #[test]
+    fn test_verbose_response_tolerates_missing_segments() {
+        let parsed: WhisperVerboseResponse =
+            serde_json::from_str(r#"{"text":"hi"}"#).unwrap();
+        assert_eq!(parsed.text, "hi");
+        assert!(parsed.segments.is_empty());
+        let parsed: WhisperVerboseResponse =
+            serde_json::from_str(r#"{"text":"hi","segments":[{}]}"#).unwrap();
+        assert_eq!(parsed.segments.len(), 1);
+        assert_eq!(parsed.segments[0].no_speech_prob, 0.0);
     }
 }

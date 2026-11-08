@@ -5,6 +5,7 @@ import {
   getMicrophoneErrorMessage,
   getTranscriptionErrorMessage,
 } from "../../src/lib/errorUtils";
+import { EnhancerApiError } from "../../src/lib/enhancer";
 
 describe("getMicrophoneErrorMessage", () => {
   it("[P0] NotAllowedError 應映射為中文權限提示", () => {
@@ -169,6 +170,33 @@ describe("getEnhancementErrorMessage - 網路錯誤", () => {
         new Error("network error: connection refused"),
       ),
     ).toBe("網路連線中斷");
+  });
+
+  it("[P0] 未映射狀態碼應附上 HTTP 狀態碼方便除錯", () => {
+    const message = getEnhancementErrorMessage(
+      new EnhancerApiError(402, "Payment Required", "insufficient allowance"),
+    );
+    expect(message).toContain("AI 整理失敗");
+    expect(message).toContain("402");
+    expect(message).toContain("insufficient allowance");
+  });
+
+  it("[P0] 自訂端點 400 MissingSessionID 應顯示 badRequest 並附詳情", () => {
+    const message = getEnhancementErrorMessage(
+      new EnhancerApiError(400, "Bad Request", '{"error":{"type":"MissingSessionID"}}'),
+    );
+    expect(message).toContain("400");
+  });
+
+  it("[P0] 空 baseUrl 等通用錯誤應附上原始訊息", () => {
+    expect(
+      getEnhancementErrorMessage(new Error("Custom API base URL is empty")),
+    ).toBe("AI 整理失敗: Custom API base URL is empty");
+  });
+
+  it("[P1] 過長錯誤詳情應被截斷", () => {
+    const message = getEnhancementErrorMessage(new Error("x".repeat(500)));
+    expect(message.length).toBeLessThan(200);
   });
 });
 

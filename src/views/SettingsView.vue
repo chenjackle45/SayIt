@@ -42,6 +42,7 @@ import {
   getModelListByProvider,
   type LlmModelId,
   type LlmProviderId,
+  type SttProviderId,
   type WhisperModelId,
 } from "../lib/modelRegistry";
 import { LLM_PROVIDER_LIST, findProviderConfig } from "../lib/llmProvider";
@@ -665,6 +666,110 @@ async function handleDeleteGeminiApiKey() {
   }
 }
 
+// -- Custom endpoint (OpenAI-compatible, STT + LLM) --
+const customSttFeedback = useFeedbackMessage();
+const customLlmFeedback = useFeedbackMessage();
+const customSttBaseUrlInput = ref("");
+const customSttApiKeyInput = ref("");
+const customSttModelInput = ref("");
+const customLlmBaseUrlInput = ref("");
+const customLlmApiKeyInput = ref("");
+const customLlmModelInput = ref("");
+const isCustomSttApiKeyVisible = ref(false);
+const isCustomLlmApiKeyVisible = ref(false);
+
+const isSttTestReady = computed(() => {
+  if (settingsStore.selectedSttProviderId === "custom") {
+    return (
+      settingsStore.customSttApiKey !== "" &&
+      settingsStore.customSttBaseUrl.trim() !== "" &&
+      settingsStore.customSttModel.trim() !== ""
+    );
+  }
+  return settingsStore.hasApiKey;
+});
+
+const isLlmTestReady = computed(() => {
+  if (settingsStore.selectedLlmProviderId === "custom") {
+    return (
+      settingsStore.customLlmApiKey !== "" &&
+      settingsStore.customLlmBaseUrl.trim() !== "" &&
+      settingsStore.customLlmModel.trim() !== ""
+    );
+  }
+  return settingsStore.hasLlmApiKey;
+});
+
+async function handleSttProviderChange(providerId: SttProviderId) {
+  try {
+    await settingsStore.saveSttProvider(providerId);
+    customSttFeedback.show("success", t("settings.sttProvider.updated"));
+  } catch (err) {
+    customSttFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleSaveCustomStt() {
+  try {
+    await settingsStore.saveCustomSttBaseUrl(customSttBaseUrlInput.value);
+    await settingsStore.saveCustomSttApiKey(customSttApiKeyInput.value);
+    await settingsStore.saveCustomSttModel(customSttModelInput.value);
+    customSttFeedback.show("success", t("settings.apiKey.saved"));
+  } catch (err) {
+    customSttFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleDeleteCustomSttApiKey() {
+  try {
+    await settingsStore.deleteCustomSttApiKey();
+    customSttApiKeyInput.value = "";
+    customSttFeedback.show("success", t("settings.apiKey.deleted"));
+  } catch (err) {
+    customSttFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleSaveCustomLlm() {
+  try {
+    await settingsStore.saveCustomLlmBaseUrl(customLlmBaseUrlInput.value);
+    await settingsStore.saveCustomLlmApiKey(customLlmApiKeyInput.value);
+    await settingsStore.saveCustomLlmModel(customLlmModelInput.value);
+    customLlmFeedback.show("success", t("settings.apiKey.saved"));
+  } catch (err) {
+    customLlmFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function handleDeleteCustomLlmApiKey() {
+  try {
+    await settingsStore.deleteCustomLlmApiKey();
+    customLlmApiKeyInput.value = "";
+    customLlmFeedback.show("success", t("settings.apiKey.deleted"));
+  } catch (err) {
+    customLlmFeedback.show("error", extractErrorMessage(err));
+  }
+}
+
+async function sttConnectionTest() {
+  return testWhisperConnection(
+    settingsStore.getActiveSttModelId(),
+    settingsStore.getSttApiKey(),
+    { baseUrl: settingsStore.getSttBaseUrl() || null },
+  );
+}
+
+async function llmConnectionTest() {
+  return testLlmConnection(
+    settingsStore.getActiveLlmModelId(),
+    settingsStore.getLlmApiKey(),
+    {
+      providerId: settingsStore.selectedLlmProviderId,
+      baseUrl: settingsStore.getLlmBaseUrl(),
+    },
+  );
+}
+
 // ── 錄音自動靜音 ──────────────────────────────────────────────
 const muteOnRecordingFeedback = useFeedbackMessage();
 
@@ -971,6 +1076,12 @@ onMounted(async () => {
   if (settingsStore.hasApiKey) {
     apiKeyInput.value = settingsStore.getApiKey();
   }
+  customSttBaseUrlInput.value = settingsStore.customSttBaseUrl;
+  customSttApiKeyInput.value = settingsStore.customSttApiKey;
+  customSttModelInput.value = settingsStore.customSttModel;
+  customLlmBaseUrlInput.value = settingsStore.customLlmBaseUrl;
+  customLlmApiKeyInput.value = settingsStore.customLlmApiKey;
+  customLlmModelInput.value = settingsStore.customLlmModel;
   thresholdEnabled.value = settingsStore.isEnhancementThresholdEnabled;
   thresholdCharCount.value = settingsStore.enhancementThresholdCharCount;
   recordingAutoCleanupEnabled.value =
@@ -1009,6 +1120,8 @@ onBeforeUnmount(() => {
   smartDictionaryFeedback.clearTimer();
   recordingCleanupFeedback.clearTimer();
   providerFeedback.clearTimer();
+  customSttFeedback.clearTimer();
+  customLlmFeedback.clearTimer();
   clearTimeout(deleteConfirmTimeoutId);
   clearTimeout(resetPromptConfirmTimeoutId);
   clearTimeout(hideDockIconPendingTimeoutId);
@@ -1255,8 +1368,37 @@ onBeforeUnmount(() => {
         <CardTitle class="text-base">{{ $t("settings.stt.title") }}</CardTitle>
       </CardHeader>
       <CardContent class="space-y-5">
+        <!-- STT Provider -->
+        <div class="space-y-3">
+          <Label>{{ $t("settings.sttProvider.title") }}</Label>
+          <p class="text-xs text-muted-foreground">{{ $t("settings.sttProvider.description") }}</p>
+          <RadioGroup
+            :model-value="settingsStore.selectedSttProviderId"
+            class="grid grid-cols-2 gap-2"
+            @update:model-value="(v: unknown) => handleSttProviderChange(v as SttProviderId)"
+          >
+            <Label
+              for="stt-provider-groq"
+              class="flex cursor-pointer items-center gap-2.5 rounded-md border border-border p-3 transition-colors"
+              :class="settingsStore.selectedSttProviderId === 'groq' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'"
+            >
+              <RadioGroupItem id="stt-provider-groq" value="groq" class="!size-0 !border-0 !shadow-none overflow-hidden" />
+              <span class="text-sm font-medium">{{ $t("settings.sttProvider.groq") }}</span>
+            </Label>
+            <Label
+              for="stt-provider-custom"
+              class="flex cursor-pointer items-center gap-2.5 rounded-md border border-border p-3 transition-colors"
+              :class="settingsStore.selectedSttProviderId === 'custom' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'"
+            >
+              <RadioGroupItem id="stt-provider-custom" value="custom" class="!size-0 !border-0 !shadow-none overflow-hidden" />
+              <span class="text-sm font-medium">{{ $t("settings.sttProvider.custom") }}</span>
+            </Label>
+          </RadioGroup>
+        </div>
+
+        <Separator />
         <!-- Groq API Key -->
-        <div class="space-y-4">
+        <div v-if="settingsStore.selectedSttProviderId === 'groq'" class="space-y-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
               <Label for="groq-api-key">{{ $t("settings.apiKey.title") }}</Label>
@@ -1344,11 +1486,86 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <div v-else class="space-y-4">
+          <!-- Custom STT endpoint (OpenAI-compatible) -->
+          <div class="space-y-2">
+            <Label for="custom-stt-base-url">{{ $t("settings.custom.baseUrlLabel") }}</Label>
+            <Input
+              id="custom-stt-base-url"
+              v-model="customSttBaseUrlInput"
+              placeholder="https://api.example.com/v1"
+              autocomplete="off"
+              class="font-mono text-xs"
+            />
+            <p class="text-xs text-muted-foreground">{{ $t("settings.custom.baseUrlHint") }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="custom-stt-api-key">{{ $t("settings.custom.apiKeyLabel") }}</Label>
+            <div class="flex gap-2">
+              <Input
+                id="custom-stt-api-key"
+                v-model="customSttApiKeyInput"
+                :type="isCustomSttApiKeyVisible ? 'text' : 'password'"
+                :placeholder="$t('settings.custom.apiKeyPlaceholder')"
+                autocomplete="off"
+                class="flex-1 font-mono text-xs"
+              />
+              <Button variant="outline" size="sm" class="shrink-0" @click="isCustomSttApiKeyVisible = !isCustomSttApiKeyVisible">
+                {{ isCustomSttApiKeyVisible ? $t("settings.apiKey.hide") : $t("settings.apiKey.show") }}
+              </Button>
+            </div>
+            <p class="text-xs text-muted-foreground">{{ $t("settings.custom.apiKeyHint") }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="custom-stt-model">{{ $t("settings.custom.modelLabel") }}</Label>
+            <Input
+              id="custom-stt-model"
+              v-model="customSttModelInput"
+              :placeholder="$t('settings.custom.modelPlaceholder')"
+              autocomplete="off"
+              class="font-mono text-xs"
+            />
+            <p class="text-xs text-muted-foreground">{{ $t("settings.custom.modelHint") }}</p>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <transition name="feedback-fade">
+              <p
+                v-if="customSttFeedback.message.value !== ''"
+                class="text-sm"
+                :class="customSttFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
+              >
+                {{ customSttFeedback.message.value }}
+              </p>
+            </transition>
+            <div class="flex gap-2">
+              <Button
+                v-if="settingsStore.customSttApiKey"
+                variant="outline"
+                size="sm"
+                class="text-destructive border-destructive hover:bg-destructive/10"
+                @click="handleDeleteCustomSttApiKey"
+              >
+                {{ $t("settings.apiKey.delete") }}
+              </Button>
+              <Button
+                size="sm"
+                :disabled="!customSttBaseUrlInput.trim() || !customSttApiKeyInput.trim() || !customSttModelInput.trim()"
+                @click="handleSaveCustomStt"
+              >
+                {{ $t("common.save") }}
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <Separator />
 
         <!-- 模型｜語言 並排 -->
         <div class="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
-          <div class="space-y-2">
+          <div v-if="settingsStore.selectedSttProviderId === 'groq'" class="space-y-2">
             <Label for="whisper-model">{{ $t("settings.model.whisperLabel") }}</Label>
             <Select
               :model-value="settingsStore.selectedWhisperModelId"
@@ -1397,8 +1614,8 @@ onBeforeUnmount(() => {
         </div>
 
         <ConnectionTestButton
-          :on-test="() => testWhisperConnection(settingsStore.selectedWhisperModelId, settingsStore.getApiKey())"
-          :disabled="!settingsStore.hasApiKey"
+          :on-test="sttConnectionTest"
+          :disabled="!isSttTestReady"
         />
 
         <transition name="feedback-fade">
@@ -1567,9 +1784,84 @@ onBeforeUnmount(() => {
           </p>
         </div>
 
+        <div v-else-if="settingsStore.selectedLlmProviderId === 'custom'" class="space-y-4">
+          <!-- Custom LLM endpoint (OpenAI-compatible) -->
+          <div class="space-y-2">
+            <Label for="custom-llm-base-url">{{ $t("settings.custom.baseUrlLabel") }}</Label>
+            <Input
+              id="custom-llm-base-url"
+              v-model="customLlmBaseUrlInput"
+              placeholder="https://api.example.com/v1"
+              autocomplete="off"
+              class="font-mono text-xs"
+            />
+            <p class="text-xs text-muted-foreground">{{ $t("settings.custom.baseUrlHint") }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="custom-llm-api-key">{{ $t("settings.custom.apiKeyLabel") }}</Label>
+            <div class="flex gap-2">
+              <Input
+                id="custom-llm-api-key"
+                v-model="customLlmApiKeyInput"
+                :type="isCustomLlmApiKeyVisible ? 'text' : 'password'"
+                :placeholder="$t('settings.custom.apiKeyPlaceholder')"
+                autocomplete="off"
+                class="flex-1 font-mono text-xs"
+              />
+              <Button variant="outline" size="sm" class="shrink-0" @click="isCustomLlmApiKeyVisible = !isCustomLlmApiKeyVisible">
+                {{ isCustomLlmApiKeyVisible ? $t("settings.apiKey.hide") : $t("settings.apiKey.show") }}
+              </Button>
+            </div>
+            <p class="text-xs text-muted-foreground">{{ $t("settings.custom.apiKeyHint") }}</p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="custom-llm-model">{{ $t("settings.custom.modelLabel") }}</Label>
+            <Input
+              id="custom-llm-model"
+              v-model="customLlmModelInput"
+              :placeholder="$t('settings.custom.modelPlaceholder')"
+              autocomplete="off"
+              class="font-mono text-xs"
+            />
+            <p class="text-xs text-muted-foreground">{{ $t("settings.custom.modelHint") }}</p>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <transition name="feedback-fade">
+              <p
+                v-if="customLlmFeedback.message.value !== ''"
+                class="text-sm"
+                :class="customLlmFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
+              >
+                {{ customLlmFeedback.message.value }}
+              </p>
+            </transition>
+            <div class="flex gap-2">
+              <Button
+                v-if="settingsStore.customLlmApiKey"
+                variant="outline"
+                size="sm"
+                class="text-destructive border-destructive hover:bg-destructive/10"
+                @click="handleDeleteCustomLlmApiKey"
+              >
+                {{ $t("settings.apiKey.delete") }}
+              </Button>
+              <Button
+                size="sm"
+                :disabled="!customLlmBaseUrlInput.trim() || !customLlmApiKeyInput.trim() || !customLlmModelInput.trim()"
+                @click="handleSaveCustomLlm"
+              >
+                {{ $t("common.save") }}
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <ConnectionTestButton
-          :on-test="() => testLlmConnection(settingsStore.selectedLlmModelId, settingsStore.getLlmApiKey())"
-          :disabled="!settingsStore.hasLlmApiKey"
+          :on-test="llmConnectionTest"
+          :disabled="!isLlmTestReady"
         />
 
         <transition name="feedback-fade">
@@ -1582,7 +1874,7 @@ onBeforeUnmount(() => {
           </p>
         </transition>
 
-        <template v-if="settingsStore.selectedLlmProviderId === 'groq' || settingsStore.hasLlmApiKey">
+        <template v-if="(settingsStore.selectedLlmProviderId === 'groq' || settingsStore.hasLlmApiKey) && settingsStore.selectedLlmProviderId !== 'custom'">
           <Separator />
 
           <!-- LLM 模型 -->

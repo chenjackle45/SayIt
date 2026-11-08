@@ -4,7 +4,7 @@ import {
   getEnhancementErrorMessage,
   getTranscriptionErrorMessage,
 } from "./errorUtils";
-import type { LlmModelId, WhisperModelId } from "./modelRegistry";
+import type { LlmProviderId } from "./modelRegistry";
 
 export interface TestSuccess {
   ok: true;
@@ -20,13 +20,16 @@ export interface TestFailure {
 export type TestResult = TestSuccess | TestFailure;
 
 export async function testLlmConnection(
-  modelId: LlmModelId,
+  modelId: string,
   apiKey: string,
+  opts?: { providerId?: LlmProviderId; baseUrl?: string },
 ): Promise<TestResult> {
   const start = performance.now();
   try {
     await enhanceText("ping", apiKey, {
       modelId,
+      providerId: opts?.providerId,
+      baseUrl: opts?.baseUrl,
       systemPrompt: "Reply with the word OK only.",
       maxTokens: 50,
     });
@@ -41,12 +44,17 @@ export async function testLlmConnection(
 }
 
 export async function testWhisperConnection(
-  modelId: WhisperModelId,
+  modelId: string,
   apiKey: string,
+  opts?: { baseUrl?: string | null },
 ): Promise<TestResult> {
   const start = performance.now();
   try {
-    await invoke("test_whisper_connection", { apiKey, modelId });
+    await invoke("test_whisper_connection", {
+      apiKey,
+      modelId,
+      baseUrl: opts?.baseUrl ?? null,
+    });
     return { ok: true, durationMs: elapsed(start) };
   } catch (err) {
     return {

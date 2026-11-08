@@ -679,7 +679,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     fieldText,
                     apiKey,
                     {
-                      modelId: settingsStore.selectedLlmModelId,
+                      modelId: settingsStore.getActiveLlmModelId(),
+                      providerId: settingsStore.selectedLlmProviderId,
+                      baseUrl: settingsStore.getLlmBaseUrl(),
                     },
                   );
 
@@ -726,7 +728,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                         id: crypto.randomUUID(),
                         transcriptionId,
                         apiType: "vocabulary_analysis",
-                        model: settingsStore.selectedLlmModelId,
+                        model: settingsStore.getActiveLlmModelId(),
                         promptTokens: analysisResult.usage.promptTokens,
                         completionTokens: analysisResult.usage.completionTokens,
                         totalTokens: analysisResult.usage.totalTokens,
@@ -736,7 +738,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                         audioDurationMs: null,
                         estimatedCostCeiling: calculateChatCostCeiling(
                           analysisResult.usage.totalTokens,
-                          settingsStore.selectedLlmModelId,
+                          settingsStore.getActiveLlmModelId(),
                         ),
                       })
                       .catch((err) =>
@@ -871,7 +873,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       id: crypto.randomUUID(),
       transcriptionId: record.id,
       apiType: "whisper",
-      model: settingsStore.selectedWhisperModelId,
+      model: settingsStore.getActiveSttModelId(),
       promptTokens: null,
       completionTokens: null,
       totalTokens: null,
@@ -881,7 +883,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       audioDurationMs: roundedAudioMs,
       estimatedCostCeiling: calculateWhisperCostCeiling(
         roundedAudioMs,
-        settingsStore.selectedWhisperModelId,
+        settingsStore.getActiveSttModelId(),
       ),
     });
 
@@ -890,7 +892,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         id: crypto.randomUUID(),
         transcriptionId: record.id,
         apiType: "chat",
-        model: settingsStore.selectedLlmModelId,
+        model: settingsStore.getActiveLlmModelId(),
         promptTokens: chatUsage.promptTokens,
         completionTokens: chatUsage.completionTokens,
         totalTokens: chatUsage.totalTokens,
@@ -900,7 +902,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         audioDurationMs: null,
         estimatedCostCeiling: calculateChatCostCeiling(
           chatUsage.totalTokens,
-          settingsStore.selectedLlmModelId,
+          settingsStore.getActiveLlmModelId(),
         ),
       });
     }
@@ -1243,11 +1245,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
       transitionTo("transcribing", t("voiceFlow.transcribing"));
       const settingsStore = useSettingsStore();
-      let apiKey = settingsStore.getApiKey();
+      let apiKey = settingsStore.getSttApiKey();
 
       if (!apiKey) {
-        await settingsStore.refreshApiKey();
-        apiKey = settingsStore.getApiKey();
+        await settingsStore.refreshSttApiKey();
+        apiKey = settingsStore.getSttApiKey();
       }
 
       if (!apiKey) {
@@ -1265,7 +1267,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       const result = await invoke<TranscriptionResult>("transcribe_audio", {
         apiKey,
         vocabularyTermList: hasVocabulary ? whisperTermList : null,
-        modelId: settingsStore.selectedWhisperModelId,
+        modelId: settingsStore.getActiveSttModelId(),
+        baseUrl: settingsStore.getSttBaseUrl() || null,
         language: settingsStore.getWhisperLanguageCode(),
       });
       if (isAborted.value) return;
@@ -1412,9 +1415,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
-            modelId: settingsStore.selectedLlmModelId,
+            modelId: settingsStore.getActiveLlmModelId(),
             signal: abortController?.signal,
             transcriptLocale: getEffectiveTranscriptLocale(),
+            providerId: settingsStore.selectedLlmProviderId,
+            baseUrl: settingsStore.getLlmBaseUrl(),
           };
 
           let enhanceResult = await enhanceText(
@@ -1613,7 +1618,9 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
       const editResult = await enhanceText(params.selectedText, llmApiKey, {
         systemPrompt,
-        modelId: settingsStore.selectedLlmModelId,
+        modelId: settingsStore.getActiveLlmModelId(),
+        providerId: settingsStore.selectedLlmProviderId,
+        baseUrl: settingsStore.getLlmBaseUrl(),
         signal: abortController?.signal,
         maxTokens: EDIT_MODE_MAX_TOKENS,
       });
@@ -1682,11 +1689,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
     try {
       const settingsStore = useSettingsStore();
-      let apiKey = settingsStore.getApiKey();
+      let apiKey = settingsStore.getSttApiKey();
 
       if (!apiKey) {
-        await settingsStore.refreshApiKey();
-        apiKey = settingsStore.getApiKey();
+        await settingsStore.refreshSttApiKey();
+        apiKey = settingsStore.getSttApiKey();
       }
 
       if (!apiKey) {
@@ -1707,7 +1714,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           filePath,
           apiKey,
           vocabularyTermList: hasVocabulary ? whisperTermList : null,
-          modelId: settingsStore.selectedWhisperModelId,
+          modelId: settingsStore.getActiveSttModelId(),
+          baseUrl: settingsStore.getSttBaseUrl() || null,
           language: settingsStore.getWhisperLanguageCode(),
         },
       );
@@ -1768,9 +1776,11 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
               enhancementTermList.length > 0 ? enhancementTermList : undefined,
-            modelId: settingsStore.selectedLlmModelId,
+            modelId: settingsStore.getActiveLlmModelId(),
             signal: abortController?.signal,
             transcriptLocale: getEffectiveTranscriptLocale(),
+            providerId: settingsStore.selectedLlmProviderId,
+            baseUrl: settingsStore.getLlmBaseUrl(),
           });
           if (isAborted.value) return;
 

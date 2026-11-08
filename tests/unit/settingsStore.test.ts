@@ -88,6 +88,7 @@ vi.mock("../../src/lib/modelRegistry", () => ({
   DEFAULT_LLM_MODEL_ID: "test-llm",
   DEFAULT_LLM_PROVIDER_ID: "groq",
   DEFAULT_WHISPER_MODEL_ID: "test-whisper",
+  DEFAULT_STT_PROVIDER_ID: "groq",
   getEffectiveLlmModelId: (id: string | null) => id ?? "test-llm",
   getEffectiveWhisperModelId: (id: string | null) => id ?? "test-whisper",
   getModelListByProvider: () => [],

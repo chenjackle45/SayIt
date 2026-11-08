@@ -1,8 +1,15 @@
 // ── LLM Provider ──────────────────────────────────────────
 
-export type LlmProviderId = "groq" | "openai" | "anthropic" | "gemini";
+export type LlmProviderId = "groq" | "openai" | "anthropic" | "gemini" | "custom";
 
 export const DEFAULT_LLM_PROVIDER_ID: LlmProviderId = "groq";
+
+// ── STT Provider（語音轉錄用）────────────────────────────────
+// Groq 官方端點與 OpenAI-compatible 自訂端點並存；自訂端點的
+// URL / Key / Model 皆由使用者自由填寫。
+export type SttProviderId = "groq" | "custom";
+
+export const DEFAULT_STT_PROVIDER_ID: SttProviderId = "groq";
 
 // ── LLM 模型（文字整理用）────────────────────────────────
 
@@ -239,6 +246,9 @@ export function getModelListByProvider(
 export function getDefaultModelIdForProvider(
   providerId: LlmProviderId,
 ): LlmModelId {
+  // custom 模型由使用者自由填寫、不在 registry 內；此處僅回傳佔位，
+  // 切換到 custom 時呼叫端應跳過重設、使用已存的自訂模型字串。
+  if (providerId === "custom") return DEFAULT_LLM_MODEL_ID;
   const providerModelList = getModelListByProvider(providerId);
   const defaultModel = providerModelList.find((m) => m.isDefault);
   return defaultModel?.id ?? providerModelList[0]?.id ?? DEFAULT_LLM_MODEL_ID;

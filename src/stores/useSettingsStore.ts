@@ -59,12 +59,14 @@ import {
   DEFAULT_LLM_MODEL_ID,
   DEFAULT_LLM_PROVIDER_ID,
   DEFAULT_WHISPER_MODEL_ID,
+  DEFAULT_STT_PROVIDER_ID,
   getEffectiveLlmModelId,
   getEffectiveWhisperModelId,
   getDefaultModelIdForProvider,
   findLlmModelConfig,
   type LlmModelId,
   type LlmProviderId,
+  type SttProviderId,
   type WhisperModelId,
 } from "../lib/modelRegistry";
 
@@ -126,6 +128,13 @@ export const useSettingsStore = defineStore("settings", () => {
   const openaiApiKey = ref<string>("");
   const anthropicApiKey = ref<string>("");
   const geminiApiKey = ref<string>("");
+  const customLlmApiKey = ref<string>("");
+  const customLlmBaseUrl = ref<string>("");
+  const customLlmModel = ref<string>("");
+  const selectedSttProviderId = ref<SttProviderId>(DEFAULT_STT_PROVIDER_ID);
+  const customSttApiKey = ref<string>("");
+  const customSttBaseUrl = ref<string>("");
+  const customSttModel = ref<string>("");
   const hasLlmApiKey = computed(() => {
     switch (selectedLlmProviderId.value) {
       case "groq":
@@ -136,6 +145,8 @@ export const useSettingsStore = defineStore("settings", () => {
         return anthropicApiKey.value !== "";
       case "gemini":
         return geminiApiKey.value !== "";
+      case "custom":
+        return customLlmApiKey.value !== "";
       default:
         // exhaustiveness：若 LlmProviderId 新增成員，這行會 type error
         selectedLlmProviderId.value satisfies never;
@@ -180,6 +191,51 @@ export const useSettingsStore = defineStore("settings", () => {
     return apiKey.value;
   }
 
+  function getActiveLlmModelId(): string {
+    if (selectedLlmProviderId.value === "custom") return customLlmModel.value.trim();
+    return selectedLlmModelId.value;
+  }
+
+  function getLlmBaseUrl(): string {
+    if (selectedLlmProviderId.value === "custom") return customLlmBaseUrl.value.trim();
+    return "";
+  }
+
+  function getSttApiKey(): string {
+    if (selectedSttProviderId.value === "custom") return customSttApiKey.value;
+    return apiKey.value;
+  }
+
+  function getActiveSttModelId(): string {
+    if (selectedSttProviderId.value === "custom") return customSttModel.value.trim();
+    return selectedWhisperModelId.value;
+  }
+
+  function getSttBaseUrl(): string {
+    if (selectedSttProviderId.value === "custom") return customSttBaseUrl.value.trim();
+    return "";
+  }
+
+  const hasSttApiKey = computed(() => getSttApiKey() !== "");
+
+  async function refreshSttApiKey() {
+    try {
+      const store = await load(STORE_NAME);
+      if (selectedSttProviderId.value === "custom") {
+        const savedKey = await store.get<string>("customSttApiKey");
+        customSttApiKey.value = savedKey?.trim() ?? "";
+      } else {
+        const savedApiKey = await store.get<string>("groqApiKey");
+        apiKey.value = savedApiKey?.trim() ?? "";
+      }
+    } catch (err) {
+      console.error(
+        "[useSettingsStore] refreshSttApiKey failed:",
+        extractErrorMessage(err),
+      );
+    }
+  }
+
   function getLlmApiKey(): string {
     switch (selectedLlmProviderId.value) {
       case "groq":
@@ -190,6 +246,8 @@ export const useSettingsStore = defineStore("settings", () => {
         return anthropicApiKey.value;
       case "gemini":
         return geminiApiKey.value;
+      case "custom":
+        return customLlmApiKey.value;
     }
   }
 
@@ -323,6 +381,12 @@ export const useSettingsStore = defineStore("settings", () => {
       anthropicApiKey.value = savedAnthropicApiKey?.trim() ?? "";
       const savedGeminiApiKey = await store.get<string>("geminiApiKey");
       geminiApiKey.value = savedGeminiApiKey?.trim() ?? "";
+      const savedCustomLlmApiKey = await store.get<string>("customLlmApiKey");
+      customLlmApiKey.value = savedCustomLlmApiKey?.trim() ?? "";
+      const savedCustomLlmBaseUrl = await store.get<string>("customLlmBaseUrl");
+      customLlmBaseUrl.value = savedCustomLlmBaseUrl?.trim() ?? "";
+      const savedCustomLlmModel = await store.get<string>("customLlmModel");
+      customLlmModel.value = savedCustomLlmModel?.trim() ?? "";
 
       // LLM Model ID（含 Kimi K2 遷移）
       const savedLlmModelId = await store.get<string>("llmModelId");
@@ -346,20 +410,30 @@ export const useSettingsStore = defineStore("settings", () => {
         selectedLlmModelId.value = effectiveLlmModelId;
       }
 
-      // model-provider 交叉驗證：防止 key 洩漏到錯誤 provider
-      const modelConfig = findLlmModelConfig(selectedLlmModelId.value);
-      if (modelConfig && modelConfig.providerId !== selectedLlmProviderId.value) {
-        selectedLlmModelId.value = getDefaultModelIdForProvider(
-          selectedLlmProviderId.value,
-        );
-        await store.set("llmModelId", selectedLlmModelId.value);
-        await store.save();
+      // model-provider 交叉驗證：防止 key 洩漏到錯誤 provider（custom 模型自由填寫，跳過驗證）
+      if (selectedLlmProviderId.value !== "custom") {
+        const modelConfig = findLlmModelConfig(selectedLlmModelId.value);
+        if (modelConfig && modelConfig.providerId !== selectedLlmProviderId.value) {
+          selectedLlmModelId.value = getDefaultModelIdForProvider(
+            selectedLlmProviderId.value,
+          );
+          await store.set("llmModelId", selectedLlmModelId.value);
+          await store.save();
+        }
       }
 
       const savedWhisperModelId = await store.get<string>("whisperModelId");
       selectedWhisperModelId.value = getEffectiveWhisperModelId(
         savedWhisperModelId ?? null,
       );
+      const savedSttProviderId = await store.get<SttProviderId>("sttProviderId");
+      selectedSttProviderId.value = savedSttProviderId ?? DEFAULT_STT_PROVIDER_ID;
+      const savedCustomSttApiKey = await store.get<string>("customSttApiKey");
+      customSttApiKey.value = savedCustomSttApiKey?.trim() ?? "";
+      const savedCustomSttBaseUrl = await store.get<string>("customSttBaseUrl");
+      customSttBaseUrl.value = savedCustomSttBaseUrl?.trim() ?? "";
+      const savedCustomSttModel = await store.get<string>("customSttModel");
+      customSttModel.value = savedCustomSttModel?.trim() ?? "";
 
       const savedMuteOnRecording = await store.get<boolean>("muteOnRecording");
       isMuteOnRecordingEnabled.value =
@@ -808,13 +882,19 @@ export const useSettingsStore = defineStore("settings", () => {
       const store = await load(STORE_NAME);
       await store.set("llmProviderId", providerId);
 
-      // 切換 provider 時重設為該 provider 預設模型
-      const defaultModelId = getDefaultModelIdForProvider(providerId);
-      await store.set("llmModelId", defaultModelId);
-      await store.save();
+      if (providerId === "custom") {
+        // custom 模型由使用者自由填寫，不重設 registry 選擇
+        await store.save();
+        selectedLlmProviderId.value = providerId;
+      } else {
+        // 切換 provider 時重設為該 provider 預設模型
+        const defaultModelId = getDefaultModelIdForProvider(providerId);
+        await store.set("llmModelId", defaultModelId);
+        await store.save();
 
-      selectedLlmProviderId.value = providerId;
-      selectedLlmModelId.value = defaultModelId;
+        selectedLlmProviderId.value = providerId;
+        selectedLlmModelId.value = defaultModelId;
+      }
 
       const payload: SettingsUpdatedPayload = {
         key: "llmProvider",
@@ -822,7 +902,7 @@ export const useSettingsStore = defineStore("settings", () => {
       };
       await emitEvent(SETTINGS_UPDATED, payload);
       console.log(
-        `[useSettingsStore] LLM provider saved: ${providerId}, model reset to: ${defaultModelId}`,
+        `[useSettingsStore] LLM provider saved: ${providerId}`,
       );
     } catch (err) {
       console.error(
@@ -951,6 +1031,141 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
+  async function saveCustomLlmApiKey(key: string) {
+    const trimmedKey = key.trim();
+    if (trimmedKey === "") {
+      throw new Error(i18n.global.t("errors.apiKeyEmpty"));
+    }
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("customLlmApiKey", trimmedKey);
+      await store.save();
+      customLlmApiKey.value = trimmedKey;
+      console.log("[useSettingsStore] Custom LLM API Key saved");
+    } catch (err) {
+      console.error("[useSettingsStore] saveCustomLlmApiKey failed:", extractErrorMessage(err));
+      captureError(err, { source: "settings", step: "save-custom-llm-api-key" });
+      throw err;
+    }
+  }
+
+  async function deleteCustomLlmApiKey() {
+    try {
+      const store = await load(STORE_NAME);
+      await store.delete("customLlmApiKey");
+      await store.save();
+      customLlmApiKey.value = "";
+      console.log("[useSettingsStore] Custom LLM API Key deleted");
+    } catch (err) {
+      console.error("[useSettingsStore] deleteCustomLlmApiKey failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function saveCustomLlmBaseUrl(url: string) {
+    const trimmed = url.trim();
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("customLlmBaseUrl", trimmed);
+      await store.save();
+      customLlmBaseUrl.value = trimmed;
+      await emitEvent(SETTINGS_UPDATED, { key: "customLlm", value: trimmed });
+      console.log("[useSettingsStore] Custom LLM base URL saved");
+    } catch (err) {
+      console.error("[useSettingsStore] saveCustomLlmBaseUrl failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function saveCustomLlmModel(model: string) {
+    const trimmed = model.trim();
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("customLlmModel", trimmed);
+      await store.save();
+      customLlmModel.value = trimmed;
+      await emitEvent(SETTINGS_UPDATED, { key: "customLlm", value: trimmed });
+      console.log("[useSettingsStore] Custom LLM model saved: " + trimmed);
+    } catch (err) {
+      console.error("[useSettingsStore] saveCustomLlmModel failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function saveSttProvider(providerId: SttProviderId) {
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("sttProviderId", providerId);
+      await store.save();
+      selectedSttProviderId.value = providerId;
+      await emitEvent(SETTINGS_UPDATED, { key: "sttProvider", value: providerId });
+      console.log("[useSettingsStore] STT provider saved: " + providerId);
+    } catch (err) {
+      console.error("[useSettingsStore] saveSttProvider failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function saveCustomSttApiKey(key: string) {
+    const trimmedKey = key.trim();
+    if (trimmedKey === "") {
+      throw new Error(i18n.global.t("errors.apiKeyEmpty"));
+    }
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("customSttApiKey", trimmedKey);
+      await store.save();
+      customSttApiKey.value = trimmedKey;
+      console.log("[useSettingsStore] Custom STT API Key saved");
+    } catch (err) {
+      console.error("[useSettingsStore] saveCustomSttApiKey failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function deleteCustomSttApiKey() {
+    try {
+      const store = await load(STORE_NAME);
+      await store.delete("customSttApiKey");
+      await store.save();
+      customSttApiKey.value = "";
+      console.log("[useSettingsStore] Custom STT API Key deleted");
+    } catch (err) {
+      console.error("[useSettingsStore] deleteCustomSttApiKey failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function saveCustomSttBaseUrl(url: string) {
+    const trimmed = url.trim();
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("customSttBaseUrl", trimmed);
+      await store.save();
+      customSttBaseUrl.value = trimmed;
+      await emitEvent(SETTINGS_UPDATED, { key: "customStt", value: trimmed });
+      console.log("[useSettingsStore] Custom STT base URL saved");
+    } catch (err) {
+      console.error("[useSettingsStore] saveCustomSttBaseUrl failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
+  async function saveCustomSttModel(model: string) {
+    const trimmed = model.trim();
+    try {
+      const store = await load(STORE_NAME);
+      await store.set("customSttModel", trimmed);
+      await store.save();
+      customSttModel.value = trimmed;
+      await emitEvent(SETTINGS_UPDATED, { key: "customStt", value: trimmed });
+      console.log("[useSettingsStore] Custom STT model saved: " + trimmed);
+    } catch (err) {
+      console.error("[useSettingsStore] saveCustomSttModel failed:", extractErrorMessage(err));
+      throw err;
+    }
+  }
+
   async function refreshLlmApiKey() {
     try {
       const store = await load(STORE_NAME);
@@ -973,6 +1188,15 @@ export const useSettingsStore = defineStore("settings", () => {
         case "gemini": {
           const savedKey = await store.get<string>("geminiApiKey");
           geminiApiKey.value = savedKey?.trim() ?? "";
+          break;
+        }
+        case "custom": {
+          const savedKey = await store.get<string>("customLlmApiKey");
+          customLlmApiKey.value = savedKey?.trim() ?? "";
+          const savedUrl = await store.get<string>("customLlmBaseUrl");
+          customLlmBaseUrl.value = savedUrl?.trim() ?? "";
+          const savedModel = await store.get<string>("customLlmModel");
+          customLlmModel.value = savedModel?.trim() ?? "";
           break;
         }
       }
@@ -1400,6 +1624,13 @@ export const useSettingsStore = defineStore("settings", () => {
       const savedOpenaiKey = await store.get<string>("openaiApiKey");
       const savedAnthropicKey = await store.get<string>("anthropicApiKey");
       const savedGeminiKey = await store.get<string>("geminiApiKey");
+      const savedCustomLlmKey = await store.get<string>("customLlmApiKey");
+      const savedCustomLlmUrl = await store.get<string>("customLlmBaseUrl");
+      const savedCustomLlmModel = await store.get<string>("customLlmModel");
+      const savedSttProviderId = await store.get<SttProviderId>("sttProviderId");
+      const savedCustomSttKey = await store.get<string>("customSttApiKey");
+      const savedCustomSttUrl = await store.get<string>("customSttBaseUrl");
+      const savedCustomSttModel = await store.get<string>("customSttModel");
       const savedMuteOnRecording = await store.get<boolean>("muteOnRecording");
       const savedSoundEffects = await store.get<boolean>("soundEffectsEnabled");
       const savedHideDockIcon = await store.get<boolean>("hideDockIcon");
@@ -1464,12 +1695,21 @@ export const useSettingsStore = defineStore("settings", () => {
       );
       const crossWindowModelConfig = findLlmModelConfig(effectiveCrossWindowModelId);
       selectedLlmModelId.value =
-        crossWindowModelConfig?.providerId === selectedLlmProviderId.value
+        selectedLlmProviderId.value === "custom"
           ? effectiveCrossWindowModelId
-          : getDefaultModelIdForProvider(selectedLlmProviderId.value);
+          : crossWindowModelConfig?.providerId === selectedLlmProviderId.value
+            ? effectiveCrossWindowModelId
+            : getDefaultModelIdForProvider(selectedLlmProviderId.value);
       openaiApiKey.value = savedOpenaiKey?.trim() ?? "";
       anthropicApiKey.value = savedAnthropicKey?.trim() ?? "";
       geminiApiKey.value = savedGeminiKey?.trim() ?? "";
+      customLlmApiKey.value = savedCustomLlmKey?.trim() ?? "";
+      customLlmBaseUrl.value = savedCustomLlmUrl?.trim() ?? "";
+      customLlmModel.value = savedCustomLlmModel?.trim() ?? "";
+      selectedSttProviderId.value = savedSttProviderId ?? DEFAULT_STT_PROVIDER_ID;
+      customSttApiKey.value = savedCustomSttKey?.trim() ?? "";
+      customSttBaseUrl.value = savedCustomSttUrl?.trim() ?? "";
+      customSttModel.value = savedCustomSttModel?.trim() ?? "";
       selectedWhisperModelId.value = getEffectiveWhisperModelId(
         savedWhisperModelId ?? null,
       );
@@ -1555,12 +1795,25 @@ export const useSettingsStore = defineStore("settings", () => {
     selectedLlmProviderId,
     selectedLlmModelId,
     selectedWhisperModelId,
+    selectedSttProviderId,
     hasLlmApiKey,
+    hasSttApiKey,
     openaiApiKey: computed(() => openaiApiKey.value),
     anthropicApiKey: computed(() => anthropicApiKey.value),
     geminiApiKey: computed(() => geminiApiKey.value),
+    customLlmApiKey: computed(() => customLlmApiKey.value),
+    customLlmBaseUrl: computed(() => customLlmBaseUrl.value),
+    customLlmModel: computed(() => customLlmModel.value),
+    customSttApiKey: computed(() => customSttApiKey.value),
+    customSttBaseUrl: computed(() => customSttBaseUrl.value),
+    customSttModel: computed(() => customSttModel.value),
     getApiKey,
     getLlmApiKey,
+    getActiveLlmModelId,
+    getLlmBaseUrl,
+    getSttApiKey,
+    getActiveSttModelId,
+    getSttBaseUrl,
     getAiPrompt,
     savePromptMode,
     consumeUpgradeNotice,
@@ -1596,7 +1849,17 @@ export const useSettingsStore = defineStore("settings", () => {
     deleteAnthropicApiKey,
     saveGeminiApiKey,
     deleteGeminiApiKey,
+    saveCustomLlmApiKey,
+    deleteCustomLlmApiKey,
+    saveCustomLlmBaseUrl,
+    saveCustomLlmModel,
+    saveSttProvider,
+    saveCustomSttApiKey,
+    deleteCustomSttApiKey,
+    saveCustomSttBaseUrl,
+    saveCustomSttModel,
     refreshLlmApiKey,
+    refreshSttApiKey,
     saveWhisperModel,
     isMuteOnRecordingEnabled,
     saveMuteOnRecording,

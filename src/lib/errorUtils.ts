@@ -98,10 +98,22 @@ export function getEnhancementErrorMessage(error: unknown): string {
       return t("errors.enhancement.modelDecommissioned");
     }
     const status = error.statusCode;
-    if (status === 401) return t("errors.enhancement.invalidApiKey");
-    if (status === 429) return t("errors.enhancement.rateLimited");
-    if (status === 400) return t("errors.enhancement.badRequest");
-    if (status >= 500) return t("errors.enhancement.serviceUnavailable");
+    const mappedBase =
+      status === 401
+        ? t("errors.enhancement.invalidApiKey")
+        : status === 429
+          ? t("errors.enhancement.rateLimited")
+          : status === 400
+            ? t("errors.enhancement.badRequest")
+            : status >= 500
+              ? t("errors.enhancement.serviceUnavailable")
+              : null;
+    // 已映射的狀態碼也附上 HTTP code，自訂端點除錯時一眼可見
+    if (mappedBase) return `${mappedBase} (HTTP ${status})`;
+    // 未映射的狀態碼（如 402/403/404）：附上狀態碼與回應 body 摘要
+    //（EnhancerApiError 的 message 不含 body，必須顯式取用）
+    const bodySnippet = truncateErrorDetail(error.body);
+    return `${t("errors.enhancement.failed")} (HTTP ${status}${bodySnippet ? `: ${bodySnippet}` : ""})`;
   }
 
   if (error instanceof Error) {
@@ -114,7 +126,17 @@ export function getEnhancementErrorMessage(error: unknown): string {
     }
   }
 
-  return t("errors.enhancement.failed");
+  // 兜底：附上原始錯誤摘要（狀態碼／回應片段），自訂端點除錯時才看得出原因
+  return `${t("errors.enhancement.failed")}: ${truncateErrorDetail(extractErrorMessage(error))}`;
+}
+
+/**
+ * 錯誤詳情摘要：壓縮空白、截斷，避免把整頁 HTML 灌進 UI。
+ */
+export function truncateErrorDetail(message: string, maxLength = 160): string {
+  const collapsed = message.replace(/\s+/g, " ").trim();
+  if (collapsed.length <= maxLength) return collapsed;
+  return `${collapsed.slice(0, maxLength)}…`;
 }
 
 const HOTKEY_ERROR_KEY_MAP: Record<string, string> = {

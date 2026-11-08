@@ -105,10 +105,11 @@ export async function analyzeCorrections(
   pastedText: string,
   fieldText: string,
   apiKey: string,
-  options?: { modelId?: string },
+  options?: { modelId?: string; providerId?: string; baseUrl?: string },
 ): Promise<VocabularyAnalysisResult> {
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
-  const providerId = getProviderIdForModel(modelId);
+  const providerId = (options?.providerId ??
+    getProviderIdForModel(modelId)) as Parameters<typeof getProviderTimeout>[0];
 
   const request: LlmChatRequest = {
     model: modelId,
@@ -123,7 +124,7 @@ export async function analyzeCorrections(
     maxTokens: 256,
   };
 
-  const { url, init } = buildFetchParams(providerId, request, apiKey);
+  const { url, init } = buildFetchParams(providerId, request, apiKey, options?.baseUrl);
 
   const timeoutMs = getProviderTimeout(providerId);
   const controller = new AbortController();

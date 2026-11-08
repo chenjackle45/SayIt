@@ -77,7 +77,8 @@
       "anthropic": "Anthropic",
       "gemini": "Google Gemini (Free Quota)",
       "groqNote": "Uses the Groq API Key from Speech to Text (set)",
-      "groqNoteNotSet": "Uses the Groq API Key from Speech to Text (not set yet — add it in the Speech to Text card above)"
+      "groqNoteNotSet": "Uses the Groq API Key from Speech to Text (not set yet — add it in the Speech to Text card above)",
+      "custom": "Custom (OpenAI-compatible)"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -226,6 +227,23 @@
     },
     "llm": {
       "title": "Text Enhancement"
+    },
+    "sttProvider": {
+      "title": "Speech Service",
+      "groq": "Groq (Free)",
+      "custom": "Custom (OpenAI-compatible)",
+      "description": "Select the speech transcription service. Custom endpoints must be OpenAI-compatible (/audio/transcriptions).",
+      "updated": "Speech service updated"
+    },
+    "custom": {
+      "baseUrlLabel": "API Base URL",
+      "baseUrlHint": "Enter a host or base path; /chat/completions or /audio/transcriptions is appended automatically. Local http servers must use localhost.",
+      "apiKeyLabel": "API Key",
+      "apiKeyPlaceholder": "sk-... (any text works for local servers without auth)",
+      "apiKeyHint": "Stored only on this device. Local servers without auth accept any text.",
+      "modelLabel": "Model ID",
+      "modelPlaceholder": "Exact model ID from your provider",
+      "modelHint": "Enter the exact model ID provided by your API service."
     }
   },
   "dashboard": {

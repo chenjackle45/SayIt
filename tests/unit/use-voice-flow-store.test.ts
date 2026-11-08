@@ -87,6 +87,7 @@ const {
       isEnhancementThresholdEnabled: true,
       enhancementThresholdCharCount: 10,
       selectedLlmModelId: "llama-3.3-70b-versatile",
+      selectedLlmProviderId: "groq",
       selectedWhisperModelId: "whisper-large-v3",
       isMuteOnRecordingEnabled: false,
       isSoundEffectsEnabled: true,
@@ -179,6 +180,12 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
     loadSettings: mockLoadSettings,
     getApiKey: () => mockSettingsState.apiKey,
     getLlmApiKey: () => mockSettingsState.apiKey,
+    getSttApiKey: () => mockSettingsState.apiKey,
+    refreshSttApiKey: vi.fn().mockResolvedValue(undefined),
+    getActiveSttModelId: () => mockSettingsState.selectedWhisperModelId,
+    getSttBaseUrl: () => "",
+    getActiveLlmModelId: () => mockSettingsState.selectedLlmModelId,
+    getLlmBaseUrl: () => "",
     getAiPrompt: () => mockSettingsState.aiPrompt,
     refreshApiKey: vi.fn().mockResolvedValue(undefined),
     refreshLlmApiKey: vi.fn().mockResolvedValue(undefined),
@@ -193,6 +200,9 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
     },
     get selectedLlmModelId() {
       return mockSettingsState.selectedLlmModelId;
+    },
+    get selectedLlmProviderId() {
+      return mockSettingsState.selectedLlmProviderId;
     },
     get selectedWhisperModelId() {
       return mockSettingsState.selectedWhisperModelId;
@@ -459,6 +469,7 @@ describe("useVoiceFlowStore", () => {
       apiKey: "test-api-key-123",
       vocabularyTermList: null,
       modelId: "whisper-large-v3",
+      baseUrl: null,
       language: "zh",
     });
     expect(store.status).toBe("success");
@@ -1659,6 +1670,7 @@ describe("useVoiceFlowStore", () => {
         apiKey: "test-api-key-123",
         vocabularyTermList: ["TypeScript", "Tauri"],
         modelId: "whisper-large-v3",
+        baseUrl: null,
         language: "zh",
       });
     });
@@ -1688,6 +1700,7 @@ describe("useVoiceFlowStore", () => {
         apiKey: "test-api-key-123",
         vocabularyTermList: null,
         modelId: "whisper-large-v3",
+        baseUrl: null,
         language: "zh",
       });
     });
@@ -1749,6 +1762,7 @@ describe("useVoiceFlowStore", () => {
         apiKey: "test-api-key-123",
         vocabularyTermList: ["Pinia", "Vitest"],
         modelId: "whisper-large-v3",
+        baseUrl: null,
         language: "zh",
       });
 

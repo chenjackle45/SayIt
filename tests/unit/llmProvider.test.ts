@@ -5,6 +5,7 @@ import {
   getProviderTimeout,
   findProviderConfig,
   getProviderIdForModel,
+  isOpencodeGoEndpoint,
   type LlmChatRequest,
 } from "../../src/lib/llmProvider";
 
@@ -356,6 +357,62 @@ describe("llmProvider.ts", () => {
 
     it("[P1] getProviderIdForModel 未知模型 fallback 到 groq", () => {
       expect(getProviderIdForModel("unknown-model-xyz")).toBe("groq");
+    });
+  });
+
+  describe("opencode Go 相容", () => {
+    it("[P0] custom + opencode 端點自動帶 x-opencode-session（不帶 UA，避免瀏覽器 forbidden header 風險）", () => {
+      const { url, init } = buildFetchParams(
+        "custom",
+        BASE_REQUEST,
+        TEST_API_KEY,
+        "https://opencode.ai/zen/go/v1",
+      );
+      expect(url).toBe("https://opencode.ai/zen/go/v1/chat/completions");
+      const headers = init.headers as Record<string, string>;
+      expect(headers["x-opencode-session"]).toBeTruthy();
+      expect(headers["User-Agent"]).toBeUndefined();
+    });
+
+    it("[P0] session ID 跨請求保持穩定（localStorage 持久化）", () => {
+      const a = buildFetchParams(
+        "custom",
+        BASE_REQUEST,
+        TEST_API_KEY,
+        "https://opencode.ai/zen/go/v1",
+      );
+      const b = buildFetchParams(
+        "custom",
+        BASE_REQUEST,
+        TEST_API_KEY,
+        "https://opencode.ai/zen/go/v1/",
+      );
+      expect(
+        (a.init.headers as Record<string, string>)["x-opencode-session"],
+      ).toBe((b.init.headers as Record<string, string>)["x-opencode-session"]);
+    });
+
+    it("[P1] 非 opencode 端點不帶 session header", () => {
+      const { init } = buildFetchParams(
+        "custom",
+        BASE_REQUEST,
+        TEST_API_KEY,
+        "https://api.deepseek.com/v1",
+      );
+      const headers = init.headers as Record<string, string>;
+      expect(headers["x-opencode-session"]).toBeUndefined();
+      expect(headers["User-Agent"]).toBeUndefined();
+    });
+
+    it("[P1] groq 等固定端點不受影響", () => {
+      const { init } = buildFetchParams("groq", BASE_REQUEST, TEST_API_KEY);
+      const headers = init.headers as Record<string, string>;
+      expect(headers["x-opencode-session"]).toBeUndefined();
+    });
+
+    it("[P1] isOpencodeGoEndpoint 大小寫不敏感", () => {
+      expect(isOpencodeGoEndpoint("https://OPENCODE.AI/zen/go/v1")).toBe(true);
+      expect(isOpencodeGoEndpoint("https://api.groq.com/openai/v1")).toBe(false);
     });
   });
 });

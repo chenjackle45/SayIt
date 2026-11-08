@@ -729,16 +729,16 @@ export const useHistoryStore = defineStore("history", () => {
     const settingsStore = useSettingsStore();
     const vocabularyStore = useVocabularyStore();
 
-    if (!settingsStore.getApiKey()) {
-      await settingsStore.refreshApiKey();
+    if (!settingsStore.getSttApiKey()) {
+      await settingsStore.refreshSttApiKey();
     }
-    const apiKey = settingsStore.getApiKey();
+    const apiKey = settingsStore.getSttApiKey();
     if (!apiKey) {
       return { ok: false, errorKey: "errors.apiKeyMissing" };
     }
 
     const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
-    const model = settingsStore.selectedWhisperModelId;
+    const model = settingsStore.getActiveSttModelId();
 
     let result: TranscriptionResult;
     try {
@@ -748,6 +748,7 @@ export const useHistoryStore = defineStore("history", () => {
         vocabularyTermList:
           whisperTermList.length > 0 ? whisperTermList : null,
         modelId: model,
+        baseUrl: settingsStore.getSttBaseUrl() || null,
         language: settingsStore.getWhisperLanguageCode(),
       });
     } catch (err) {
@@ -865,7 +866,9 @@ export const useHistoryStore = defineStore("history", () => {
         {
           systemPrompt: settingsStore.getAiPrompt(),
           vocabularyTermList: termList.length > 0 ? termList : undefined,
-          modelId: settingsStore.selectedLlmModelId,
+          modelId: settingsStore.getActiveLlmModelId(),
+          providerId: settingsStore.selectedLlmProviderId,
+          baseUrl: settingsStore.getLlmBaseUrl(),
           transcriptLocale: getEffectiveTranscriptLocale(settingsStore),
         },
       );
@@ -880,7 +883,7 @@ export const useHistoryStore = defineStore("history", () => {
     recordChatUsage(
       record.id,
       enhanceResult.usage,
-      settingsStore.selectedLlmModelId,
+      settingsStore.getActiveLlmModelId(),
     );
 
     // 空回應（LLM 回空、enhanceText 退回原文）→ 不是整理結果，保留既有 processed_text

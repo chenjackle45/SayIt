@@ -11,6 +11,13 @@ const h = vi.hoisted(() => {
   const settingsStub = {
     getApiKey: () => "whisper-key",
     refreshApiKey: vi.fn(),
+    getSttApiKey: () => "whisper-key",
+    refreshSttApiKey: vi.fn(),
+    getActiveSttModelId: () => "whisper-large-v3-turbo",
+    getSttBaseUrl: () => "",
+    getActiveLlmModelId: () => "llama-3.3-70b-versatile",
+    getLlmBaseUrl: () => "",
+    selectedLlmProviderId: "groq",
     selectedWhisperModelId: "whisper-large-v3-turbo",
     getWhisperLanguageCode: () => "zh",
     selectedTranscriptionLocale: "en",

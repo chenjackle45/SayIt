@@ -40,6 +40,15 @@ export const LLM_PROVIDER_LIST: LlmProviderConfig[] = [
     consoleUrl: "https://console.anthropic.com/settings/keys",
     apiKeyPrefix: "sk-ant-",
   },
+  {
+    id: "custom",
+    displayName: "Custom",
+    // 自訂端點相容 OpenAI Chat Completions 格式；baseUrl 由使用者填寫，
+    // 實際請求 URL 經 resolveCustomChatUrl 規範化後產生。
+    baseUrl: "",
+    consoleUrl: "",
+    apiKeyPrefix: "",
+  },
 ];
 
 export function findProviderConfig(
@@ -55,6 +64,7 @@ const PROVIDER_TIMEOUT_MS: Record<LlmProviderId, number> = {
   openai: 30_000,
   anthropic: 30_000,
   gemini: 30_000,
+  custom: 30_000,
 };
 
 export function getProviderTimeout(providerId: LlmProviderId): number {
@@ -69,6 +79,7 @@ const PROVIDER_DEFAULT_MAX_TOKENS: Record<LlmProviderId, number> = {
   openai: 16384,
   anthropic: 8192,
   gemini: 16384,
+  custom: 16384,
 };
 
 export function getDefaultMaxTokens(providerId: LlmProviderId): number {
@@ -109,11 +120,65 @@ export function getProviderIdForModel(modelId: string): LlmProviderId {
   return findLlmModelConfig(modelId)?.providerId ?? "groq";
 }
 
+/**
+ * 規範化自訂 Chat 端點 URL：
+ * - 去除首尾空白與尾端斜線
+ * - 無 scheme 時補 https://
+ * - 無 /chat/completions 尾綴時自動補上（相容只填 host 或 /v1 的寫法）
+ * 空字串時丟錯（呼叫端應先檢查並禁用按鈕）。
+ */
+export function resolveCustomChatUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  if (!trimmed) {
+    throw new Error("Custom API base URL is empty");
+  }
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  const withoutSlash = withScheme.replace(/\/+$/, "");
+  return withoutSlash.endsWith("/chat/completions")
+    ? withoutSlash
+    : `${withoutSlash}/chat/completions`;
+}
+
+// ── OpenCode Go 相容 ──────────────────────────────────────
+// opencode.ai/zen/go 端點要求每個請求帶 x-opencode-session（stable session ID，
+// 否則回 400 MissingSessionID；見 https://opencode.ai/docs/console/go/
+// 「Where can I use it?」）。自訂端點偵測到 opencode.ai host 時自動補上；
+// session ID 以 localStorage 持久化、同一個安裝共用，符合「stable」要求。
+const OPENCODE_SESSION_STORAGE_KEY = "sayit.opencodeSessionId";
+
+export function isOpencodeGoEndpoint(url: string): boolean {
+  return url.toLowerCase().includes("opencode.ai");
+}
+
+export function getOrCreateOpencodeSessionId(): string {
+  try {
+    if (typeof localStorage !== "undefined") {
+      const existing = localStorage.getItem(OPENCODE_SESSION_STORAGE_KEY);
+      if (existing) return existing;
+      const created = crypto.randomUUID();
+      localStorage.setItem(OPENCODE_SESSION_STORAGE_KEY, created);
+      return created;
+    }
+  } catch {
+    // localStorage 不可用（單測 node 環境／隱私模式）時退回單次隨機 ID
+  }
+  return crypto.randomUUID();
+}
+
 export function buildFetchParams(
   providerId: LlmProviderId,
   request: LlmChatRequest,
   apiKey: string,
+  customBaseUrl?: string,
 ): { url: string; init: RequestInit } {
+  if (providerId === "custom") {
+    // 自訂端點走 OpenAI-compatible 組裝（不套用任何 provider 專屬欄位）
+    const url = resolveCustomChatUrl(customBaseUrl ?? "");
+    return buildOpenAiCompatibleFetchParams(providerId, url, request, apiKey);
+  }
+
   const providerConfig = findProviderConfig(providerId);
   const url = providerConfig?.baseUrl ?? LLM_PROVIDER_LIST[0].baseUrl;
 
@@ -166,14 +231,19 @@ function buildOpenAiCompatibleFetchParams(
     }
   }
 
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+  };
+  if (isOpencodeGoEndpoint(url)) {
+    headers["x-opencode-session"] = getOrCreateOpencodeSessionId();
+  }
+
   return {
     url,
     init: {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify(body),
     },
   };

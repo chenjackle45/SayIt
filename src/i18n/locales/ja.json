@@ -77,7 +77,8 @@
       "anthropic": "Anthropic",
       "gemini": "Google Gemini（無料枠あり）",
       "groqNote": "音声文字起こしの Groq API Key を使用（設定済み）",
-      "groqNoteNotSet": "音声文字起こしの Groq API Key を使用（未設定。上の「音声文字起こし」で入力してください）"
+      "groqNoteNotSet": "音声文字起こしの Groq API Key を使用（未設定。上の「音声文字起こし」で入力してください）",
+      "custom": "カスタム（OpenAI互換）"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -226,6 +227,23 @@
     },
     "llm": {
       "title": "文章整形"
+    },
+    "sttProvider": {
+      "title": "音声サービス",
+      "groq": "Groq（無料）",
+      "custom": "カスタム（OpenAI互換）",
+      "description": "音声文字起こしサービスを選択。カスタムエンドポイントはOpenAI互換（/audio/transcriptions）である必要があります。",
+      "updated": "音声サービスを更新しました"
+    },
+    "custom": {
+      "baseUrlLabel": "APIベースURL",
+      "baseUrlHint": "ホストまたはベースパスを入力。/chat/completions・/audio/transcriptionsは自動補完されます。ローカルのhttpサーバーはlocalhostを使用してください。",
+      "apiKeyLabel": "APIキー",
+      "apiKeyPlaceholder": "sk-...（認証なしのローカルサーバーは任意の文字で可）",
+      "apiKeyHint": "このデバイスにのみ保存されます。認証なしのローカルサーバーは任意の文字で構いません。",
+      "modelLabel": "モデルID",
+      "modelPlaceholder": "プロバイダーが提供する正確なモデルID",
+      "modelHint": "プロバイダーが提供する正確なモデルIDを入力してください。"
     }
   },
   "dashboard": {

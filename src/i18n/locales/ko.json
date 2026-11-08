@@ -77,7 +77,8 @@
       "anthropic": "Anthropic",
       "gemini": "Google Gemini (무료 할당량)",
       "groqNote": "음성 인식의 Groq API Key 사용(설정됨)",
-      "groqNoteNotSet": "음성 인식의 Groq API Key 사용(아직 미설정, 위 「음성 인식」에서 먼저 입력하세요)"
+      "groqNoteNotSet": "음성 인식의 Groq API Key 사용(아직 미설정, 위 「음성 인식」에서 먼저 입력하세요)",
+      "custom": "사용자 지정(OpenAI 호환)"
     },
     "providerApiKey": {
       "openaiTitle": "OpenAI API Key",
@@ -226,6 +227,23 @@
     },
     "llm": {
       "title": "텍스트 정리"
+    },
+    "sttProvider": {
+      "title": "음성 서비스",
+      "groq": "Groq(무료)",
+      "custom": "사용자 지정(OpenAI 호환)",
+      "description": "음성 전사 서비스를 선택하세요. 사용자 지정 엔드포인트는 OpenAI 호환(/audio/transcriptions)이어야 합니다.",
+      "updated": "음성 서비스가 업데이트되었습니다"
+    },
+    "custom": {
+      "baseUrlLabel": "API 베이스 URL",
+      "baseUrlHint": "호스트 또는 베이스 경로를 입력하세요. /chat/completions·/audio/transcriptions는 자동 완성됩니다. 로컬 http 서버는 localhost를 사용하세요.",
+      "apiKeyLabel": "API 키",
+      "apiKeyPlaceholder": "sk-...(인증 없는 로컬 서버는 아무 문자나 가능)",
+      "apiKeyHint": "이 기기에만 저장됩니다. 인증 없는 로컬 서버는 아무 문자나 입력하세요.",
+      "modelLabel": "모델 ID",
+      "modelPlaceholder": "제공업체가 제공한 정확한 모델 ID",
+      "modelHint": "제공업체가 제공한 정확한 모델 ID를 입력하세요."
     }
   },
   "dashboard": {

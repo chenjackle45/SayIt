@@ -47,6 +47,10 @@ export interface EnhanceOptions {
    * （zh-TW／yue → 簡轉繁，#83）。編輯模式、連線測試不傳。
    */
   transcriptLocale?: string;
+  /** 自訂端點用：顯式 provider（custom 不在 registry，反查不到時由呼叫端傳入）。 */
+  providerId?: string;
+  /** 自訂端點用：使用者填寫的 base URL。 */
+  baseUrl?: string;
 }
 
 async function withTimeout<T>(
@@ -121,7 +125,8 @@ export async function enhanceText(
   }
 
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
-  const providerId = getProviderIdForModel(modelId);
+  const providerId = (options?.providerId ??
+    getProviderIdForModel(modelId)) as Parameters<typeof getDefaultMaxTokens>[0];
 
   const basePrompt = options?.systemPrompt || getDefaultSystemPrompt();
   const fullPrompt = buildSystemPrompt(basePrompt, options?.vocabularyTermList);
@@ -136,7 +141,7 @@ export async function enhanceText(
     maxTokens: options?.maxTokens ?? getDefaultMaxTokens(providerId),
   };
 
-  const { url, init } = buildFetchParams(providerId, request, apiKey);
+  const { url, init } = buildFetchParams(providerId, request, apiKey, options?.baseUrl);
 
   const response = await withTimeout(
     fetch(url, {
