@@ -24,6 +24,10 @@ Gemini 不在本輪範圍（使用者收窄為 OpenAI＋Anthropic＋Groq）；�
 
 - **A. Haiku 5.5**：帶 `temperature: 0.1` → 400「`temperature` is deprecated for this model」；不關 thinking → 200 但**推理文字混進 text 區塊**（先輸出簡體，再寫 "Wait, I should match…"）；`thinking: {type: "disabled"}`＋不送 temperature → 200、繁中正確、約 1.1 秒。Haiku 4.5 現行請求（含 temperature 0.1）→ 200。
 - **B. OpenAI**：`GET /v1/models/gpt-6-luna` → 200、`shutdown_date: null`；官方模型頁寫 Chat Completions Supported、`reasoning.effort` 支援 `none`。**整理請求未實測**：帳戶額度用盡（429 `credit_balance_exhausted`），儲值後須重跑探針才可發版。
+- **B2. OpenAI 補測（2026-11-13，使用者換另一把 key）**：同 C 的 8 種情境 × 兩模型，16/16 HTTP 200，延遲 0.9–4.9 秒（逾時 30 秒）
+  - gpt-6-luna：精簡版問句型改寫成信件口吻（「老闆您好，我明天要請假。請問…」，內容未丟）；積極版中英夾雜漏「deploy 的 pipeline」；其餘 6 筆正常
+  - gpt-5.6-luna（舊預設）：精簡版問句型**直接寫出整封信**（含「主旨：」，長度 1.46 倍）；其餘 7 筆正常
+  - 判定：6-luna 當預設不劣於現狀（最嚴重的回答行為舊預設更明顯）、價格一半 → 維持拍板，程式不改
 - **C. Groq**（App 內建 zh-TW 精簡版／積極版指示 × 短句／問句型／中英夾雜／長文，共 8 筆／模型）：
   - gpt-oss-120b：積極版問句型**拒答**（「抱歉，我只能協助校對…」）；精簡版中英夾雜**漏前半句**；延遲 0.3–1.1 秒
   - qwen3.8-27b：8/8 正常，品質與 qwen3.6 相當，延遲 0.24–0.67 秒（逾時 5 秒）
@@ -53,4 +57,4 @@ Gemini 不在本輪範圍（使用者收窄為 OpenAI＋Anthropic＋Groq）；�
 ## 驗收
 
 - `pnpm test`、`vue-tsc --noEmit`、eslint 全綠
-- 發版前：OpenAI 儲值後以 `gpt-6-luna` 跑整理探針 → 200 且輸出正確
+- ~~發版前：OpenAI 儲值後以 `gpt-6-luna` 跑整理探針 → 200 且輸出正確~~ ✅ 2026-11-13 已補測（見 B2）
