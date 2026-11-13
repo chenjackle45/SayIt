@@ -33,6 +33,22 @@ Gemini 不在本輪範圍（使用者收窄為 OpenAI＋Anthropic＋Groq）；�
   - qwen3.8-27b：8/8 正常，品質與 qwen3.6 相當，延遲 0.24–0.67 秒（逾時 5 秒）
   - 使用者的 key 呼叫 qwen3.6 仍回 200（非免費層），免費層是否已失效未驗
 
+## 追加：Gemini（2026-11-13 使用者追加範圍）
+
+使用者追加「Gemini 也要更新、顯示的模型名稱也要更新」。
+
+- 官方頁（aistudio.google.com/docs）：`gemini-3.5-flash` 已不在 AI Studio、端點自動轉 `gemini-3.6-flash`；`gemini-3.1-flash-lite` 最早 2027-05-07 退役、替代 `gemini-3.5-flash-lite`；3.6-flash $0.75/$3.75、**2027-01-01 起 $1.50/$7.50**；3.5-flash-lite $0.30/$2.50；四者皆 Stable、有免費層；`gemini-3.8-flash` 不支援 MINIMAL thinking
+- 實測（D，同 C 的 8 種情境 × 4 模型，請求照 llmProvider 的 generateContent 格式、逾時 30 秒）：
+  - 3.8-flash（LOW）：0/8，全部 503「high demand」
+  - 3.6-flash（MINIMAL）：7/8，品質好；延遲不穩，出現 19 秒、28 秒與一筆 30 秒逾時
+  - 3.5-flash-lite（MINIMAL）：8/8，0.7–2.1 秒，無回答行為（小瑕疵：一筆留「呃」、一筆未補標點）
+  - 3.1-flash-lite（MINIMAL，現有）：8/8，但兩筆問句型直接寫成信件，延遲最慢 13 秒
+- 拍板：`gemini-3.5-flash-lite`（預設、full）＋`gemini-3.6-flash`（limited，沿用 3.5-flash 分類）；3.5-flash → 3.6-flash、3.1-flash-lite → 3.5-flash-lite 遷移
+- 代決：3.6-flash 價格登錄 2027 起的 $1.50/$7.50（出貨後多數時間在漲價後、費用上限寧可高估）；要改回現價改 registry 兩個數字即可
+- 顯示名稱：registry 的 `displayName` 是 App 唯一的模型名稱來源；全部對齊官方寫法（Gemini 官方 models 頁寫「Flash-Lite」、OpenAI「GPT-6 Luna」、Anthropic「Claude Haiku 5.5」、Groq「GPT OSS 120B」；Qwen 保留「Qwen3.8 27B (Preview)」以標示 preview）
+- thinking 參數不需改：兩顆都支援 MINIMAL，沿用 `gemini-3` 前綴判斷
+- apiPricing fallback 常數 $9/M 仍 ≥ registry 最大值（3.6-flash $7.5），只更正註解
+
 ## 改動
 
 1. `src/lib/modelRegistry.ts`
