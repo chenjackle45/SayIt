@@ -56,22 +56,22 @@ describe("apiPricing.ts", () => {
     });
 
     it("[P0] 1000 tokens 應按 output 價格上限計算", () => {
-      // 預設模型 Qwen3.6 27B: max(input=0.60, output=3.00) = 3.00/M
-      // 1000 * 0.000003 = 0.003
+      // 預設模型 Qwen3.8 27B: max(input=0.80, output=4.00) = 4.00/M
+      // 1000 * 0.000004 = 0.004
       const cost = calculateChatCostCeiling(1000);
-      expect(cost).toBeCloseTo(0.003, 6);
+      expect(cost).toBeCloseTo(0.004, 6);
     });
 
-    it("[P0] 1M tokens 應回傳 $3.00", () => {
-      // 預設模型 Qwen3.6 27B: 1M * 3.00/M = 3.00
+    it("[P0] 1M tokens 應回傳 $4.00", () => {
+      // 預設模型 Qwen3.8 27B: 1M * 4.00/M = 4.00
       const cost = calculateChatCostCeiling(1_000_000);
-      expect(cost).toBeCloseTo(3.0, 4);
+      expect(cost).toBeCloseTo(4.0, 4);
     });
 
     it("[P1] 150 tokens 應正確計算", () => {
-      // 預設模型 Qwen3.6 27B: 150 * 0.000003 = 0.00045
+      // 預設模型 Qwen3.8 27B: 150 * 0.000004 = 0.0006
       const cost = calculateChatCostCeiling(150);
-      expect(cost).toBeCloseTo(0.00045, 6);
+      expect(cost).toBeCloseTo(0.0006, 6);
     });
 
     it("[P1] 未知 model id 應以全 registry 最貴 output 價當上限", () => {

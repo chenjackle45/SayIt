@@ -79,7 +79,7 @@ describe("llmProvider.ts", () => {
     it("[P0] Groq qwen：reasoning_effort none 關閉思考模式", () => {
       const qwenRequest: LlmChatRequest = {
         ...BASE_REQUEST,
-        model: "qwen/qwen3.6-27b",
+        model: "qwen/qwen3.8-27b",
       };
       const { init } = buildFetchParams("groq", qwenRequest, TEST_API_KEY);
       const body = JSON.parse(init.body as string);
@@ -128,6 +128,31 @@ describe("llmProvider.ts", () => {
       expect(body.system).toBe("You are a helper");
       expect(body.messages).toHaveLength(1);
       expect(body.messages[0].role).toBe("user");
+    });
+
+    it("[P0] Anthropic Haiku 5.x：不送 temperature、關閉 thinking", () => {
+      // 實測：Haiku 5.5 帶 temperature 回 400；不關 thinking 會把推理文字混進輸出
+      const { init } = buildFetchParams(
+        "anthropic",
+        { ...BASE_REQUEST, model: "claude-haiku-5-5" },
+        TEST_API_KEY,
+      );
+      const body = JSON.parse(init.body as string);
+
+      expect(body.temperature).toBeUndefined();
+      expect(body.thinking).toEqual({ type: "disabled" });
+    });
+
+    it("[P0] Anthropic Haiku 4.5：照舊送 temperature、不帶 thinking", () => {
+      const { init } = buildFetchParams(
+        "anthropic",
+        { ...BASE_REQUEST, model: "claude-haiku-4-5-20251001" },
+        TEST_API_KEY,
+      );
+      const body = JSON.parse(init.body as string);
+
+      expect(body.temperature).toBe(0.1);
+      expect(body.thinking).toBeUndefined();
     });
 
     it("[P0] Anthropic：max_tokens 必填，未提供時預設 8192", () => {
@@ -348,7 +373,7 @@ describe("llmProvider.ts", () => {
     });
 
     it("[P0] getProviderIdForModel 根據 modelId 回傳 providerId", () => {
-      expect(getProviderIdForModel("qwen/qwen3.6-27b")).toBe("groq");
+      expect(getProviderIdForModel("qwen/qwen3.8-27b")).toBe("groq");
       expect(getProviderIdForModel("gpt-5.6-luna")).toBe("openai");
       expect(getProviderIdForModel("claude-haiku-4-5-20251001")).toBe("anthropic");
       expect(getProviderIdForModel("gemini-3.5-flash")).toBe("gemini");

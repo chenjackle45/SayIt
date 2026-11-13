@@ -204,7 +204,11 @@ function buildAnthropicFetchParams(
     max_tokens: request.maxTokens ?? getDefaultMaxTokens("anthropic"),
   };
   if (systemPrompt) body.system = systemPrompt;
-  if (request.temperature !== undefined) {
+  if (request.model.startsWith("claude-haiku-5")) {
+    // Haiku 5.x：送 temperature 回 400（2026-11-13 真 key 實測）；預設開啟的
+    // adaptive thinking 會把推理文字混進 text 區塊，必須關閉
+    body.thinking = { type: "disabled" };
+  } else if (request.temperature !== undefined) {
     body.temperature = request.temperature;
   }
 
