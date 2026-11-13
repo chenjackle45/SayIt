@@ -441,7 +441,9 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Recording a custom trigger key on Windows no longer requires clicking another window first — with the SayIt window in front, nothing used to register; now you can press the key right in SayIt",
+      "item1": "Triggering with Alt or Shift on Windows no longer types a stray C — selected text now enters Edit mode as expected, and pasting no longer opens the menu bar",
+      "item2": "More reliable AI cleanup — speaking Chinese is no longer flagged as \"too different\" or translated into the interface language, and words you add to the dictionary yourself now take priority",
+      "item3": "Updated AI model list — Groq and Gemini now default to newer models, and if your chosen model was retired you're moved to a replacement from the same provider; OpenAI and Anthropic gain newer, cheaper models",
       "dismiss": "Got it"
     }
   },

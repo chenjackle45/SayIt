@@ -2,6 +2,22 @@
 
 SayIt 版本更新紀錄。
 
+## [0.14.2] - 2026-11-13
+
+### Fixed
+
+- Windows 用 Hold 搭配 Alt／Shift 觸發時，Line、WeChat、PowerShell 會先多打一個 `C`、反引號或 `^C`，選了字也進不了編輯模式（#79、#80）：舊做法在錄音開始時替你按 Ctrl+C 讀選取，但你的手指還壓著 Alt，目標程式收到的是 Alt+Ctrl+C。改用 Windows 的 UI Automation 直接讀選取的文字，Windows 上不再模擬任何複製按鍵。限制：不支援 UI Automation 的程式（例如 Sublime Text）在 Windows 上不會進編輯模式；PowerShell 用 Toggle Alt 時，反白會被 PowerShell 自己清掉
+- Windows 單獨用 Alt 當觸發鍵，貼上時會打開視窗的選單列、文字沒貼進去（#70）：單獨按放 Alt 會讓 Windows 把選單列設為待命，接著送出的 Ctrl+V 被當成選單快捷鍵。改成在 Alt 放開前送一個未指派的遮罩鍵（同 AutoHotkey 的做法）
+- 辨識語言設為「自動」時，AI 整理會把內容翻成介面語言，被長度防呆擋下、重試也永遠失敗（#83）：改成保持你說話的語言、不翻譯；繁中／簡中介面只在說中文時統一字形
+- 說中文時 AI 整理偶爾被判定「差異過大」而退回原文（#83）：守衛比對前沒有統一繁簡，模型回簡體時重疊率直接掉到門檻以下。改成比對前兩邊都轉繁體，整理結果也套用原文的繁體轉換
+- 字典手動加的詞常常沒被修正（#84）：只有排序前 50 的詞會送進模型，手動新增的詞起始權重低、排不進去。改成手動加的詞優先送出，Whisper 提示也把優先詞放在最後（模型最看重的位置）
+- macOS 開啟「隱藏 Dock 圖示」後，叫出主視窗再關掉，Dock 圖示又會回來（#82）：改用應用程式啟用策略來隱藏，開關主視窗不再影響
+- 文字整理模型清單更新：Groq 預設的 Qwen3.6 已被 Groq 下架，換成官方替代的 Qwen3.8 27B；OpenAI 新增 GPT-6 Luna（預設，價格約 GPT-5.6 Luna 的一半），GPT-5.4 Nano（2027-04 下架）移除；Anthropic 新增 Claude Haiku 5.5（預設，約 Haiku 4.5 十分之一的價格），Haiku 4.5 保留；Gemini 改為 3.5 Flash-Lite（預設）與 3.6 Flash，原本的 3.5 Flash 已被 Google 自動轉到 3.6 Flash。選了已下架模型的人會自動換到同一家的替代模型
+
+### Improved
+
+- 內建根憑證清單移除 eMudhra 私鑰外洩事件涉及的三張 emSign 根憑證（webpki-roots 1.0.11）
+
 ## [0.14.1] - 2026-09-12
 
 ### Fixed
