@@ -219,6 +219,9 @@ function buildAnthropicFetchParams(
       headers: {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        // tauri-plugin-http 一律附上 Origin 標頭，Anthropic 視為瀏覽器 CORS 請求，
+        // 沒有這個標頭就回 401 authentication_error（2026-11-13 真 key 實測）
+        "anthropic-dangerous-direct-browser-access": "true",
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),

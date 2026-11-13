@@ -118,6 +118,8 @@ describe("llmProvider.ts", () => {
       const headers = init.headers as Record<string, string>;
       expect(headers["x-api-key"]).toBe(TEST_API_KEY);
       expect(headers["anthropic-version"]).toBe("2023-06-01");
+      // plugin-http 會帶 Origin，缺這個標頭 Anthropic 回 401（看起來像金鑰無效）
+      expect(headers["anthropic-dangerous-direct-browser-access"]).toBe("true");
       expect(headers.Authorization).toBeUndefined();
     });
 
