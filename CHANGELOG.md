@@ -2,6 +2,12 @@
 
 SayIt 版本更新紀錄。
 
+## [0.14.3] - 2026-11-13
+
+### Fixed
+
+- 使用 Anthropic（Claude）時，金鑰明明正確，測試連線卻顯示「API key 無效或已過期」，AI 整理與字典分析也一律失敗、退回原文：SayIt 的連線元件會在每個請求附上 `Origin` 標頭，Anthropic 因此把它當成瀏覽器請求，沒有附上 `anthropic-dangerous-direct-browser-access` 就回 401；而 401 在 SayIt 裡被顯示成金鑰無效。現在 Anthropic 請求會附上這個標頭。金鑰仍只存在你自己的電腦上，沒有額外風險
+
 ## [0.14.2] - 2026-11-13
 
 ### Fixed
