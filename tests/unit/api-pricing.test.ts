@@ -75,7 +75,7 @@ describe("apiPricing.ts", () => {
     });
 
     it("[P1] 未知 model id 應以全 registry 最貴 output 價當上限", () => {
-      // fallback 常數 = gemini-3.5-flash 的 $9.00/M，維持「保證上限」不變量
+      // fallback 常數 $9.00/M ≥ 全 registry 最貴 output 價，維持「保證上限」不變量
       const cost = calculateChatCostCeiling(1_000_000, "dead-model-id");
       expect(cost).toBeCloseTo(9.0, 4);
     });

@@ -14,8 +14,8 @@ export type LlmModelId =
   | "gpt-5.6-luna"
   | "claude-haiku-5-5"
   | "claude-haiku-4-5-20251001"
-  | "gemini-3.5-flash"
-  | "gemini-3.1-flash-lite";
+  | "gemini-3.5-flash-lite"
+  | "gemini-3.6-flash";
 
 // ── Whisper 模型（語音轉錄用）─────────────────────────────
 
@@ -82,6 +82,9 @@ export const DECOMMISSIONED_MODEL_MAP: Record<string, string> = {
   // Gemini — 2.5 世代汰換
   "gemini-2.5-flash": "gemini-3.5-flash",
   "gemini-2.5-flash-lite": "gemini-3.1-flash-lite",
+  // Gemini — 3.5-flash 已被官方自動轉到 3.6-flash；3.1-flash-lite 官方替代 3.5-flash-lite
+  "gemini-3.5-flash": "gemini-3.6-flash",
+  "gemini-3.1-flash-lite": "gemini-3.5-flash-lite",
   // OpenAI
   "gpt-5.4-mini": "gpt-5.6-luna",
   // OpenAI — 5.4-nano 2027-04-01 下架，官方替代 6-luna
@@ -136,27 +139,30 @@ export const LLM_MODEL_LIST: LlmModelConfig[] = [
   },
   // ── Google Gemini（免費額度依帳號而異，不在此顯示）──
   {
-    id: "gemini-3.5-flash",
+    id: "gemini-3.5-flash-lite",
     providerId: "gemini",
-    freeTier: "limited",
-    displayName: "Gemini 3.5 Flash",
-    badgeKey: "settings.modelBadge.premium",
+    freeTier: "full",
+    displayName: "Gemini 3.5 Flash-Lite",
+    badgeKey: "settings.modelBadge.fastCheap",
     speedTps: 0,
-    inputCostPerMillion: 1.5,
-    outputCostPerMillion: 9.0,
+    inputCostPerMillion: 0.3,
+    outputCostPerMillion: 2.5,
     freeQuotaRpd: 0,
     freeQuotaTpd: 0,
     isDefault: true,
   },
   {
-    id: "gemini-3.1-flash-lite",
+    // freeTier 沿用 3.5-flash 的分類：3.5-flash 請求實際已被轉到這顆
+    // 價格取官方公告 2027-01-01 起的 $1.50/$7.50（之前為 $0.75/$3.75）：
+    // 出貨後多數時間落在漲價後，且費用上限寧可高估
+    id: "gemini-3.6-flash",
     providerId: "gemini",
-    freeTier: "full",
-    displayName: "Gemini 3.1 Flash-Lite",
-    badgeKey: "settings.modelBadge.fastCheap",
+    freeTier: "limited",
+    displayName: "Gemini 3.6 Flash",
+    badgeKey: "settings.modelBadge.premium",
     speedTps: 0,
-    inputCostPerMillion: 0.25,
-    outputCostPerMillion: 1.5,
+    inputCostPerMillion: 1.5,
+    outputCostPerMillion: 7.5,
     freeQuotaRpd: 0,
     freeQuotaTpd: 0,
     isDefault: false,

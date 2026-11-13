@@ -13,7 +13,7 @@ describe("modelRegistry — 各 provider 預設模型（2026-11 拍板）", () =
     expect(DEFAULT_LLM_MODEL_ID).toBe("qwen/qwen3.8-27b");
     const expected = {
       groq: "qwen/qwen3.8-27b",
-      gemini: "gemini-3.5-flash",
+      gemini: "gemini-3.5-flash-lite",
       openai: "gpt-6-luna",
       anthropic: "claude-haiku-5-5",
     } as const;
@@ -31,8 +31,8 @@ describe("modelRegistry — 免費專案可用性標示（gh-71）", () => {
     "qwen/qwen3.8-27b": "full",
     "openai/gpt-oss-120b": "full",
     "openai/gpt-oss-20b": "full",
-    "gemini-3.5-flash": "limited",
-    "gemini-3.1-flash-lite": "full",
+    "gemini-3.5-flash-lite": "full",
+    "gemini-3.6-flash": "limited",
     "gpt-6-luna": "none",
     "gpt-5.6-luna": "none",
     "claude-haiku-5-5": "none",
@@ -101,6 +101,12 @@ describe("modelRegistry — 下架遷移", () => {
     expect(DECOMMISSIONED_MODEL_MAP["qwen/qwen3.6-27b"]).toBe("qwen/qwen3.8-27b");
     expect(getEffectiveLlmModelId("qwen/qwen3.6-27b")).toBe("qwen/qwen3.8-27b");
     expect(getEffectiveLlmModelId("gpt-5.4-nano")).toBe("gpt-6-luna");
+    // Gemini：3.5-flash → 3.6-flash（官方已自動轉址）、3.1-flash-lite → 3.5-flash-lite
+    expect(getEffectiveLlmModelId("gemini-3.5-flash")).toBe("gemini-3.6-flash");
+    expect(getEffectiveLlmModelId("gemini-3.1-flash-lite")).toBe("gemini-3.5-flash-lite");
+    // 2.5 世代經兩跳落到新 id
+    expect(getEffectiveLlmModelId("gemini-2.5-flash")).toBe("gemini-3.6-flash");
+    expect(getEffectiveLlmModelId("gemini-2.5-flash-lite")).toBe("gemini-3.5-flash-lite");
   });
 
   it("[P1] null 與未知 id 應 fallback 到預設", () => {

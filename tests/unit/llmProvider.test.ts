@@ -376,7 +376,7 @@ describe("llmProvider.ts", () => {
       expect(getProviderIdForModel("qwen/qwen3.8-27b")).toBe("groq");
       expect(getProviderIdForModel("gpt-5.6-luna")).toBe("openai");
       expect(getProviderIdForModel("claude-haiku-4-5-20251001")).toBe("anthropic");
-      expect(getProviderIdForModel("gemini-3.5-flash")).toBe("gemini");
+      expect(getProviderIdForModel("gemini-3.5-flash-lite")).toBe("gemini");
     });
 
     it("[P1] getProviderIdForModel 未知模型 fallback 到 groq", () => {
