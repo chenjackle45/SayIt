@@ -493,3 +493,113 @@ describe("useVocabularyStore", () => {
     });
   });
 });
+
+// ==========================================================================
+// #81 字典搜尋＋編輯
+// ==========================================================================
+
+describe("matchesTermQuery（#81 搜尋）", () => {
+  it("大小寫不敏感包含、忽略前後空白、空字串全符合、中文子字串", async () => {
+    const { matchesTermQuery } = await import(
+      "../../src/stores/useVocabularyStore"
+    );
+    expect(matchesTermQuery("Heptabase", "hepta")).toBe(true);
+    expect(matchesTermQuery("Heptabase", "  BASE ")).toBe(true);
+    expect(matchesTermQuery("Heptabase", "")).toBe(true);
+    expect(matchesTermQuery("Heptabase", "   ")).toBe(true);
+    expect(matchesTermQuery("未來誌", "未來")).toBe(true);
+  });
+
+  it("反例：不包含就不符合", async () => {
+    const { matchesTermQuery } = await import(
+      "../../src/stores/useVocabularyStore"
+    );
+    expect(matchesTermQuery("開會紀錄", "未來")).toBe(false);
+    expect(matchesTermQuery("Heptabase", "xyz")).toBe(false);
+  });
+});
+
+describe("updateTerm（#81 編輯）", () => {
+  const rows = [
+    createRawVocabularyRow({ id: "a", term: "未來志", weight: 7, source: "ai" }),
+    createRawVocabularyRow({ id: "b", term: "Heptabase", weight: 3 }),
+  ];
+
+  async function setupStore() {
+    setActivePinia(createPinia());
+    mockDbExecute.mockClear().mockResolvedValue(undefined);
+    mockDbSelect.mockClear().mockResolvedValue(rows);
+    mockEmit.mockClear().mockResolvedValue(undefined);
+    const { useVocabularyStore } = await import(
+      "../../src/stores/useVocabularyStore"
+    );
+    const store = useVocabularyStore();
+    await store.fetchTermList();
+    mockDbSelect.mockClear();
+    return store;
+  }
+
+  it("成功：只改 term（trim 後）、重抓清單、送變更事件", async () => {
+    const store = await setupStore();
+
+    await store.updateTerm("a", "  未來誌  ");
+
+    expect(mockDbExecute).toHaveBeenCalledTimes(1);
+    expect(mockDbExecute).toHaveBeenCalledWith(
+      "UPDATE vocabulary SET term = $1, source = 'manual' WHERE id = $2",
+      ["未來誌", "a"],
+    );
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(mockEmit).toHaveBeenCalledWith(
+      "vocabulary:changed",
+      expect.anything(),
+    );
+  });
+
+  it("新詞為空：不寫 DB", async () => {
+    const store = await setupStore();
+    await store.updateTerm("a", "   ");
+    expect(mockDbExecute).not.toHaveBeenCalled();
+  });
+
+  it("與原詞相同：不寫 DB", async () => {
+    const store = await setupStore();
+    await store.updateTerm("a", " 未來志 ");
+    expect(mockDbExecute).not.toHaveBeenCalled();
+  });
+
+  it("與其他詞重複（大小寫不敏感）：拋重複訊息、不寫 DB", async () => {
+    const store = await setupStore();
+    await expect(store.updateTerm("a", "heptabase")).rejects.toThrow(
+      "dictionary.duplicateEntry",
+    );
+    expect(mockDbExecute).not.toHaveBeenCalled();
+  });
+
+  it("只改大小寫：排除自己、允許寫入", async () => {
+    const store = await setupStore();
+    await store.updateTerm("b", "HeptaBase");
+    expect(mockDbExecute).toHaveBeenCalledWith(
+      "UPDATE vocabulary SET term = $1, source = 'manual' WHERE id = $2",
+      ["HeptaBase", "b"],
+    );
+  });
+
+  it("DB 回 UNIQUE 錯誤：轉成重複訊息", async () => {
+    const store = await setupStore();
+    mockDbExecute.mockRejectedValueOnce(
+      new Error("UNIQUE constraint failed: vocabulary.term"),
+    );
+    await expect(store.updateTerm("a", "未來誌")).rejects.toThrow(
+      "dictionary.duplicateEntry",
+    );
+  });
+
+  it("DB 其他錯誤：原樣拋出", async () => {
+    const store = await setupStore();
+    mockDbExecute.mockRejectedValueOnce(new Error("disk I/O error"));
+    await expect(store.updateTerm("a", "未來誌")).rejects.toThrow(
+      "disk I/O error",
+    );
+  });
+});

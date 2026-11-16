@@ -1,15 +1,29 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import {
   DICTIONARY_IMPORT_MAX_ENTRIES,
   DICTIONARY_IMPORT_MAX_FILE_BYTES,
+  matchesTermQuery,
   useVocabularyStore,
 } from "../stores/useVocabularyStore";
+import type { VocabularyEntry } from "../types/vocabulary";
 import { useSettingsStore } from "../stores/useSettingsStore";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { useFeedbackMessage } from "../composables/useFeedbackMessage";
 import { useI18n } from "vue-i18n";
-import { Plus, Trash2, Bot, Hand, Info, Download, Upload } from "lucide-vue-next";
+import {
+  Plus,
+  Trash2,
+  Bot,
+  Hand,
+  Info,
+  Download,
+  Upload,
+  Search,
+  Pencil,
+  Check,
+  X,
+} from "lucide-vue-next";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,6 +60,64 @@ const showDuplicateHint = computed(
     newTermInput.value.trim() !== "" &&
     vocabularyStore.isDuplicateTerm(newTermInput.value),
 );
+
+// #81 搜尋：只存在本頁，離開即清空
+const searchQuery = ref("");
+const filteredAiTermList = computed(() =>
+  vocabularyStore.aiSuggestedTermList.filter((entry) =>
+    matchesTermQuery(entry.term, searchQuery.value),
+  ),
+);
+const filteredManualTermList = computed(() =>
+  vocabularyStore.manualTermList.filter((entry) =>
+    matchesTermQuery(entry.term, searchQuery.value),
+  ),
+);
+
+// #81 行內編輯：同一時間只編輯一列
+const editingTermId = ref<string | null>(null);
+const editingDraft = ref("");
+const isSavingEdit = ref(false);
+
+/** 只在按下鉛筆時聚焦一次；清單重抓或搜尋後重新出現不搶焦點 */
+async function startEdit(entry: VocabularyEntry) {
+  editingTermId.value = entry.id;
+  editingDraft.value = entry.term;
+  await nextTick();
+  document.querySelector<HTMLInputElement>("[data-editing-input]")?.focus();
+}
+
+function cancelEdit() {
+  editingTermId.value = null;
+}
+
+async function saveEdit(entry: VocabularyEntry) {
+  const newTerm = editingDraft.value.trim();
+  if (!newTerm || isSavingEdit.value) return;
+  if (newTerm === entry.term) {
+    cancelEdit();
+    return;
+  }
+
+  try {
+    isSavingEdit.value = true;
+    await vocabularyStore.updateTerm(entry.id, newTerm);
+    // 存檔期間編輯已鎖住（鉛筆、取消、Esc 停用、輸入框唯讀），編輯列與草稿不會變
+    cancelEdit();
+    feedback.show("success", t("dictionary.updated", { from: entry.term, to: newTerm }));
+  } catch (err) {
+    feedback.show("error", extractErrorMessage(err));
+  } finally {
+    isSavingEdit.value = false;
+  }
+}
+
+/** 輸入法組字中（注音、倉頡選字）的 Enter／Esc 不觸發存檔或取消 */
+function handleEditKeydown(event: KeyboardEvent, entry: VocabularyEntry) {
+  if (event.isComposing || isSavingEdit.value) return;
+  if (event.key === "Enter") void saveEdit(entry);
+  else if (event.key === "Escape") cancelEdit();
+}
 
 function getWeightVariant(weight: number): "default" | "secondary" | "outline" {
   if (weight >= 30) return "default";
@@ -230,6 +302,14 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="flex items-center gap-2">
+        <div class="relative">
+          <Search class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            v-model="searchQuery"
+            :placeholder="$t('dictionary.searchPlaceholder')"
+            class="w-48 pl-8"
+          />
+        </div>
         <div class="flex flex-col">
           <Input
             v-model="newTermInput"
@@ -314,32 +394,79 @@ onBeforeUnmount(() => {
                 : $t("dictionary.noAiSuggestions")
             }}
           </div>
+          <div
+            v-else-if="filteredAiTermList.length === 0"
+            class="py-4 text-center text-sm text-muted-foreground"
+          >
+            {{ $t("dictionary.noSearchResults") }}
+          </div>
           <Table v-else>
             <TableHeader>
               <TableRow>
                 <TableHead class="w-full">{{ $t("dictionary.termHeader") }}</TableHead>
                 <TableHead class="w-24 text-center">{{ $t("dictionary.weight") }}</TableHead>
                 <TableHead class="w-40">{{ $t("dictionary.dateHeader") }}</TableHead>
-                <TableHead class="w-20 text-right">{{ $t("dictionary.actionHeader") }}</TableHead>
+                <TableHead class="w-24 text-right">{{ $t("dictionary.actionHeader") }}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="entry in vocabularyStore.aiSuggestedTermList" :key="entry.id">
-                <TableCell class="font-medium text-foreground">{{ entry.term }}</TableCell>
+              <TableRow v-for="entry in filteredAiTermList" :key="entry.id">
+                <TableCell class="font-medium text-foreground">
+                  <Input
+                    v-if="editingTermId === entry.id"
+                    v-model="editingDraft"
+                    data-editing-input
+                    :readonly="isSavingEdit"
+                    class="h-8"
+                    @keydown="handleEditKeydown($event, entry)"
+                  />
+                  <template v-else>{{ entry.term }}</template>
+                </TableCell>
                 <TableCell class="text-center">
                   <Badge :variant="getWeightVariant(entry.weight)">{{ entry.weight }}</Badge>
                 </TableCell>
                 <TableCell class="text-muted-foreground">{{ formatDate(entry.createdAt) }}</TableCell>
-                <TableCell class="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    class="text-destructive"
-                    :disabled="removingTermIdSet.has(entry.id)"
-                    @click="handleRemoveTerm(entry.id, entry.term)"
-                  >
-                    <Trash2 class="h-4 w-4" />
-                  </Button>
+                <TableCell class="text-right whitespace-nowrap">
+                  <template v-if="editingTermId === entry.id">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      :title="$t('dictionary.save')"
+                      :disabled="isSavingEdit || !editingDraft.trim()"
+                      @click="saveEdit(entry)"
+                    >
+                      <Check class="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      :title="$t('dictionary.cancel')"
+                      :disabled="isSavingEdit"
+                      @click="cancelEdit"
+                    >
+                      <X class="h-4 w-4" />
+                    </Button>
+                  </template>
+                  <template v-else>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      :title="$t('dictionary.edit')"
+                      :disabled="isSavingEdit"
+                      @click="startEdit(entry)"
+                    >
+                      <Pencil class="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      class="text-destructive"
+                      :disabled="removingTermIdSet.has(entry.id)"
+                      @click="handleRemoveTerm(entry.id, entry.term)"
+                    >
+                      <Trash2 class="h-4 w-4" />
+                    </Button>
+                  </template>
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -356,38 +483,83 @@ onBeforeUnmount(() => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table v-if="vocabularyStore.manualTermList.length > 0">
+          <Table v-if="filteredManualTermList.length > 0">
             <TableHeader>
               <TableRow>
                 <TableHead class="w-full">{{ $t("dictionary.termHeader") }}</TableHead>
                 <TableHead class="w-24 text-center">{{ $t("dictionary.weight") }}</TableHead>
                 <TableHead class="w-40">{{ $t("dictionary.dateHeader") }}</TableHead>
-                <TableHead class="w-20 text-right">{{ $t("dictionary.actionHeader") }}</TableHead>
+                <TableHead class="w-24 text-right">{{ $t("dictionary.actionHeader") }}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="entry in vocabularyStore.manualTermList" :key="entry.id">
-                <TableCell class="font-medium text-foreground">{{ entry.term }}</TableCell>
+              <TableRow v-for="entry in filteredManualTermList" :key="entry.id">
+                <TableCell class="font-medium text-foreground">
+                  <Input
+                    v-if="editingTermId === entry.id"
+                    v-model="editingDraft"
+                    data-editing-input
+                    :readonly="isSavingEdit"
+                    class="h-8"
+                    @keydown="handleEditKeydown($event, entry)"
+                  />
+                  <template v-else>{{ entry.term }}</template>
+                </TableCell>
                 <TableCell class="text-center">
                   <Badge :variant="getWeightVariant(entry.weight)">{{ entry.weight }}</Badge>
                 </TableCell>
                 <TableCell class="text-muted-foreground">{{ formatDate(entry.createdAt) }}</TableCell>
-                <TableCell class="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    class="text-destructive"
-                    :disabled="removingTermIdSet.has(entry.id)"
-                    @click="handleRemoveTerm(entry.id, entry.term)"
-                  >
-                    <Trash2 class="h-4 w-4" />
-                  </Button>
+                <TableCell class="text-right whitespace-nowrap">
+                  <template v-if="editingTermId === entry.id">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      :title="$t('dictionary.save')"
+                      :disabled="isSavingEdit || !editingDraft.trim()"
+                      @click="saveEdit(entry)"
+                    >
+                      <Check class="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      :title="$t('dictionary.cancel')"
+                      :disabled="isSavingEdit"
+                      @click="cancelEdit"
+                    >
+                      <X class="h-4 w-4" />
+                    </Button>
+                  </template>
+                  <template v-else>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      :title="$t('dictionary.edit')"
+                      :disabled="isSavingEdit"
+                      @click="startEdit(entry)"
+                    >
+                      <Pencil class="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      class="text-destructive"
+                      :disabled="removingTermIdSet.has(entry.id)"
+                      @click="handleRemoveTerm(entry.id, entry.term)"
+                    >
+                      <Trash2 class="h-4 w-4" />
+                    </Button>
+                  </template>
                 </TableCell>
               </TableRow>
             </TableBody>
           </Table>
           <div v-else class="py-4 text-center text-sm text-muted-foreground">
-            {{ $t("dictionary.emptyState") }}
+            {{
+              vocabularyStore.manualTermList.length > 0
+                ? $t("dictionary.noSearchResults")
+                : $t("dictionary.emptyState")
+            }}
           </div>
         </CardContent>
       </Card>

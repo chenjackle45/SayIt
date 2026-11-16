@@ -33,6 +33,12 @@ export const DICTIONARY_IMPORT_MAX_ENTRIES = MAX_IMPORT_ENTRIES;
 export const TOP_TERM_LIST_SQL =
   "SELECT term FROM vocabulary ORDER BY CASE WHEN source = 'manual' THEN 0 ELSE 1 END, weight DESC, created_at DESC LIMIT $1";
 
+/** 字典頁搜尋（#81）：大小寫不敏感的包含比對；空字串＝不篩選 */
+export function matchesTermQuery(term: string, query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  return term.toLowerCase().includes(normalizedQuery);
+}
+
 interface RawVocabularyRow {
   id: string;
   term: string;
@@ -133,6 +139,41 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
         `[vocabulary-store] removeTerm failed: ${extractErrorMessage(error)}`,
       );
       captureError(error, { source: "vocabulary", step: "remove" });
+      throw error;
+    }
+  }
+
+  /** 改詞（#81）：改 term 並轉為手動詞（使用者拍板：改過＝使用者指定）；權重、新增時間保留 */
+  async function updateTerm(id: string, newTerm: string) {
+    const entry = termList.value.find((e) => e.id === id);
+    const trimmedTerm = newTerm.trim();
+    if (!entry || !trimmedTerm || trimmedTerm === entry.term) return;
+
+    const normalizedTerm = trimmedTerm.toLowerCase();
+    const isDuplicate = termList.value.some(
+      (e) => e.id !== id && e.term.trim().toLowerCase() === normalizedTerm,
+    );
+    if (isDuplicate) {
+      throw new Error(i18n.global.t("dictionary.duplicateEntry"));
+    }
+
+    try {
+      const db = getDatabase();
+      await db.execute(
+        "UPDATE vocabulary SET term = $1, source = 'manual' WHERE id = $2",
+        [trimmedTerm, id],
+      );
+      await fetchTermList();
+      emitVocabularyChanged();
+    } catch (error) {
+      const message = extractErrorMessage(error);
+      if (message.includes("UNIQUE")) {
+        throw new Error(i18n.global.t("dictionary.duplicateEntry"), {
+          cause: error,
+        });
+      }
+      console.error(`[vocabulary-store] updateTerm failed: ${message}`);
+      captureError(error, { source: "vocabulary", step: "update" });
       throw error;
     }
   }
@@ -363,6 +404,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     batchIncrementWeights,
     getTopTermListByWeight,
     removeTerm,
+    updateTerm,
     exportEntries,
     importEntries,
     buildExportDownload,
