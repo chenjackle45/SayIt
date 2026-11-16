@@ -59,4 +59,4 @@
 
 ## 內部待辦（無對外承諾）
 
-FK 787 調查、Windows edit-mode UIA 升級、#24「編輯失敗退回貼上」、ElevenLabs 三項 HIGH（見 `plan-elevenlabs-stt-provider.md`）。
+FK 787 調查、Windows edit-mode UIA 升級、#24「編輯失敗退回貼上」；~~ElevenLabs~~ 2026-11-17 放棄（不加新服務接法，見 `plan-elevenlabs-stt-provider.md` 檔頭）；v0.15＝#81 字典搜尋＋編輯、Windows 錄音提示框可見性（#88＋#70）。
