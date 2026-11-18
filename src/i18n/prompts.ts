@@ -463,3 +463,23 @@ export function isKnownDefaultPrompt(prompt: string): boolean {
   }
   return false;
 }
+
+/**
+ * 字典清單前的用途說明（#84）：近音近拼一律改成字典寫法，排除一般單字與另一個完整姓名。
+ * zh-TW 版經真模型實測（docs/plan-vocabulary-prompt-instruction.md），其他語系照 zh-TW 語意翻譯。
+ * 語言跟著指示本體走，避免影響輸出語言（#83 教訓）。
+ */
+const VOCABULARY_NOTES: Record<PromptLocale, string> = {
+  "zh-TW":
+    "以下是使用者字典裡的專有名詞與正確寫法。逐字稿中與這些詞發音或拼法相近的詞，一律改成字典裡的寫法；這條優先於『不確定就不改』。例外：該詞在句中明顯是一般單字，或屬於另一個完整姓名（名加姓）時，保留原文。",
+  yue: "以下是使用者字典裡的專有名詞與正確寫法。逐字稿中與這些詞發音或拼法相近的詞，一律改成字典裡的寫法；這條優先於『不確定就不改』。例外：該詞在句中明顯是一般單字，或屬於另一個完整姓名（名加姓）時，保留原文。",
+  "zh-CN":
+    "以下是用户词典里的专有名词与正确写法。逐字稿中与这些词发音或拼写相近的词，一律改成词典里的写法；这条优先于“不确定就不改”。例外：该词在句中明显是普通单词，或属于另一个完整姓名（名加姓）时，保留原文。",
+  en: 'The following are proper nouns from the user\'s dictionary with their correct spellings. Any word in the transcript that sounds or is spelled similarly to one of these terms must be changed to the dictionary spelling; this rule takes priority over "leave it unchanged if unsure". Exception: keep the original when the word is clearly an ordinary word in context, or is part of a different full name (given name plus surname).',
+  ja: "以下はユーザー辞書に登録された固有名詞と正しい表記です。文字起こしの中でこれらの語と発音や綴りが近い語は、必ず辞書の表記に修正してください。このルールは「確信がなければ変更しない」より優先されます。例外：文中で明らかに一般的な単語である場合、または別の完全な氏名（名と姓）の一部である場合は、原文のままにしてください。",
+  ko: '다음은 사용자 사전에 등록된 고유명사와 올바른 표기입니다. 전사문에서 이 단어들과 발음이나 철자가 비슷한 단어는 반드시 사전의 표기로 고치세요. 이 규칙은 "확실하지 않으면 바꾸지 않는다"보다 우선합니다. 예외: 문맥상 명백히 일반 단어이거나 다른 사람의 전체 이름(이름과 성)의 일부인 경우에는 원문을 유지하세요.',
+};
+
+export function getVocabularyNoteForLocale(locale: PromptLocale): string {
+  return VOCABULARY_NOTES[locale];
+}
