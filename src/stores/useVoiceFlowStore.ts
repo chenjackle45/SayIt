@@ -268,12 +268,25 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     isRepositioning = false;
   }
 
+  // gh-88／gh-70：Windows 最上層只在啟動時設一次、被其他程式蓋過就不補回，每次顯示後重設；失敗不擋錄音
+  async function reassertHudTopmost() {
+    if (!isWindowsPlatform()) return;
+    try {
+      await invoke("reassert_hud_topmost");
+    } catch (err) {
+      writeErrorLog(
+        `useVoiceFlowStore: reassert_hud_topmost failed (non-blocking): ${extractErrorMessage(err)}`,
+      );
+    }
+  }
+
   async function showHud() {
     clearLearnedHideTimer();
     const window = getAppWindow();
     lastMonitorKey = "";
     await repositionHudToCurrentMonitor();
     await window.show();
+    await reassertHudTopmost();
     await window.setIgnoreCursorEvents(true);
     startMonitorPolling();
   }
@@ -763,6 +776,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                       clearLearnedHideTimer();
                       const appWindow = getAppWindow();
                       await appWindow.show();
+                      await reassertHudTopmost();
                       await appWindow.setIgnoreCursorEvents(true);
                       learnedHideTimer = setTimeout(() => {
                         learnedHideTimer = null;

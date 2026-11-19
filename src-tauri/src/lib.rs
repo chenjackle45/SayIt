@@ -161,6 +161,38 @@ fn set_dock_icon_hidden<R: Runtime>(app: AppHandle<R>, hidden: bool) -> Result<(
     apply_dock_icon_hidden(&app, hidden).map_err(|e| e.to_string())
 }
 
+/// gh-88／gh-70：Windows 上 HUD 每次顯示後重新拉到最上層。
+/// 最上層只在 setup 設一次，之後被其他程式蓋過就不會補回；tao 的 set_always_on_top
+/// 會因狀態快取判定「已是最上層」而略過，所以直接呼叫 SetWindowPos 強制重排（不搶焦點）。
+#[command]
+fn reassert_hud_topmost<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        };
+        let window = app
+            .get_webview_window("main")
+            .ok_or_else(|| "HUD window not found".to_string())?;
+        let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                Some(HWND_TOPMOST),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
+            )
+        }
+        .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    let _ = app;
+    Ok(())
+}
+
 /// 供前端在啟動/需要時查詢權威 OS 外觀（"dark" | "light"，未知回 null）。
 #[command]
 fn get_os_theme() -> Option<String> {
@@ -471,6 +503,7 @@ pub fn run() {
         .plugin(plugins::hotkey_listener::init())
         .invoke_handler(tauri::generate_handler![
             request_app_restart,
+            reassert_hud_topmost,
             plugins::logging::set_file_logging_enabled,
             plugins::logging::open_log_folder,
             plugins::logging::get_hotkey_recording_diagnostics,
