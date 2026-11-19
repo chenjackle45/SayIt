@@ -229,4 +229,41 @@ describe("useSettingsStore — prompt mode 遷移", () => {
 
     expect(store.getAiPrompt()).toBe(customPrompt);
   });
+
+  it("[P1] #84 getAiPromptLocale：明確辨識語言 → 該語言（與內建指示同語言）", async () => {
+    setupStoreGetMock({
+      promptMode: "active",
+      selectedLocale: "ja",
+      selectedTranscriptionLocale: "en",
+    });
+    const store = await createStore();
+    await store.loadSettings();
+
+    expect(store.getAiPromptLocale()).toBe("en");
+  });
+
+  it("[P1] #84 getAiPromptLocale：辨識語言自動 → 介面語言", async () => {
+    setupStoreGetMock({
+      promptMode: "minimal",
+      selectedLocale: "ko",
+      selectedTranscriptionLocale: "auto",
+    });
+    const store = await createStore();
+    await store.loadSettings();
+
+    expect(store.getAiPromptLocale()).toBe("ko");
+  });
+
+  it("[P1] #84 getAiPromptLocale：自訂指示 → 介面語言（不跟辨識語言）", async () => {
+    setupStoreGetMock({
+      promptMode: "custom",
+      aiPrompt: "完全自訂的 prompt",
+      selectedLocale: "ja",
+      selectedTranscriptionLocale: "en",
+    });
+    const store = await createStore();
+    await store.loadSettings();
+
+    expect(store.getAiPromptLocale()).toBe("ja");
+  });
 });

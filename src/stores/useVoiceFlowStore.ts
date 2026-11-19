@@ -1415,6 +1415,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             modelId: settingsStore.selectedLlmModelId,
             signal: abortController?.signal,
             transcriptLocale: getEffectiveTranscriptLocale(),
+            promptLocale: settingsStore.getAiPromptLocale(),
           };
 
           let enhanceResult = await enhanceText(
@@ -1771,6 +1772,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             modelId: settingsStore.selectedLlmModelId,
             signal: abortController?.signal,
             transcriptLocale: getEffectiveTranscriptLocale(),
+            promptLocale: settingsStore.getAiPromptLocale(),
           });
           if (isAborted.value) return;
 

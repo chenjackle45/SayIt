@@ -180,6 +180,7 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
     getApiKey: () => mockSettingsState.apiKey,
     getLlmApiKey: () => mockSettingsState.apiKey,
     getAiPrompt: () => mockSettingsState.aiPrompt,
+    getAiPromptLocale: () => "ja",
     refreshApiKey: vi.fn().mockResolvedValue(undefined),
     refreshLlmApiKey: vi.fn().mockResolvedValue(undefined),
     hasLlmApiKey: true,
@@ -1180,7 +1181,10 @@ describe("useVoiceFlowStore", () => {
         expect(mockEnhanceText).toHaveBeenCalledWith(
           longText,
           "test-api-key-123",
-          expect.objectContaining({ transcriptLocale: expected }),
+          expect.objectContaining({
+            transcriptLocale: expected,
+            promptLocale: "ja",
+          }),
         );
       },
     );
@@ -2443,7 +2447,7 @@ describe("useVoiceFlowStore", () => {
         expect(mockEnhanceText).toHaveBeenCalledWith(
           longText,
           "test-api-key-123",
-          expect.objectContaining({ transcriptLocale: "en" }),
+          expect.objectContaining({ transcriptLocale: "en", promptLocale: "ja" }),
         );
       });
     });
