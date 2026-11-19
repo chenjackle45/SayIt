@@ -225,6 +225,8 @@ vi.mock("../../src/stores/useVocabularyStore", () => ({
     termList: mockVocabularyState.termList,
     getTopTermListByWeight: mockVocabularyState.getTopTermListByWeight,
     batchIncrementWeights: mockVocabularyState.batchIncrementWeights,
+    isDuplicateTerm: () => false,
+    addAiSuggestedTerm: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -237,6 +239,7 @@ vi.mock("../../src/stores/useHistoryStore", () => ({
 }));
 
 import { useVoiceFlowStore } from "../../src/stores/useVoiceFlowStore";
+import { analyzeCorrections } from "../../src/lib/vocabularyAnalyzer";
 
 function triggerHotkeyEvent(eventName: string, payload: unknown = undefined) {
   const callback = listenerCallbackMap.get(eventName);
@@ -2692,6 +2695,183 @@ describe("useVoiceFlowStore", () => {
         });
       });
       expect(mockInvoke).not.toHaveBeenCalledWith("play_stop_sound");
+    });
+  });
+  // gh-88／gh-70：Windows HUD 每次顯示後重新拉到最上層（show 之後、失敗不擋錄音、非 Windows 不呼叫）
+  describe("Windows HUD 最上層重設", () => {
+    const WINDOWS_UA =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0";
+    let order: string[];
+    let hud: {
+      show: ReturnType<typeof vi.fn>;
+      hide: ReturnType<typeof vi.fn>;
+      setIgnoreCursorEvents: ReturnType<typeof vi.fn>;
+    };
+    const defaultWindowImpl = mockGetCurrentWindow.getMockImplementation();
+
+    function useWindows() {
+      Object.defineProperty(navigator, "userAgent", {
+        value: WINDOWS_UA,
+        configurable: true,
+      });
+    }
+
+    function stubTopmost(result: () => Promise<unknown>) {
+      const base = createMockInvokeHandler();
+      mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+        if (cmd === "reassert_hud_topmost") {
+          order.push("reassert");
+          return result();
+        }
+        return base(cmd, args);
+      });
+    }
+
+    // 下一次 show 卡住直到 release()：用來確認重設是在 show 完成之後才呼叫
+    function holdNextShow(): () => void {
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      hud.show.mockImplementationOnce(async () => {
+        order.push("show-start");
+        await gate;
+        order.push("show");
+      });
+      return release;
+    }
+
+    const settle = () => new Promise((r) => setTimeout(r, 20));
+    const reassertCount = () => order.filter((e) => e === "reassert").length;
+
+    beforeEach(() => {
+      order = [];
+      hud = {
+        show: vi.fn(async () => {
+          order.push("show");
+        }),
+        hide: vi.fn().mockResolvedValue(undefined),
+        setIgnoreCursorEvents: vi.fn(async () => {
+          order.push("ignore");
+        }),
+      };
+      mockGetCurrentWindow.mockImplementation(() => hud);
+    });
+
+    afterEach(() => {
+      mockGetCurrentWindow.mockImplementation(defaultWindowImpl!);
+      delete (navigator as unknown as { userAgent?: string }).userAgent;
+    });
+
+    it("[P1] Windows：開始錄音顯示 HUD → show 之後重設最上層", async () => {
+      useWindows();
+      stubTopmost(async () => undefined);
+      const store = useVoiceFlowStore();
+      await store.initialize();
+      const releaseShow = holdNextShow();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(order).toContain("show-start");
+      });
+      await settle();
+      expect(reassertCount()).toBe(0);
+
+      releaseShow();
+      await vi.waitFor(() => {
+        expect(order).toContain("ignore");
+      });
+      expect(order).toEqual(["show-start", "show", "reassert", "ignore"]);
+    });
+
+    it("[P1] 非 Windows：不呼叫重設", async () => {
+      stubTopmost(async () => undefined);
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+          deviceName: "",
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(order).toContain("ignore");
+      });
+      expect(order).not.toContain("reassert");
+    });
+
+    it("[P1] Windows：重設失敗 → 錄音照常", async () => {
+      useWindows();
+      stubTopmost(async () => {
+        throw new Error("SetWindowPos failed");
+      });
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+          deviceName: "",
+        });
+      });
+
+      await vi.waitFor(() => {
+        expect(order).toContain("ignore");
+      });
+      expect(order).toContain("reassert");
+      expect(store.status).toBe("recording");
+    });
+
+    it("[P1] Windows：學到新詞重新顯示 HUD → show 之後重設最上層", async () => {
+      useWindows();
+      mockSettingsState.isSmartDictionaryEnabled = true;
+      stubTopmost(async () => undefined);
+      vi.mocked(analyzeCorrections).mockResolvedValueOnce({
+        suggestedTermList: ["Anny"],
+        usage: null,
+      } as never);
+      const store = useVoiceFlowStore();
+      await store.initialize();
+
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_recording", {
+          deviceName: "",
+        });
+      });
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("start_correction_monitor");
+        expect(listenerCallbackMap.has("correction-monitor:result")).toBe(true);
+      });
+
+      const base = createMockInvokeHandler();
+      mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+        if (cmd === "reassert_hud_topmost") {
+          order.push("reassert");
+          return undefined;
+        }
+        if (cmd === "read_focused_text_field") return "測試專錄";
+        return base(cmd, args);
+      });
+      order.length = 0;
+      const releaseShow = holdNextShow();
+      triggerHotkeyEvent("correction-monitor:result", {
+        anyKeyPressed: true,
+        enterPressed: false,
+      });
+
+      await vi.waitFor(() => {
+        expect(order).toContain("show-start");
+      });
+      await settle();
+      expect(reassertCount()).toBe(0);
+
+      releaseShow();
+      await vi.waitFor(() => {
+        expect(order).toContain("ignore");
+      });
+      expect(order).toEqual(["show-start", "show", "reassert", "ignore"]);
     });
   });
 });
