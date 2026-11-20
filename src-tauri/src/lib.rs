@@ -20,6 +20,10 @@ use tauri::{
 /// `RunEvent::Exit` handler 在 `_exit(0)` 前檢查並 spawn 新 process。
 static RESTART_REQUESTED: AtomicBool = AtomicBool::new(false);
 
+/// gh-82：最後一次要求套用的「隱藏 Dock 圖示」設定（非 OS 讀回值），供 Reopen 後重套
+#[cfg(target_os = "macos")]
+static DOCK_ICON_HIDDEN: AtomicBool = AtomicBool::new(false);
+
 /// 設定 macOS 視窗為瀏海覆蓋層級（與 BoringNotch 相同）
 #[cfg(target_os = "macos")]
 fn configure_macos_notch_window(window: &tauri::WebviewWindow) {
@@ -142,6 +146,7 @@ fn current_os_theme_is_dark() -> Option<bool> {
 fn apply_dock_icon_hidden<R: Runtime>(app: &AppHandle<R>, hidden: bool) -> tauri::Result<()> {
     #[cfg(target_os = "macos")]
     {
+        DOCK_ICON_HIDDEN.store(hidden, Ordering::SeqCst);
         let policy = if hidden {
             tauri::ActivationPolicy::Accessory
         } else {
@@ -701,6 +706,23 @@ pub fn run() {
             match event {
                 #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
+                    // gh-82：從應用程式資料夾／Spotlight 打開會把程式轉回前景程式、Dock 圖示回來；
+                    // 隱藏開著就重套 Accessory。重套會讓出前景，所以先重套、再顯示與聚焦
+                    if DOCK_ICON_HIDDEN.load(Ordering::SeqCst) {
+                        let _ = apply_dock_icon_hidden(app_handle, true);
+                        // 策略切換由系統稍後完成，立即聚焦會被忽略；延遲後在主執行緒再聚焦一次。
+                        // 只聚焦不顯示：期間使用者已關掉視窗時不會把它叫回來
+                        let handle = app_handle.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(std::time::Duration::from_millis(200));
+                            let inner = handle.clone();
+                            let _ = handle.run_on_main_thread(move || {
+                                if let Some(window) = inner.get_webview_window("main-window") {
+                                    let _ = window.set_focus();
+                                }
+                            });
+                        });
+                    }
                     show_main_window(app_handle);
                 }
                 tauri::RunEvent::Exit => {
