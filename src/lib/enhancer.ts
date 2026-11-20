@@ -9,7 +9,11 @@ import {
   getDefaultMaxTokens,
   type LlmChatRequest,
 } from "./llmProvider";
-import { getMinimalPromptForLocale } from "../i18n/prompts";
+import {
+  getMinimalPromptForLocale,
+  getVocabularyNoteForLocale,
+  type PromptLocale,
+} from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
 import i18n from "../i18n";
 import {
@@ -47,6 +51,8 @@ export interface EnhanceOptions {
    * （zh-TW／yue → 簡轉繁，#83）。編輯模式、連線測試不傳。
    */
   transcriptLocale?: string;
+  /** 指示本體的語言，決定字典說明句用哪個語言（#84）；有字典時才用得到 */
+  promptLocale?: PromptLocale;
 }
 
 async function withTimeout<T>(
@@ -92,12 +98,13 @@ async function withTimeout<T>(
 export function buildSystemPrompt(
   basePrompt: string,
   vocabularyTermList?: string[],
+  promptLocale: PromptLocale = "zh-TW",
 ): string {
   let prompt = basePrompt;
 
   if (vocabularyTermList && vocabularyTermList.length > 0) {
     const truncatedTermList = vocabularyTermList.slice(0, MAX_VOCABULARY_TERMS);
-    prompt += `\n\n<vocabulary>\n${truncatedTermList.join(", ")}\n</vocabulary>`;
+    prompt += `\n\n${getVocabularyNoteForLocale(promptLocale)}\n<vocabulary>\n${truncatedTermList.join(", ")}\n</vocabulary>`;
   }
 
   return prompt;
@@ -124,7 +131,11 @@ export async function enhanceText(
   const providerId = getProviderIdForModel(modelId);
 
   const basePrompt = options?.systemPrompt || getDefaultSystemPrompt();
-  const fullPrompt = buildSystemPrompt(basePrompt, options?.vocabularyTermList);
+  const fullPrompt = buildSystemPrompt(
+    basePrompt,
+    options?.vocabularyTermList,
+    options?.promptLocale,
+  );
 
   const request: LlmChatRequest = {
     model: modelId,

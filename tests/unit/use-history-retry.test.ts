@@ -19,6 +19,7 @@ const h = vi.hoisted(() => {
     getLlmApiKey: () => "llm-key",
     selectedLlmModelId: "llama-3.3-70b-versatile",
     getAiPrompt: () => "prompt",
+    getAiPromptLocale: () => "ja",
   };
   return {
     mockDbExecute,
@@ -365,7 +366,10 @@ describe("useHistoryStore retry", () => {
         expect(h.mockEnhanceGuard).toHaveBeenCalledWith(
           "原始口語內容",
           expect.any(String),
-          expect.objectContaining({ transcriptLocale: expected }),
+          expect.objectContaining({
+            transcriptLocale: expected,
+            promptLocale: "ja",
+          }),
         );
       },
     );

@@ -636,6 +636,13 @@ export const useSettingsStore = defineStore("settings", () => {
     );
   }
 
+  /** getAiPrompt() 回傳指示的語言（#84 字典說明句用）；自訂指示無從得知，以介面語言當後備 */
+  function getAiPromptLocale(): PromptLocale {
+    return promptMode.value === "custom"
+      ? selectedLocale.value
+      : getEffectivePromptLocale();
+  }
+
   async function savePromptMode(mode: PromptMode) {
     const previousMode = promptMode.value;
     promptMode.value = mode;
@@ -1562,6 +1569,7 @@ export const useSettingsStore = defineStore("settings", () => {
     getApiKey,
     getLlmApiKey,
     getAiPrompt,
+    getAiPromptLocale,
     savePromptMode,
     consumeUpgradeNotice,
     saveAiPrompt,

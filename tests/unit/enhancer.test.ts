@@ -16,6 +16,7 @@ vi.mock("../../src/i18n", () => ({
 
 vi.mock("../../src/i18n/prompts", () => ({
   getMinimalPromptForLocale: () => "mock-default-prompt",
+  getVocabularyNoteForLocale: (locale: string) => `NOTE:${locale}`,
   getPromptForModeAndLocale: (mode: string) =>
     mode === "active" ? "mock-active-prompt" : "mock-default-prompt",
   isKnownDefaultPrompt: (prompt: string) => prompt === "mock-default-prompt",
@@ -333,6 +334,21 @@ describe("enhancer.ts", () => {
       );
     });
 
+    it("[P0] #84 promptLocale 選項 → 送出的指示帶該語言說明句", async () => {
+      mockFetch.mockResolvedValue(createSuccessResponse("整理後文字"));
+
+      const { enhanceText } = await import("../../src/lib/enhancer");
+      await enhanceText("測試輸入文字", TEST_API_KEY, {
+        vocabularyTermList: ["Anny"],
+        promptLocale: "ja",
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.messages[0].content).toContain(
+        "NOTE:ja\n<vocabulary>\nAnny\n</vocabulary>",
+      );
+    });
+
     it("[P0] 空 vocabularyTermList 不應注入 <vocabulary> 標籤", async () => {
       mockFetch.mockResolvedValue(createSuccessResponse("整理後文字"));
 
@@ -353,7 +369,25 @@ describe("enhancer.ts", () => {
       const result = buildSystemPrompt("基礎 prompt", ["詞彙A", "詞彙B"]);
 
       expect(result).toBe(
-        "基礎 prompt\n\n<vocabulary>\n詞彙A, 詞彙B\n</vocabulary>",
+        "基礎 prompt\n\nNOTE:zh-TW\n<vocabulary>\n詞彙A, 詞彙B\n</vocabulary>",
+      );
+    });
+
+    it("[P0] #84 說明句用指定的指示語言、緊接在清單前", async () => {
+      const { buildSystemPrompt } = await import("../../src/lib/enhancer");
+      const result = buildSystemPrompt("基礎 prompt", ["Anny"], "en");
+
+      expect(result).toBe(
+        "基礎 prompt\n\nNOTE:en\n<vocabulary>\nAnny\n</vocabulary>",
+      );
+    });
+
+    it("[P0] #84 無字典時不加說明句、輸出與基礎 prompt 逐字相同", async () => {
+      const { buildSystemPrompt } = await import("../../src/lib/enhancer");
+
+      expect(buildSystemPrompt("基礎 prompt", [], "en")).toBe("基礎 prompt");
+      expect(buildSystemPrompt("基礎 prompt", undefined, "en")).toBe(
+        "基礎 prompt",
       );
     });
 
