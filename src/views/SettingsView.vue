@@ -390,8 +390,8 @@ const apiKeyStatusLabel = computed(() =>
 );
 const apiKeyStatusClass = computed(() =>
   settingsStore.hasApiKey
-    ? "bg-green-500/20 text-green-400"
-    : "bg-red-500/20 text-red-400",
+    ? "bg-success/15 text-success"
+    : "bg-destructive/15 text-destructive",
 );
 const shouldShowOnboardingHint = computed(() => !settingsStore.hasApiKey);
 
@@ -1028,24 +1028,24 @@ onBeforeUnmount(() => {
             {{ $t("settings.about.description") }}
           </p>
           <p class="text-sm text-muted-foreground">
-            {{ $t("settings.about.author") }}<a href="https://jackle.pro" target="_blank" rel="noopener noreferrer" class="font-medium text-foreground hover:text-primary transition-colors">Jackle Chen</a>
+            {{ $t("settings.about.author") }}<a href="https://jackle.pro" target="_blank" rel="noopener noreferrer" class="font-medium text-foreground hover:text-link transition-colors">Jackle Chen</a>
           </p>
         </div>
 
         <div class="flex flex-wrap gap-x-4 gap-y-2">
-          <a href="https://jackle.pro" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
+          <a href="https://jackle.pro" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-link transition-colors">
             <Globe class="size-4" />
             <span>{{ $t("settings.about.website") }}</span>
           </a>
-          <a href="https://www.facebook.com/jackle45" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
+          <a href="https://www.facebook.com/jackle45" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-link transition-colors">
             <Facebook class="size-4" />
             <span>Facebook</span>
           </a>
-          <a href="https://www.instagram.com/jackle9527" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
+          <a href="https://www.instagram.com/jackle9527" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-link transition-colors">
             <Instagram class="size-4" />
             <span>Instagram</span>
           </a>
-          <a href="https://www.threads.com/@jackle9527" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
+          <a href="https://www.threads.com/@jackle9527" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-link transition-colors">
             <AtSign class="size-4" />
             <span>Threads</span>
           </a>
@@ -1054,11 +1054,11 @@ onBeforeUnmount(() => {
         <Separator />
 
         <div class="flex flex-wrap gap-x-4 gap-y-2">
-          <a href="https://github.com/chenjackle45/SayIt" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
+          <a href="https://github.com/chenjackle45/SayIt" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-link transition-colors">
             <Github class="size-4" />
             <span>{{ $t("settings.about.sourceCode") }}</span>
           </a>
-          <a href="https://github.com/chenjackle45/SayIt/issues" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
+          <a href="https://github.com/chenjackle45/SayIt/issues" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-link transition-colors">
             <CircleAlert class="size-4" />
             <span>{{ $t("settings.about.reportIssue") }}</span>
           </a>
@@ -1178,7 +1178,7 @@ onBeforeUnmount(() => {
               <p
                 v-if="reportFeedback.message.value !== ''"
                 class="text-sm"
-                :class="reportFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
+                :class="reportFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
               >
                 {{ reportFeedback.message.value }}
               </p>
@@ -1239,8 +1239,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               hotkeyFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ hotkeyFeedback.message.value }}
@@ -1283,7 +1283,7 @@ onBeforeUnmount(() => {
 
           <p
             v-if="shouldShowOnboardingHint"
-            class="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-sm text-blue-200"
+            class="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground"
           >
             {{ $t("settings.apiKey.onboarding") }}
           </p>
@@ -1321,7 +1321,7 @@ onBeforeUnmount(() => {
                 v-if="apiKeyFeedback.message.value !== ''"
                 class="text-sm"
                 :class="
-                  apiKeyFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'
+                  apiKeyFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'
                 "
               >
                 {{ apiKeyFeedback.message.value }}
@@ -1405,7 +1405,7 @@ onBeforeUnmount(() => {
           <p
             v-if="whisperModelFeedback.message.value !== ''"
             class="text-sm"
-            :class="whisperModelFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
+            :class="whisperModelFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
           >
             {{ whisperModelFeedback.message.value }}
           </p>
@@ -1417,8 +1417,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               transcriptionLocaleFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ transcriptionLocaleFeedback.message.value }}
@@ -1576,7 +1576,7 @@ onBeforeUnmount(() => {
           <p
             v-if="providerFeedback.message.value !== ''"
             class="text-sm"
-            :class="providerFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
+            :class="providerFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
           >
             {{ providerFeedback.message.value }}
           </p>
@@ -1619,7 +1619,7 @@ onBeforeUnmount(() => {
           <p
             v-if="llmModelFeedback.message.value !== ''"
             class="text-sm"
-            :class="llmModelFeedback.type.value === 'success' ? 'text-green-400' : 'text-red-400'"
+            :class="llmModelFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
           >
             {{ llmModelFeedback.message.value }}
           </p>
@@ -1714,8 +1714,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               promptFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ promptFeedback.message.value }}
@@ -1766,8 +1766,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               enhancementThresholdFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ enhancementThresholdFeedback.message.value }}
@@ -1805,8 +1805,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               smartDictionaryFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ smartDictionaryFeedback.message.value }}
@@ -1884,7 +1884,7 @@ onBeforeUnmount(() => {
           <p
             v-if="audioInputFeedback.message.value !== ''"
             class="text-sm"
-            :class="audioInputFeedback.type.value === 'success' ? 'text-green-400' : 'text-destructive'"
+            :class="audioInputFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
           >
             {{ audioInputFeedback.message.value }}
           </p>
@@ -1966,8 +1966,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               recordingCleanupFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ recordingCleanupFeedback.message.value }}
@@ -2010,7 +2010,7 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               themeFeedback.type.value === 'success'
-                ? 'text-green-400'
+                ? 'text-success'
                 : 'text-destructive'
             "
           >
@@ -2046,8 +2046,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               localeFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ localeFeedback.message.value }}
@@ -2074,8 +2074,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               muteOnRecordingFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ muteOnRecordingFeedback.message.value }}
@@ -2114,8 +2114,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               copyTranscriptionToClipboardFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ copyTranscriptionToClipboardFeedback.message.value }}
@@ -2142,8 +2142,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               soundFeedbackFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ soundFeedbackFeedback.message.value }}
@@ -2172,8 +2172,8 @@ onBeforeUnmount(() => {
               class="text-sm"
               :class="
                 hideDockIconFeedback.type.value === 'success'
-                  ? 'text-green-400'
-                  : 'text-red-400'
+                  ? 'text-success'
+                  : 'text-destructive'
               "
             >
               {{ hideDockIconFeedback.message.value }}
@@ -2202,8 +2202,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               autoStartFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ autoStartFeedback.message.value }}
@@ -2230,8 +2230,8 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               startHiddenFeedback.type.value === 'success'
-                ? 'text-green-400'
-                : 'text-red-400'
+                ? 'text-success'
+                : 'text-destructive'
             "
           >
             {{ startHiddenFeedback.message.value }}
@@ -2278,7 +2278,7 @@ onBeforeUnmount(() => {
             class="text-sm"
             :class="
               debugLogFeedback.type.value === 'success'
-                ? 'text-green-400'
+                ? 'text-success'
                 : 'text-destructive'
             "
           >

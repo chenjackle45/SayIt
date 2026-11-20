@@ -150,8 +150,8 @@ const quotaBottleneckLabel = computed(() => {
 
 const quotaBarColorClass = computed(() => {
   const pct = quotaRemainingPercent.value;
-  if (pct >= 0.5) return "bg-emerald-500";
-  if (pct >= 0.2) return "bg-amber-500";
+  if (pct >= 0.5) return "bg-success";
+  if (pct >= 0.2) return "bg-warning";
   return "bg-destructive";
 });
 
@@ -395,7 +395,7 @@ onBeforeUnmount(() => {
               </span>
               <Badge
                 v-if="record.wasEnhanced"
-                class="bg-emerald-500/20 text-emerald-400 border-0"
+                class="bg-success/15 text-success border-0"
               >
                 {{ $t("dashboard.aiEnhanced") }}
               </Badge>

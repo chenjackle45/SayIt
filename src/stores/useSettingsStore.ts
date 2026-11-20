@@ -36,6 +36,7 @@ import {
 import { captureError } from "../lib/sentry";
 import { openLogFolder, setFileLoggingEnabled } from "../lib/logger";
 import { getDefaultSystemPrompt } from "../lib/enhancer";
+import { LLM_PROVIDER_LIST } from "../lib/llmProvider";
 import {
   type PromptLocale,
   getAutoLanguagePrompt,
@@ -121,6 +122,12 @@ export const useSettingsStore = defineStore("settings", () => {
     DEFAULT_ENHANCEMENT_THRESHOLD_CHAR_COUNT,
   );
   const selectedLlmProviderId = ref<LlmProviderId>(DEFAULT_LLM_PROVIDER_ID);
+  // 側欄狀態區顯示目前整理服務（views 不可直接 import lib）
+  const llmProviderDisplayName = computed(
+    () =>
+      LLM_PROVIDER_LIST.find((p) => p.id === selectedLlmProviderId.value)
+        ?.displayName ?? selectedLlmProviderId.value,
+  );
   const selectedLlmModelId = ref<LlmModelId>(DEFAULT_LLM_MODEL_ID);
   const selectedWhisperModelId = ref<WhisperModelId>(DEFAULT_WHISPER_MODEL_ID);
   const openaiApiKey = ref<string>("");
@@ -1582,6 +1589,7 @@ export const useSettingsStore = defineStore("settings", () => {
     switchToPresetMode,
     switchToCustomMode,
     getTriggerKeyDisplayName,
+    llmProviderDisplayName,
     customTriggerKey,
     customTriggerKeyDomCode,
     // Hotkey recording helpers (proxied from lib/ for views)

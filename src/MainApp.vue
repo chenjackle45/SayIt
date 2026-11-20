@@ -2,11 +2,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
+  AudioLines,
   BookOpen,
   Download,
-  FileText,
-  LayoutDashboard,
-  Lightbulb,
   Settings,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
@@ -14,6 +12,7 @@ import { computed, markRaw, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import AccessibilityGuide from "./components/AccessibilityGuide.vue";
 import SiteHeader from "./components/SiteHeader.vue";
+import SidebarStatus from "./components/SidebarStatus.vue";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -26,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useFeedbackMessage } from "./composables/useFeedbackMessage";
+import { useCrossWindowSettingsSync } from "./composables/useCrossWindowSettingsSync";
 import { listenToEvent, VOCABULARY_CHANGED } from "./composables/useTauriEvents";
 import { useSettingsStore } from "./stores/useSettingsStore";
 import { useVocabularyStore } from "./stores/useVocabularyStore";
@@ -51,18 +51,24 @@ declare const __APP_VERSION__: string;
 const appVersion = __APP_VERSION__;
 const { t } = useI18n();
 
+// 改版側欄只留兩項；「記錄」暫接歷史頁（v0.16 #3 換成合併後的記錄頁），
+// 偏好設定在側欄底部（v0.16 #4 改開獨立視窗），功能介紹 v0.17 才移除、路由保留。
 const navItems = computed(() => [
-  { path: "/dashboard", label: t("mainApp.nav.dashboard"), icon: markRaw(LayoutDashboard) },
-  { path: "/history", label: t("mainApp.nav.history"), icon: markRaw(FileText) },
-  { path: "/dictionary", label: t("mainApp.nav.dictionary"), icon: markRaw(BookOpen) },
-  { path: "/settings", label: t("mainApp.nav.settings"), icon: markRaw(Settings) },
-  { path: "/guide", label: t("mainApp.nav.guide"), icon: markRaw(Lightbulb) },
+  { path: "/history", label: t("mainApp.nav.records"), icon: markRaw(AudioLines) },
+  { path: "/dictionary", label: t("mainApp.nav.words"), icon: markRaw(BookOpen) },
 ]);
 
 const route = useRoute();
+const PAGE_TITLE_KEYS: Record<string, string> = {
+  "/history": "mainApp.nav.records",
+  "/dictionary": "mainApp.nav.words",
+  "/dashboard": "mainApp.nav.dashboard",
+  "/settings": "mainApp.nav.preferences",
+  "/guide": "mainApp.nav.guide",
+};
 const currentPageTitle = computed(() => {
-  const item = navItems.value.find((n) => route.path.startsWith(n.path));
-  return item?.label ?? "SayIt";
+  const matched = Object.keys(PAGE_TITLE_KEYS).find((p) => route.path.startsWith(p));
+  return matched ? t(PAGE_TITLE_KEYS[matched]) : "SayIt";
 });
 
 // 必須在 app.mount() 後讀取 — setDatabaseInitError 在 bootstrap catch 中已設定
@@ -222,6 +228,9 @@ const isUpdateBusy = computed(() =>
 );
 
 
+// HUD 雙擊切整理模式等跨視窗設定變更 → 側欄狀態等即時更新
+useCrossWindowSettingsSync();
+
 const vocabularyStore = useVocabularyStore();
 let unlistenVocabularyChanged: UnlistenFn | null = null;
 
@@ -272,7 +281,7 @@ onUnmounted(() => {
     <span data-tauri-drag-region class="text-xs font-medium text-muted-foreground select-none">SayIt - 言</span>
   </div>
 
-  <SidebarProvider class="h-screen !min-h-0 pt-9">
+  <SidebarProvider class="h-screen !min-h-0 pt-9" style="--sidebar-width: 13rem">
     <Sidebar collapsible="offcanvas">
       <SidebarHeader class="flex-row h-12 items-center gap-3 border-b border-sidebar-border px-4">
         <img src="@/assets/logo-yan.png" alt="言" class="h-7 w-auto" />
@@ -297,8 +306,21 @@ onUnmounted(() => {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter class="border-t border-sidebar-border px-4 py-2">
-        <div class="flex items-center justify-between">
+      <SidebarFooter class="gap-3 px-3 py-3">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton as-child :is-active="route.path.startsWith('/settings')">
+              <RouterLink to="/settings">
+                <Settings />
+                <span>{{ $t("mainApp.nav.preferences") }}</span>
+              </RouterLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        <div class="border-t border-sidebar-border pt-3 px-1">
+          <SidebarStatus />
+        </div>
+        <div class="flex items-center justify-between px-1">
           <span class="text-xs text-muted-foreground">v{{ appVersion }}</span>
           <!-- ready-to-install 時不顯示檢查按鈕，改顯示安裝提示 -->
           <Button
@@ -313,7 +335,7 @@ onUnmounted(() => {
         </div>
         <!-- 自動下載完成：顯示持久的安裝提示 -->
         <div v-if="updateState === 'ready-to-install'" class="mt-1.5 flex items-center justify-between rounded-md bg-primary/10 px-2 py-1.5">
-          <span class="text-xs font-medium text-primary">v{{ availableVersion }} {{ $t("mainApp.update.ready") }}</span>
+          <span class="text-xs font-medium text-link">v{{ availableVersion }} {{ $t("mainApp.update.ready") }}</span>
           <Button
             size="sm"
             class="h-6 gap-1 px-2 text-xs"
@@ -326,7 +348,7 @@ onUnmounted(() => {
         <p
           v-if="updateFeedback.message.value"
           class="mt-1 text-xs"
-          :class="updateFeedback.type.value === 'success' ? 'text-primary' : 'text-destructive'"
+          :class="updateFeedback.type.value === 'success' ? 'text-link' : 'text-destructive'"
         >
           {{ updateFeedback.message.value }}
         </p>
@@ -340,7 +362,7 @@ onUnmounted(() => {
         class="border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
       >
         <p class="font-medium">{{ $t("errors.databaseInitFailed") }}</p>
-        <p class="mt-1 text-xs text-destructive/80">{{ databaseError }}</p>
+        <p class="mt-1 text-xs text-destructive">{{ databaseError }}</p>
       </div>
       <div class="flex-1 overflow-y-auto">
         <RouterView />

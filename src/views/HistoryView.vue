@@ -278,7 +278,7 @@ onBeforeUnmount(() => {
                   </span>
                   <Badge
                     v-if="record.wasEnhanced"
-                    class="bg-emerald-500/20 text-emerald-400 border-0 text-[11px]"
+                    class="bg-success/15 text-success border-0 text-[11px]"
                   >
                     {{ $t("dashboard.aiEnhanced") }}
                   </Badge>
@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
                     class="h-7 w-7"
                     @click.stop="handleCopyText(record)"
                   >
-                    <Check v-if="copiedRecordId === record.id" class="h-3.5 w-3.5 text-green-400" />
+                    <Check v-if="copiedRecordId === record.id" class="h-3.5 w-3.5 text-success" />
                     <Copy v-else class="h-3.5 w-3.5" />
                   </Button>
                   <Button
@@ -365,7 +365,7 @@ onBeforeUnmount(() => {
             >
               <!-- 整理後文字 -->
               <div v-if="record.wasEnhanced && record.processedText">
-                <p class="text-xs font-medium text-emerald-400 mb-1">{{ $t("history.enhancedText") }}</p>
+                <p class="text-xs font-medium text-success mb-1">{{ $t("history.enhancedText") }}</p>
                 <p class="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
                   {{ record.processedText }}
                 </p>
@@ -379,7 +379,7 @@ onBeforeUnmount(() => {
                     class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                     @click.stop="handleCopyRawText(record)"
                   >
-                    <Check v-if="copiedRawRecordId === record.id" class="h-3 w-3 text-green-400" />
+                    <Check v-if="copiedRawRecordId === record.id" class="h-3 w-3 text-success" />
                     <Copy v-else class="h-3 w-3" />
                     <span>{{ copiedRawRecordId === record.id ? $t("history.copied") : $t("history.copy") }}</span>
                   </button>

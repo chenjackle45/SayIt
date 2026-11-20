@@ -8,7 +8,7 @@ import FeatureGuideView from "./views/FeatureGuideView.vue";
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: "/", redirect: "/dashboard" },
+    { path: "/", redirect: "/history" },
     { path: "/dashboard", component: DashboardView },
     { path: "/history", component: HistoryView },
     { path: "/dictionary", component: DictionaryView },

@@ -422,7 +422,10 @@
       "history": "履歴",
       "dictionary": "カスタム辞書",
       "settings": "設定",
-      "guide": "機能ガイド"
+      "guide": "機能ガイド",
+      "records": "記録",
+      "words": "単語帳",
+      "preferences": "環境設定"
     },
     "update": {
       "installFailed": "インストールに失敗しました。手動でアップデートをダウンロードしてください",
@@ -452,6 +455,12 @@
       "item3": "AI モデル一覧を更新しました。Groq と Gemini の既定モデルを新しいバージョンに変更し、選択中のモデルが提供終了した場合は同じサービスの後継モデルに自動で切り替わります。OpenAI と Anthropic には、より安価な新モデルを追加しました",
       "item4": "Anthropic（Claude）が再び使えるようになりました。以前は正しい API キーでも「無効または期限切れ」と表示され、AI 整形が常に元のテキストに戻っていましたが、現在は接続テストも整形も正常に動作します",
       "dismiss": "了解"
+    },
+    "status": {
+      "ready": "準備完了",
+      "needsApiKey": "API キー未設定",
+      "holdToTalk": "押している間に話す",
+      "pressToTalk": "押して話し始める"
     }
   },
   "featureGuide": {

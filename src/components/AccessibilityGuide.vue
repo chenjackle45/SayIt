@@ -160,7 +160,7 @@ async function handleOpenAccessibilitySettings() {
         </div>
       </div>
 
-      <p v-if="isReinitializing" class="text-sm text-primary">
+      <p v-if="isReinitializing" class="text-sm text-link">
         {{ $t("accessibility.reinitializing") }}
       </p>
       <p v-if="reinitializeError" class="text-sm text-destructive">

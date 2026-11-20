@@ -422,7 +422,10 @@
       "history": "历史记录",
       "dictionary": "自定义字典",
       "settings": "设置",
-      "guide": "功能介绍"
+      "guide": "功能介绍",
+      "records": "记录",
+      "words": "词库",
+      "preferences": "偏好设置"
     },
     "update": {
       "installFailed": "安装失败，请手动下载更新",
@@ -452,6 +455,12 @@
       "item3": "AI 模型列表更新：Groq、Gemini 的默认模型换成较新的版本，原来选择的模型若已下线会自动换成同一家的替代模型；OpenAI、Anthropic 新增更便宜的新模型",
       "item4": "Anthropic（Claude）恢复可用：之前密钥正确却显示“无效或已过期”、AI 整理一直退回原文，现在测试连接和整理都能正常运作",
       "dismiss": "了解"
+    },
+    "status": {
+      "ready": "就绪",
+      "needsApiKey": "尚未设置 API 密钥",
+      "holdToTalk": "按住说话",
+      "pressToTalk": "按一下开始说话"
     }
   },
   "featureGuide": {

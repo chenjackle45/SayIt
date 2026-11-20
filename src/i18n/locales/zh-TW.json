@@ -422,7 +422,10 @@
       "history": "歷史記錄",
       "dictionary": "自訂字典",
       "settings": "設定",
-      "guide": "功能介紹"
+      "guide": "功能介紹",
+      "records": "記錄",
+      "words": "詞庫",
+      "preferences": "偏好設定"
     },
     "update": {
       "installFailed": "安裝失敗，請手動下載更新",
@@ -452,6 +455,12 @@
       "item3": "AI 模型清單更新：Groq、Gemini 的預設模型換成較新的版本，原本選的模型若已下架會自動換成同一家的替代；OpenAI、Anthropic 新增較便宜的新模型",
       "item4": "Anthropic（Claude）恢復可用：之前金鑰正確卻顯示「無效或已過期」、AI 整理一直退回原文，現在測試連線和整理都能正常運作",
       "dismiss": "了解"
+    },
+    "status": {
+      "ready": "就緒",
+      "needsApiKey": "尚未設定 API 金鑰",
+      "holdToTalk": "按住說話",
+      "pressToTalk": "按一下開始說話"
     }
   },
   "featureGuide": {

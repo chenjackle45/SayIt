@@ -348,7 +348,7 @@ onBeforeUnmount(() => {
       <p
         v-if="feedback.message.value !== ''"
         class="mt-3 text-sm"
-        :class="feedback.type.value === 'success' ? 'text-emerald-500' : 'text-destructive'"
+        :class="feedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
       >
         {{ feedback.message.value }}
       </p>

@@ -42,7 +42,7 @@ async function handleTest() {
 
     <div
       v-if="result?.ok === true"
-      class="text-sm text-green-400"
+      class="text-sm text-success"
     >
       ✅
       {{ t("settings.connectionTest.success", { ms: result.durationMs }) }}
