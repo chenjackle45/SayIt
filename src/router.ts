@@ -1,6 +1,5 @@
 import { createRouter, createWebHashHistory } from "vue-router";
-import DashboardView from "./views/DashboardView.vue";
-import HistoryView from "./views/HistoryView.vue";
+import RecordsView from "./views/RecordsView.vue";
 import DictionaryView from "./views/DictionaryView.vue";
 import SettingsView from "./views/SettingsView.vue";
 import FeatureGuideView from "./views/FeatureGuideView.vue";
@@ -8,9 +7,11 @@ import FeatureGuideView from "./views/FeatureGuideView.vue";
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
-    { path: "/", redirect: "/history" },
-    { path: "/dashboard", component: DashboardView },
-    { path: "/history", component: HistoryView },
+    { path: "/", redirect: "/records" },
+    { path: "/records", component: RecordsView },
+    // 儀表板與歷史記錄已合併成記錄頁；舊路徑導過去
+    { path: "/dashboard", redirect: "/records" },
+    { path: "/history", redirect: "/records" },
     { path: "/dictionary", component: DictionaryView },
     { path: "/settings", component: SettingsView },
     { path: "/guide", component: FeatureGuideView },

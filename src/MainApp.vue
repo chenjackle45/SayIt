@@ -51,18 +51,17 @@ declare const __APP_VERSION__: string;
 const appVersion = __APP_VERSION__;
 const { t } = useI18n();
 
-// 改版側欄只留兩項；「記錄」暫接歷史頁（v0.16 #3 換成合併後的記錄頁），
-// 偏好設定在側欄底部（v0.16 #4 改開獨立視窗），功能介紹 v0.17 才移除、路由保留。
+// 改版側欄只留兩項；偏好設定在側欄底部（v0.16 #4 改開獨立視窗），
+// 功能介紹 v0.17 才移除、路由保留。
 const navItems = computed(() => [
-  { path: "/history", label: t("mainApp.nav.records"), icon: markRaw(AudioLines) },
+  { path: "/records", label: t("mainApp.nav.records"), icon: markRaw(AudioLines) },
   { path: "/dictionary", label: t("mainApp.nav.words"), icon: markRaw(BookOpen) },
 ]);
 
 const route = useRoute();
 const PAGE_TITLE_KEYS: Record<string, string> = {
-  "/history": "mainApp.nav.records",
+  "/records": "mainApp.nav.records",
   "/dictionary": "mainApp.nav.words",
-  "/dashboard": "mainApp.nav.dashboard",
   "/settings": "mainApp.nav.preferences",
   "/guide": "mainApp.nav.guide",
 };

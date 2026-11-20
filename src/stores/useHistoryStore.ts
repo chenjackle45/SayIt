@@ -5,7 +5,6 @@ import type {
   DashboardStats,
   DailyQuotaUsage,
   ApiUsageRecord,
-  DailyUsageTrend,
   ChatUsageData,
 } from "../types/transcription";
 import type { TriggerMode } from "../types";
@@ -13,7 +12,6 @@ import type { TranscriptionResult } from "../types/audio";
 import type { TranscriptionCompletedPayload } from "../types/events";
 import { invoke } from "@tauri-apps/api/core";
 import { getDatabase } from "../lib/database";
-import { buildDailyUsageSeries } from "../lib/usageTrend";
 import { extractErrorMessage } from "../lib/errorUtils";
 import { captureError } from "../lib/sentry";
 import {
@@ -43,7 +41,6 @@ export interface HistoryRetryResult {
 }
 
 const PAGE_SIZE = 20;
-const USAGE_TREND_DAYS = 14;
 
 interface RawTranscriptionRow {
   id: string;
@@ -124,7 +121,10 @@ const DASHBOARD_STATS_SQL = `
   SELECT
     COUNT(*) as total_count,
     COALESCE(SUM(char_count), 0) as total_characters,
-    COALESCE(SUM(recording_duration_ms), 0) as total_recording_duration_ms
+    COALESCE(SUM(recording_duration_ms), 0) as total_recording_duration_ms,
+    COALESCE(SUM(CASE WHEN timestamp >= $1 THEN 1 ELSE 0 END), 0) as today_count,
+    COALESCE(SUM(CASE WHEN timestamp >= $1 THEN char_count ELSE 0 END), 0) as today_characters,
+    COALESCE(SUM(CASE WHEN timestamp >= $2 THEN char_count ELSE 0 END), 0) as week_characters
   FROM transcriptions
   WHERE status != 'failed'
 `;
@@ -149,17 +149,6 @@ const DAILY_QUOTA_USAGE_SQL = `
   GROUP BY api_type
 `;
 
-const DAILY_USAGE_TREND_SQL = `
-  SELECT
-    DATE(datetime(timestamp / 1000, 'unixepoch', 'localtime')) as date,
-    COUNT(*) as count,
-    COALESCE(SUM(char_count), 0) as total_chars
-  FROM transcriptions
-  WHERE timestamp >= $1 AND status != 'failed'
-  GROUP BY date
-  ORDER BY date DESC
-  LIMIT $2
-`;
 
 const UPDATE_ON_RETRY_SUCCESS_SQL = `
   UPDATE transcriptions
@@ -202,14 +191,23 @@ const DELETE_TRANSCRIPTION_SQL = `
   DELETE FROM transcriptions WHERE id = $1
 `;
 
-const SELECT_RECENT_SQL = `
-  SELECT ${TRANSCRIPTION_SELECT_COLUMNS}
-  FROM transcriptions
-  ORDER BY timestamp DESC
-  LIMIT $1
-`;
 
 const ASSUMED_TYPING_SPEED_CHARS_PER_MIN = 40;
+
+/** 本地時間當天 00:00 的毫秒時間戳（記錄頁「今天」統計）。 */
+export function getLocalDayStartMs(now: Date): number {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+/** 本地時間本週一 00:00 的毫秒時間戳（記錄頁「本週」統計；週一起算）。 */
+export function getLocalWeekStartMs(now: Date): number {
+  const daysSinceMonday = (now.getDay() + 6) % 7;
+  return new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() - daysSinceMonday,
+  ).getTime();
+}
 
 /** 有效轉譯語言：auto 回退到介面語言。重新辨識（原文轉換）與重新整理（#83）共用。 */
 function getEffectiveTranscriptLocale(
@@ -225,6 +223,9 @@ interface DashboardStatsRow {
   total_count: number;
   total_characters: number;
   total_recording_duration_ms: number;
+  today_count: number;
+  today_characters: number;
+  week_characters: number;
 }
 
 interface DailyQuotaUsageRow {
@@ -234,11 +235,6 @@ interface DailyQuotaUsageRow {
   billed_audio_ms: number;
 }
 
-interface DailyUsageTrendRow {
-  date: string;
-  count: number;
-  total_chars: number;
-}
 
 export const useHistoryStore = defineStore("history", () => {
   const transcriptionList = ref<TranscriptionRecord[]>([]);
@@ -394,6 +390,9 @@ export const useHistoryStore = defineStore("history", () => {
     totalTranscriptions: 0,
     totalCharacters: 0,
     totalRecordingDurationMs: 0,
+    todayTranscriptions: 0,
+    todayCharacters: 0,
+    weekCharacters: 0,
     estimatedTimeSavedMs: 0,
     dailyQuotaUsage: {
       whisperRequestCount: 0,
@@ -404,25 +403,33 @@ export const useHistoryStore = defineStore("history", () => {
       vocabularyAnalysisTotalTokens: 0,
     },
   });
-  const recentTranscriptionList = ref<TranscriptionRecord[]>([]);
-  const dailyUsageTrendList = ref<DailyUsageTrend[]>([]);
 
   async function fetchDashboardStats(): Promise<DashboardStats> {
     const db = getDatabase();
+    const now = new Date();
     const [statsRows, dailyQuotaUsage] = await Promise.all([
-      db.select<DashboardStatsRow[]>(DASHBOARD_STATS_SQL),
+      db.select<DashboardStatsRow[]>(DASHBOARD_STATS_SQL, [
+        getLocalDayStartMs(now),
+        getLocalWeekStartMs(now),
+      ]),
       fetchDailyQuotaUsage(),
     ]);
     const row = statsRows[0] ?? {
       total_count: 0,
       total_characters: 0,
       total_recording_duration_ms: 0,
+      today_count: 0,
+      today_characters: 0,
+      week_characters: 0,
     };
 
     return {
       totalTranscriptions: row.total_count,
       totalCharacters: row.total_characters,
       totalRecordingDurationMs: row.total_recording_duration_ms,
+      todayTranscriptions: row.today_count,
+      todayCharacters: row.today_characters,
+      weekCharacters: row.week_characters,
       estimatedTimeSavedMs: Math.max(
         0,
         Math.round(
@@ -480,69 +487,13 @@ export const useHistoryStore = defineStore("history", () => {
     return result;
   }
 
-  async function fetchDailyUsageTrend(
-    days = USAGE_TREND_DAYS,
-  ): Promise<DailyUsageTrend[]> {
-    const db = getDatabase();
-    // SQL 查詢窗口必須與 buildDailyUsageSeries 的補零窗口對齊（同一個本地日曆區間），
-    // 否則落在「滾動 24h cutoff 但日曆區間外」的記錄會被 SQL 撈到卻被補零丟棄。
-    const endDate = new Date();
-    const startDate = new Date(
-      endDate.getFullYear(),
-      endDate.getMonth(),
-      endDate.getDate() - days + 1,
-    );
-    const rows = await db.select<DailyUsageTrendRow[]>(DAILY_USAGE_TREND_SQL, [
-      startDate.getTime(),
-      days,
-    ]);
-    const mapped = rows.map((row) => ({
-      date: row.date,
-      count: row.count,
-      totalChars: row.total_chars,
-    }));
-    return buildDailyUsageSeries(mapped, days, endDate);
-  }
 
-  async function fetchRecentTranscriptionList(
-    limit = 10,
-  ): Promise<TranscriptionRecord[]> {
-    const db = getDatabase();
-    const rows = await db.select<RawTranscriptionRow[]>(SELECT_RECENT_SQL, [
-      limit,
-    ]);
-    return rows.map(mapRowToRecord);
-  }
 
   async function refreshDashboard() {
-    const results = await Promise.allSettled([
-      fetchDashboardStats(),
-      fetchRecentTranscriptionList(10),
-      fetchDailyUsageTrend(),
-    ]);
-    if (results[0].status === "fulfilled") {
-      dashboardStats.value = results[0].value;
-    } else {
-      captureError(results[0].reason, {
-        source: "history",
-        step: "fetch-stats",
-      });
-    }
-    if (results[1].status === "fulfilled") {
-      recentTranscriptionList.value = results[1].value;
-    } else {
-      captureError(results[1].reason, {
-        source: "history",
-        step: "fetch-recent",
-      });
-    }
-    if (results[2].status === "fulfilled") {
-      dailyUsageTrendList.value = results[2].value;
-    } else {
-      captureError(results[2].reason, {
-        source: "history",
-        step: "fetch-trend",
-      });
+    try {
+      dashboardStats.value = await fetchDashboardStats();
+    } catch (err) {
+      captureError(err, { source: "history", step: "fetch-stats" });
     }
   }
 
@@ -922,9 +873,6 @@ export const useHistoryStore = defineStore("history", () => {
     hasMore,
     currentOffset,
     dashboardStats,
-    recentTranscriptionList,
-    dailyUsageTrendList,
-    usageTrendDays: USAGE_TREND_DAYS,
     fetchTranscriptionList,
     searchTranscriptionList,
     resetAndFetch,
@@ -933,7 +881,6 @@ export const useHistoryStore = defineStore("history", () => {
     updateTranscriptionOnRetrySuccess,
     addApiUsage,
     fetchDashboardStats,
-    fetchRecentTranscriptionList,
     refreshDashboard,
     clearAllAudioFilePath,
     clearAudioFilePathByIdList,

@@ -487,6 +487,30 @@ describe("useHistoryStore", () => {
       expect(sql).toContain("SUM(recording_duration_ms)");
     });
 
+    it("[P0] 今天與本週以本地午夜、週一為界，排除失敗記錄", async () => {
+      mockDbSelect.mockResolvedValueOnce([]);
+      mockDbSelect.mockResolvedValueOnce([]);
+
+      const { useHistoryStore } = await import(
+        "../../src/stores/useHistoryStore"
+      );
+      const store = useHistoryStore();
+
+      await store.fetchDashboardStats();
+
+      const [sql, params] = mockDbSelect.mock.calls[0] as [string, number[]];
+      expect(sql).toContain("status != 'failed'");
+      const dayStart = new Date(params[0]);
+      const weekStart = new Date(params[1]);
+      expect(dayStart.getHours()).toBe(0);
+      expect(dayStart.getMinutes()).toBe(0);
+      expect(dayStart.toDateString()).toBe(new Date().toDateString());
+      expect(weekStart.getDay()).toBe(1);
+      expect(weekStart.getHours()).toBe(0);
+      expect(params[1]).toBeLessThanOrEqual(params[0]);
+      expect(params[0] - params[1]).toBeLessThan(7 * 86_400_000);
+    });
+
     it("[P0] 應正確計算節省時間和整合每日額度用量", async () => {
       // 節省時間 = 600 / 40 * 60000 - 120000 = 780000ms
       mockDbSelect.mockResolvedValueOnce([
@@ -535,73 +559,21 @@ describe("useHistoryStore", () => {
   });
 
   // ==========================================================================
-  // fetchRecentTranscriptionList
-  // ==========================================================================
-
-  describe("fetchRecentTranscriptionList", () => {
-    it("[P0] 應使用 LIMIT 查詢最近記錄", async () => {
-      mockDbSelect.mockResolvedValueOnce([]);
-
-      const { useHistoryStore } = await import(
-        "../../src/stores/useHistoryStore"
-      );
-      const store = useHistoryStore();
-
-      await store.fetchRecentTranscriptionList(10);
-
-      const [sql, params] = mockDbSelect.mock.calls[0];
-      expect(sql).toContain("ORDER BY timestamp DESC");
-      expect(sql).toContain("LIMIT");
-      expect(params).toEqual([10]);
-    });
-
-    it("[P0] 應回傳 camelCase 映射後的記錄", async () => {
-      mockDbSelect.mockResolvedValueOnce([
-        createRawRow({ id: "recent-1", raw_text: "最近的文字" }),
-      ]);
-
-      const { useHistoryStore } = await import(
-        "../../src/stores/useHistoryStore"
-      );
-      const store = useHistoryStore();
-
-      const results = await store.fetchRecentTranscriptionList(10);
-
-      expect(results).toHaveLength(1);
-      expect(results[0].id).toBe("recent-1");
-      expect(results[0].rawText).toBe("最近的文字");
-    });
-
-    it("[P0] 預設 limit 應為 10", async () => {
-      mockDbSelect.mockResolvedValueOnce([]);
-
-      const { useHistoryStore } = await import(
-        "../../src/stores/useHistoryStore"
-      );
-      const store = useHistoryStore();
-
-      await store.fetchRecentTranscriptionList();
-
-      const params = mockDbSelect.mock.calls[0][1];
-      expect(params).toEqual([10]);
-    });
-  });
-
-  // ==========================================================================
   // refreshDashboard
   // ==========================================================================
 
   describe("refreshDashboard", () => {
-    it("[P0] 應同時載入統計、最近列表和趨勢並更新 refs", async () => {
-      // fetchDashboardStats → DASHBOARD_STATS_SQL
+    it("[P0] 應載入統計並更新 dashboardStats", async () => {
       mockDbSelect.mockResolvedValueOnce([
         {
           total_count: 5,
           total_characters: 200,
           total_recording_duration_ms: 60000,
+          today_count: 2,
+          today_characters: 40,
+          week_characters: 120,
         },
       ]);
-      // fetchDashboardStats → DAILY_QUOTA_USAGE_SQL
       mockDbSelect.mockResolvedValueOnce([
         {
           api_type: "whisper",
@@ -609,22 +581,6 @@ describe("useHistoryStore", () => {
           total_tokens: 0,
           billed_audio_ms: 20000,
         },
-      ]);
-      // fetchRecentTranscriptionList
-      mockDbSelect.mockResolvedValueOnce([
-        createRawRow({ id: "recent-1" }),
-        createRawRow({ id: "recent-2" }),
-      ]);
-      // fetchDailyUsageTrend（補零後固定 14 天，命中日對應今天）
-      const todayKey = (() => {
-        const now = new Date();
-        const y = now.getFullYear();
-        const m = String(now.getMonth() + 1).padStart(2, "0");
-        const d = String(now.getDate()).padStart(2, "0");
-        return `${y}-${m}-${d}`;
-      })();
-      mockDbSelect.mockResolvedValueOnce([
-        { date: todayKey, count: 3, total_chars: 100 },
       ]);
 
       const { useHistoryStore } = await import(
@@ -636,18 +592,13 @@ describe("useHistoryStore", () => {
 
       expect(store.dashboardStats.totalTranscriptions).toBe(5);
       expect(store.dashboardStats.totalCharacters).toBe(200);
+      expect(store.dashboardStats.todayTranscriptions).toBe(2);
+      expect(store.dashboardStats.todayCharacters).toBe(40);
+      expect(store.dashboardStats.weekCharacters).toBe(120);
       expect(store.dashboardStats.dailyQuotaUsage.whisperRequestCount).toBe(2);
       expect(store.dashboardStats.dailyQuotaUsage.whisperBilledAudioMs).toBe(
         20000,
       );
-      expect(store.recentTranscriptionList).toHaveLength(2);
-      expect(store.recentTranscriptionList[0].id).toBe("recent-1");
-      expect(store.dailyUsageTrendList).toHaveLength(14);
-      const lastDay =
-        store.dailyUsageTrendList[store.dailyUsageTrendList.length - 1];
-      expect(lastDay.date).toBe(todayKey);
-      expect(lastDay.count).toBe(3);
-      expect(lastDay.totalChars).toBe(100);
     });
 
     it("[P0] dashboardStats 初始值應全為零", async () => {
@@ -668,8 +619,8 @@ describe("useHistoryStore", () => {
         vocabularyAnalysisRequestCount: 0,
         vocabularyAnalysisTotalTokens: 0,
       });
-      expect(store.recentTranscriptionList).toHaveLength(0);
-      expect(store.dailyUsageTrendList).toHaveLength(0);
+      expect(store.dashboardStats.todayTranscriptions).toBe(0);
+      expect(store.dashboardStats.weekCharacters).toBe(0);
     });
   });
 
@@ -991,101 +942,4 @@ describe("useHistoryStore", () => {
     });
   });
 
-  // ==========================================================================
-  // fetchDailyUsageTrend
-  // ==========================================================================
-
-  describe("fetchDailyUsageTrend", () => {
-    it("[P0] 應回傳 camelCase 映射並補零成固定區間的趨勢陣列", async () => {
-      const { useHistoryStore } = await import(
-        "../../src/stores/useHistoryStore"
-      );
-      const store = useHistoryStore();
-
-      const toLocalKey = (date: Date) => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, "0");
-        const d = String(date.getDate()).padStart(2, "0");
-        return `${y}-${m}-${d}`;
-      };
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const todayKey = toLocalKey(today);
-      const yesterdayKey = toLocalKey(yesterday);
-
-      // fetchDashboardStats → DASHBOARD_STATS_SQL
-      mockDbSelect.mockResolvedValueOnce([
-        { total_count: 0, total_characters: 0, total_recording_duration_ms: 0 },
-      ]);
-      // fetchDashboardStats → DAILY_QUOTA_USAGE_SQL
-      mockDbSelect.mockResolvedValueOnce([]);
-      // fetchRecentTranscriptionList
-      mockDbSelect.mockResolvedValueOnce([]);
-      // fetchDailyUsageTrend（SQL 只回有使用記錄的日期）
-      mockDbSelect.mockResolvedValueOnce([
-        { date: todayKey, count: 5, total_chars: 250 },
-        { date: yesterdayKey, count: 3, total_chars: 120 },
-      ]);
-
-      await store.refreshDashboard();
-
-      const list = store.dailyUsageTrendList;
-      // 補零後固定 14 天、升冪、今天在最後
-      expect(list).toHaveLength(14);
-      expect(list[list.length - 1]).toEqual({
-        date: todayKey,
-        count: 5,
-        totalChars: 250,
-      });
-      expect(list[list.length - 2]).toEqual({
-        date: yesterdayKey,
-        count: 3,
-        totalChars: 120,
-      });
-      // 缺席日補 0
-      expect(list[0]).toEqual({
-        date: list[0].date,
-        count: 0,
-        totalChars: 0,
-      });
-    });
-
-    it("[P0] DAILY_USAGE_TREND_SQL 應包含 GROUP BY 和 LIMIT", async () => {
-      // fetchDashboardStats → DASHBOARD_STATS_SQL
-      mockDbSelect.mockResolvedValueOnce([
-        { total_count: 0, total_characters: 0, total_recording_duration_ms: 0 },
-      ]);
-      // fetchDashboardStats → DAILY_QUOTA_USAGE_SQL
-      mockDbSelect.mockResolvedValueOnce([]);
-      // fetchRecentTranscriptionList
-      mockDbSelect.mockResolvedValueOnce([]);
-      // fetchDailyUsageTrend
-      mockDbSelect.mockResolvedValueOnce([]);
-
-      const { useHistoryStore } = await import(
-        "../../src/stores/useHistoryStore"
-      );
-      const store = useHistoryStore();
-
-      await store.refreshDashboard();
-
-      // fetchDailyUsageTrend 是第 4 次 select 呼叫
-      const trendCall = mockDbSelect.mock.calls[3];
-      const sql = trendCall[0] as string;
-      expect(sql).toContain("WHERE timestamp >=");
-      expect(sql).toContain("GROUP BY date");
-      expect(sql).toContain("LIMIT");
-      const params = trendCall[1] as number[];
-      // cutoff 必須是「本地午夜」（與補零的日曆窗口對齊），而非滾動 24h
-      const cutoff = new Date(params[0]);
-      expect(cutoff.getHours()).toBe(0);
-      expect(cutoff.getMinutes()).toBe(0);
-      expect(cutoff.getSeconds()).toBe(0);
-      expect(cutoff.getMilliseconds()).toBe(0);
-      expect(params[0]).toBeLessThanOrEqual(Date.now());
-      expect(params[0]).toBeGreaterThan(Date.now() - 15 * 86_400_000);
-      expect(params[1]).toBe(14);
-    });
-  });
 });

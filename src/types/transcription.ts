@@ -34,6 +34,9 @@ export interface DashboardStats {
   totalTranscriptions: number;
   totalCharacters: number;
   totalRecordingDurationMs: number;
+  todayTranscriptions: number;
+  todayCharacters: number;
+  weekCharacters: number;
   estimatedTimeSavedMs: number;
   dailyQuotaUsage: DailyQuotaUsage;
 }
@@ -71,8 +74,3 @@ export interface ApiUsageRecord {
   estimatedCostCeiling: number;
 }
 
-export interface DailyUsageTrend {
-  date: string;
-  count: number;
-  totalChars: number;
-}
