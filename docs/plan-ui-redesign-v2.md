@@ -1,0 +1,202 @@
+# 計畫：主視窗與 HUD 改版「安靜工具」（v0.16＋v0.17）
+
+> 建立：2026-11-21 · 狀態：計劃閘 R1 NO-GO（4 HIGH、8 MED、1 LOW）→ 全收 → R2 NO-GO（3 HIGH、4 MED、1 LOW）→ 全收 → R3 NO-GO（1 HIGH、1 MED、1 LOW）→ 全收 → **R4 GO（無 finding）**，可動工
+> 拍板（2026-11-21 使用者，決策頁複製摘要）：Q1 照新資訊架構（記錄合併、設定改獨立偏好設定視窗 ⌘,、刪功能介紹）／Q2 ⌘K＋選單列最近 5 句都做／Q3 全做、分兩版出
+> **規格以 demo 為準**：`docs/demos/ui-redesign-v2/prototype.html`（段 4 可操作原型），**但以下三類例外以本檔為準**：①「功能去向表」列出的現有功能，demo 沒畫不代表刪除；②「代決」段改掉的 demo 文案；③**流程、狀態、錯誤互動一律以 C1～C4 契約為準**（demo 只決定視覺與版面）——包括 demo 未畫的引導 API Key 步驟與真實試講輸入框（C2）、HUD 不畫假進度、既有錯誤的滑鼠互動與重試保留（C3）。
+> 前提：建立在 v0.15（#81、#84、#88、#82）之上；分支 `feat/ui-redesign-v2` 自 `verify/v0.15-integration` 分出。
+
+## 要解決什麼
+
+| 現況（v0.14.3 實機＋程式碼盤點） | 使用資料（app.db 9,428 筆，2026-03-06～11-21，SQL 摘要見附錄） |
+|---|---|
+| 五頁平鋪：儀表板 6 張等大數字卡、歷史每列 4 顆按鈕＋展開箭頭且無日期分組、字典說明框佔首屏（960×680）約 1/4、設定 11 張卡單欄長捲、功能介紹 8 張文字卡 | 62% 句子 < 30 字；79% 用 AI 整理；編輯模式 0.5%；近 30 天失敗 11 筆 |
+| HUD 轉錄中／整理中／編輯中合併成同一畫面、成功只畫勾不寫字 | 平均每句錄 11 秒 |
+| 寫死顏色：固定 green／red／emerald／blue 色 token 全 src 56 個（45 行；其中 SettingsView 46 個／37 行）＋NotchHud 色碼；淺色主題「AI 整理」標籤 1.92:1、藍提示框 1.42:1；行內回饋 26 處（口徑見附錄）；原生 button 分段 4 處、Hold／Toggle 未翻譯 | 最常用時段 23～02 點 |
+
+獨立評審（Awwwards 四項加權，評分方法：同一評審讀截圖＋原始碼、四輪）：現況 4.5 → 原型第三輪 7.7。
+
+## 資訊架構（改前 → 改後）
+
+| 改前 | 改後 |
+|---|---|
+| 儀表板＋歷史記錄 | **記錄**：頂部一行統計＋依日期分組時間軸＋右側細節窗格 |
+| 自訂字典 | **詞庫**（v0.16 先沿用現有 DictionaryView＋#81；v0.17 改新版＋收件匣） |
+| 設定（11 卡） | **偏好設定視窗**（獨立 Tauri 視窗，label `preferences`；macOS ⌘,、Windows Ctrl+,、側欄齒輪） |
+| 功能介紹 | v0.17 才刪，同版上第一次啟動引導；v0.16 保留舊頁（側欄收進偏好設定「關於」分頁的連結） |
+| — | **⌘K 指令面板**（v0.17） |
+| 選單列 2 項寫死 | **原生選單**最近 5 句（v0.16） |
+
+## 功能去向表（demo 沒畫的現有功能一律保留）
+
+| 現有功能 | 新位置 |
+|---|---|
+| 四家 API Key（Groq、OpenAI、Anthropic、Gemini）＋測試連線＋前往取得 | 偏好設定「轉錄與整理」；轉錄服務只列現有支援的 Groq（**不新增 OpenAI 轉錄**，demo 的該選項移除） |
+| 轉錄模型、轉錄語言、整理服務與模型（含 badge） | 偏好設定「轉錄與整理」 |
+| AI 整理 Prompt：精簡／積極／自訂＋Textarea＋儲存／重置 | 偏好設定「轉錄與整理」下方「整理 Prompt」群組 |
+| 短文字門檻、智慧字典學習開關 | 偏好設定「轉錄與整理」 |
+| 快捷鍵：簡易／自訂、錄製、診斷回報；觸發模式 hold／toggle；雙擊切整理模式說明 | 偏好設定「快捷鍵」＋快捷鍵小抄；**顯示值一律讀實際設定與平台**（macOS 預設 Fn、Windows 預設 Right Alt；demo 的 Right ⌘ 是使用者本人的設定） |
+| 麥克風選擇＋重新整理＋音量預覽 | 偏好設定「麥克風」 |
+| 錄音儲存：自動清理、保留天數、刪除全部 | 偏好設定「進階」 |
+| 主題、介面語言、錄音靜音、複製到剪貼簿、音效、隱藏 Dock（僅 macOS）、開機啟動、啟動隱藏主視窗 | 偏好設定「一般」 |
+| 除錯記錄、開啟資料夾 | 偏好設定「進階」 |
+| 關於、原始碼、回報問題、檢查更新 | 偏好設定「關於」；側欄底部保留版本與「有新版本」提示 |
+| 歷史：播放、複製、重新辨識（有錄音才可）、重新整理、刪除、展開原文、無限捲動、搜尋 | 記錄細節窗格（工具列＋「⋯」選單放刪除與重新辨識）；沿用 store 與既有禁用條件（無錄音、編輯模式） |
+| 字典：#81 搜尋＋編輯（IME、草稿、存檔鎖、AI 改詞轉 manual 保留權重日期）、匯入／匯出、新增、刪除 | v0.16 原樣；v0.17 新詞庫頁保留全部（編輯用列內雙擊或鉛筆、匯入匯出放頁首「⋯」） |
+| 歷史展開區：原文獨立複製、錄音／轉錄／AI 耗時、字數、觸發模式 | 細節窗格「原文」分頁附複製；meta 列顯示錄音／轉錄／整理耗時（有值才顯示）、字數、觸發模式（按住／切換） |
+| 儀表板：總口述時間、口述字數、節省時間、總使用次數、平均每次字數 | 統計列 ⓘ 的展開卡（累計區塊）逐項保留 |
+| 儀表板：今日額度卡（含全付費時「今日用量」＋計費 badge）、hover 明細（Whisper、音訊、LLM 次數與 tokens、Gemini 額度提示、字典分析次數與 tokens） | 統計列「免費額度／今日用量」一格，hover 顯示既有明細全文 |
+| 儀表板：每日趨勢圖 | 移除（demo 未保留，屬拍板 Q1 範圍） |
+
+## 契約（R1 HIGH 補齊）
+
+### C1 偏好設定第三視窗（F1）
+- 新增入口 `preferences.html`＋`src/preferences.ts`，Vite input、`tauri.conf.json` 視窗（預設不建立，Rust 指令 `open_preferences(tab?)` 單例建立／聚焦）、capability 加 `preferences` label。不套 HUD 的 always-on-top／skipTaskbar／noactivate。
+- **關閉＝先清理再銷毀**（R2-1：原生銷毀不保證跑完 Vue 卸載）：Rust 攔 `preferences` 的 CloseRequested → `prevent_close` → emit `preferences:before-close` → 前端 **await** `stop_audio_preview` 與 `cancel_hotkey_recording` 兩個 IPC 都回傳（現有錄鍵終止只送不等，需改為等待）→ invoke `close_preferences` 銷毀。不設逾時強關（R3-2 消融採納）。驗收：關窗後麥克風指示燈熄、全域快捷鍵可用、錄鍵中關窗後觸發鍵恢復正常。
+- 現有缺口：OpenAI／Anthropic／Gemini Key 的儲存與刪除、錄音清理設定、除錯設定目前**不 emit** `settings:updated`，本卡一併補齊。
+- **設定載入（R2-2）**：偏好設定視窗初始化用**純讀**路徑（只讀 store 檔＋refresh 記憶體），**不呼叫 `update_hotkey_config`**；只有使用者真的改了快捷鍵才送 Rust。主視窗啟動流程不變。驗收：錄音中（hold 與 toggle 各一）開啟／重開偏好設定，錄音照常結束、不誤觸開始。
+- 同步：任何視窗寫入後 emit 既有 `settings:updated`（現有 emit 在 settings store 的儲存／刪除 actions，HUD 雙擊經 `savePromptMode`）；**主視窗、HUD、偏好設定三方都監聽、收到只 refresh，不反向 emit、不重跑完整載入**。
+- migration、更新摘要、清理排程只由主視窗執行；偏好設定入口不呼叫。
+- macOS 應用程式選單綁 ⌘,（保留原生編輯選單）；Windows 用 Ctrl+, 與齒輪。
+
+### C2 第一次啟動引導（F2，v0.17）
+- 觸發：新安裝（無完成旗標，且 consume 前讀到的 `lastSeenVersion` 不存在）→ 顯示；升級使用者（`lastSeenVersion` 存在，或有歷史記錄、或已有 Key，任一成立）→ 不顯示、直接設完成旗標；略過 → 設旗標；偏好設定「關於」可「重新顯示引導」；已完成但權限被撤銷 → 沿用現有 AccessibilityGuide 偵測與 reinitialize，不重播引導。
+- 步驟：①（僅 macOS）輔助使用權限：「打開系統設定」＋沿用權限輪詢＋授權後 reinitialize listener ②Groq API Key：輸入＋測試連線（沿用現有元件）③快捷鍵：讀實際設定、可改 ④試講：提供真實輸入框，按實際觸發鍵走既有錄音流程。
+- 與更新摘要不疊：引導顯示時延後更新摘要到下次啟動。
+- **v0.16 過渡（R2-4）**：現有「首次無 Groq Key 導向 /settings」改為開啟偏好設定視窗「轉錄與整理」分頁；v0.17 再改接引導。
+
+### C3 HUD 狀態映射（F3）
+| 現有狀態／事件 | 新畫面 | 條件 |
+|---|---|---|
+| recording | 錄音中＋計時＋模式（編輯模式顯示「編輯」） | 模式讀設定 |
+| transcribing | 轉錄中 | 不畫假進度 |
+| enhancing／editing | 整理中・模式／編輯中 | editing 語意保留 |
+| success | 已貼上・N 字＋言 | paste 成功才進；N＝實際貼上文字的字數，由 voice flow store 在 paste 成功後計算、經 store→NotchHud prop 傳入（HUD 與 store 同窗，不新增對外事件；`record.charCount` 是原文長度，不可沿用） |
+| error | **僅**「已存記錄且有錄音可重試」的轉錄錯誤顯示「辨識失敗・到記錄重試」；其餘照現有具體錯誤文案 | 現有 error 的滑鼠互動與 retry 行為保留不變 |
+| cancelled | 已取消（短暫）→ 隱藏 | Esc 取消保留 |
+| mode-switch | 已切換至〇〇模式（短暫） | 沿用雙擊切換 |
+| learned | 新增字典＋詞（短暫） | 沿用排隊、音效、錄音優先 |
+| idle | 隱藏 | 沿用中斷與穿透規則 |
+- 外窗維持 470px（Tauri 與 Rust 置中常數不動），內容固定寬 320px 置中；過渡用 CSS transition＋cubic-bezier；prefers-reduced-motion 關補間。
+
+### C4 收件匣語意（F4、F7，v0.17）—— 代決
+- **代決：AI 新學到的詞照舊立即具備提示入選資格**（沿用手動優先＋權重＋前 50），收件匣只代表「尚未檢視」；保留＝標為已檢視、刪除＝刪詞（可復原）。demo 文案「保留的詞會加進辨識與整理」改為「這些詞已在使用中，看一眼要不要留」。要改成「保留才生效」屬另一次產品行為變更。
+- 欄位：追加 migration 加 `is_reviewed INTEGER NOT NULL DEFAULT 1`（消融建議採納：布林即可，不存時間）；既有資料預設 1。寫入點逐一（`useVocabularyStore`）：手動新增→1；刪除→刪；改詞（轉 manual）→1；**AI 自動學習新增→0**；加權→不動 is_reviewed；匯入 UPSERT 的新增、合併、原本 skipped 三個分支都明確寫 1（不靠預設值）。
+- 畫面（R2-3，demo 已同步修正互動）：未檢視的詞**本來就在詞庫列表與總數裡**；保留＝只消徽章、總數不變；刪除＝詞與總數一起減；復原＝兩者一起回來；側欄徽章只計未檢視數。
+- 復原：回存原條目的 id、term、source、weight、created_at、is_reviewed，不呼叫 addTerm。
+- 提示查詢不加 is_reviewed 條件。
+
+## 分兩版（R1 F10 重切）
+
+### v0.16（估 15～17 工作天）
+| # | 項目 | 驗證 |
+|---|---|---|
+| 1 | 設計 token 改版（深淺兩套全 AA）、清寫死色（全 src 固定色 token 56 個＋NotchHud 色碼改接 token） | rg 無固定色 class；對比腳本實測 |
+| 2 | 側欄＋外殼：記錄、詞庫兩項＋齒輪＋狀態區（讀實際設定）；保留 ⌘/Ctrl+B 側欄快捷鍵 | 元件測試 |
+| 3 | 記錄頁：日期分組、↑↓／Enter 複製（輸入框聚焦、IME 組字、文字選取時讓位）、細節窗格、功能去向表的歷史操作、失敗列重試；沿用 20 筆分頁 | 元件測試；9,428 筆合成資料量測首屏／搜尋／捲動（互動 < 100ms 為目標），超標且證明是 DOM 才考慮虛擬化 |
+| 4 | 偏好設定視窗（C1）：SettingsView 依副作用邊界拆 6 分頁，處理方法與 store action 原樣搬 | 分頁生命週期（離頁停預覽／停錄鍵）、三窗同步、關窗銷毀、Windows 前景錄鍵整合測試；既有 store 測試全綠 |
+| 5 | HUD（C3） | NotchHud 測試補各態；五語系 320px 溢字檢查 |
+| 6 | 選單列原生選單：最近 5 筆成功記錄（主視窗 DB owner 直接查 DB → 新 IPC `update_tray_recent(items)` → Rust 重建 Menu）；觸發（R2-6，`useHistoryStore` 五條落地路徑全部要刷新）：啟動、新增、HUD 重送成功、刪除、重新辨識完成、重新整理完成，加上切語系；刷新掛在 store 層（主視窗常駐），不綁歷史頁元件，主視窗隱藏或在詞庫頁也有效；項目以記錄 ID 綁完整文字、標題截斷；點擊只寫剪貼簿 | Rust 測試；五條路徑各一條測試；Windows 實機左右鍵、選單開著時更新、& 與 Unicode 標題 |
+| 7 | inline 回饋：**成功類**改 toast（新增 shadcn `sonner`）；持續錯誤、連線測試結果、可重試提示維持原位；原生 button 改 shadcn；Hold/Toggle 進 i18n | rg 驗證 |
+| 8 | 五語系新增 key（估 N×5，重用既有 400 key）、v0.16 更新摘要 itemN＋upgradeNoticeItemCount | 既有 key 一致性測試＋三窗切語系 |
+
+### v0.17（估 10～13 工作天）
+| # | 項目 | 驗證 |
+|---|---|---|
+| 9 | ⌘K（新增 shadcn `command`＋必要相依）：記錄搜尋走 DB 有界查詢（不只已載入 20 筆）、切整理模式、複製上一句、新增詞彙（無記錄比對才出現、沿用重複檢查）、跳偏好設定分頁；只在 SayIt 前景作用；錄鍵期間 ⌘/Ctrl+K 與 ⌘/Ctrl+, 都退讓（v0.16 的 ⌘, 同樣適用） | 元件測試 |
+| 10 | 詞庫新頁＋收件匣（C4） | migration、四種寫入、刪除復原測試；#81 測試全綠 |
+| 11 | 第一次啟動引導（C2）＋刪功能介紹頁與路由 | 元件測試（五種入口） |
+| 12 | 主視窗補播落地：session 記憶體記錄上次聚焦後新增的 ID，聚焦時新列撐開 180ms＋高亮 1.2s；重整理舊列不算新 | 元件測試 |
+| 13 | macOS 側欄 vibrancy；Windows 實色、原生標題列 | 雙平台實機 |
+| 14 | v0.17 更新摘要 | 同 8 |
+
+合計約 25～30 工作天（5～6 週，單人推估、非承諾）。
+
+## 不做
+
+- 不改辨識／整理／貼上流程與全域錄音 hook；不改快捷鍵行為（按兩下＝切整理模式、Esc 取消）
+- 不記錄服務商／失敗原因到 DB；不新增 OpenAI 轉錄
+- 不做自繪選單列 popover、不做「暫停」、不做跨視窗飛行動態
+- 不加虛擬清單、通用設定 schema、tray 背景 worker 或節流（無量測依據）
+- 不刪 4～6 個未用範本元件（消融審查建議：與本改版無操作關聯，另開清理卡）
+
+## 平台與尺寸驗收（F12）
+
+- 主視窗 960×680 與最小 720×480 兩種尺寸都照 demo 排得下（細節窗格 < 840px 寬時收成可切換的右側抽屜）
+- HUD 五語系、Windows 100／150／200% DPI、多螢幕、#88 topmost 不退步
+- Windows：無 Dock、無輔助使用步驟、隱藏 Dock 選項不顯示、vibrancy 不套用
+
+## 驗收
+
+- 每版：該版畫面與操作清單 vs demo 對照；v0.17 驗收完整 demo
+- 5 件常做的事：統一起點（SayIt 在背景、主視窗關著），計入開窗與選字步驟，並與現有最快方式比較（例：切整理模式現況可用雙擊觸發鍵，新舊都是 1 步，不列為改善）
+- 深淺主題對比 AA 實測
+- `pnpm test`、`vue-tsc`、`cargo clippy -D warnings`、`cargo test`、Windows CI＋實機
+
+## 計劃閘 R1（2026-11-21，codex gpt-6.1-sol xhigh、審查暫存區）
+
+判定 **NO-GO**：4 HIGH、8 MED、1 LOW；實跑 10 檔 166 項測試、vue-tsc 通過。裁決：獨立偏好設定視窗（照拍板）、暫不加虛擬清單、tray 可動態重建、SettingsView 可拆六頁、Command 未安裝需新增。
+
+| # | 等級 | 問題 | 處置 |
+|---|---|---|---|
+| F1 | HIGH | 第三視窗缺入口／同步／清理契約 | 收：C1 |
+| F2 | HIGH | 引導缺 API Key、權限補救、彈窗順序 | 收：C2 |
+| F3 | HIGH | HUD 五態吃掉既有狀態與錯誤 | 收：C3 |
+| F4 | HIGH | 收件匣生效語意矛盾 | 收：C4 代決「立即生效」，改 demo 文案 |
+| F5 | MED | 缺舊功能保留表；demo 示範不支援的 OpenAI 轉錄 | 收：功能去向表 |
+| F6 | MED | tray 只在新增時更新 | 收：v0.16 #6 觸發清單 |
+| F7 | MED | reviewed migration 寫入來源與復原 | 收：C4 |
+| F8 | MED | i18n／更新摘要驗收太粗 | 收：#8、#14 |
+| F9 | MED | 快捷鍵預設值與面板捷徑衝突 | 收：功能去向表＋#3、#9 讓位規則 |
+| F10 | MED | v0.16 超載、工期 4 週不可信 | 收：重切兩版、改估 5～6 週 |
+| F11 | MED | 消融：未用範本刪除、reviewed 時間值可刪 | 收：兩者皆採納（布林欄位；範本清理移出本卡） |
+| F12 | MED | 尺寸與 Windows 實機契約 | 收：平台與尺寸驗收 |
+| F13 | LOW | 盤點口徑 | 收：數字改附口徑、附錄 SQL |
+
+## 計劃閘 R2（2026-11-21，同上，窄審）
+
+判定 **NO-GO**：3 HIGH、4 MED、1 LOW；R1 十三條中 F7、F8、F10、F11、F12 收斂，其餘部分收斂。派工端已核對 R2-2：`loadSettings()` 結尾 `syncHotkeyConfigToRust`，Rust `update_config` 清除 `is_pressed`／`is_toggled_on`。
+
+| # | 等級 | 問題 | 處置 |
+|---|---|---|---|
+| R2-1 | HIGH | 原生銷毀不保證 Vue 卸載清理 | 收：C1 先清理再銷毀（before-close 事件＋超時強制） |
+| R2-2 | HIGH | 開偏好設定會重設進行中的錄音按鍵狀態 | 收：C1 偏好設定純讀載入，不呼叫 `update_hotkey_config` |
+| R2-3 | HIGH | demo 互動仍是「保留才加入」 | 收：demo 互動已改（未檢視詞已在列表與總數、保留只消徽章、刪除與復原連動總數），C4 畫面段同步 |
+| R2-4 | MED | 升級判定漏人；v0.16 缺 Key 入口 | 收：C2 加 `lastSeenVersion`；v0.16 過渡導向偏好設定 |
+| R2-5 | MED | HUD 字數資料路徑 | 收：C3 由 store 在 paste 後算、經 prop 傳入 |
+| R2-6 | MED | tray 五條落地路徑 | 收：v0.16 #6 |
+| R2-7 | MED | 功能去向缺具名映射 | 收：功能去向表補歷史展開區與儀表板各項 |
+| R2-8 | LOW | 色彩統計範圍、SQL 佐證 | 收：改全 src 口徑、附完整 SQL 與結果 |
+
+## 計劃閘 R3（2026-11-21，同上，窄審）
+
+判定 **NO-GO**：1 HIGH、1 MED、1 LOW；R1 F4～F12 與 R2-2～R2-7 確認收斂。
+
+| # | 等級 | 問題 | 處置 |
+|---|---|---|---|
+| R3-1 | HIGH | demo 的引導與 HUD 互動與 C2／C3 契約衝突，而 demo 優先 | 收：檔頭例外③——流程／狀態／錯誤互動以 C1～C4 為準，demo 只管視覺 |
+| R3-2 | MED | 逾時強關漏取消錄鍵 | 收：拿掉逾時（消融），正常路徑 await 兩個 IPC |
+| R3-3 | LOW | 工作清單仍寫 46 | 收：改全 src 56 |
+
+## 計劃閘 R4（2026-11-21，同上，窄審）
+
+判定 **GO**：R3 三條收斂、無新 finding。補充：`cancel_hotkey_recording` 在非錄鍵狀態呼叫只清錄鍵暫存、不動一般錄音狀態，安全；兩個停止 command 回傳 `()`，不另加防禦。
+
+## 代決
+
+- 代決：收件匣生效語意／選「AI 詞立即生效、收件匣只標檢視」／不改現有辨識行為、符合「不改流程」約束／要改成「保留才生效」需另開卡並拍板
+- 代決：版本切分／照 R1 F10 建議（tray 提前到 v0.16，⌘K、引導、收件匣移到 v0.17）／v0.16 範圍才能在 15～17 天內驗收／要調整改本表即可
+- 代決：未用範本元件清理移出本卡／消融審查無操作關聯／另開小卡即可
+
+## 附錄：統計口徑
+
+- 使用資料（本機 app.db 2026-11-21 唯讀查詢，未入 repo；數字為派工端轉述、審查者未獨立複驗）：
+  - `select case when char_count<10 then 'a' when char_count<30 then 'b' when char_count<80 then 'c' when char_count<200 then 'd' else 'e' end b, count(*) from transcriptions group by b;` → 2082／3814／2779／653／100
+  - `select trigger_mode, count(*) from transcriptions group by 1;` → hold 4984、toggle 4444
+  - `select was_enhanced, count(*) from transcriptions group by 1;` → 0:1964、1:7464
+  - `select is_edit_mode, count(*) from transcriptions group by 1;` → 0:9377、1:51
+  - `select avg(recording_duration_ms) from transcriptions;` → 約 11.0 秒
+  - `select strftime('%H', created_at, 'localtime') h, count(*) from transcriptions group by h order by 2 desc limit 5;` → 02、01、00、23、18
+  - `select count(*) from transcriptions where status='failed' and created_at > datetime('now','-30 days');` → 11
+- 寫死色：`rg 'text-(green|red|emerald|blue)-[0-9]|bg-(green|red|emerald|blue)-[0-9]|border-(green|red|emerald|blue)-[0-9]' src` 計 token 數
+- 行內回饋 26：`message.value` 的 v-if 區塊 23（Settings 21、MainApp 1、Dictionary 1）＋ConnectionTestButton 2＋History retry-error 1
+- 對比：WCAG 2.x 相對亮度，色組 #34d399／#ffffff、#bfdbfe／#ffffff
