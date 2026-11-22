@@ -15,6 +15,7 @@ import { extractErrorMessage } from "./lib/errorUtils";
 import { initSentryForDashboard, captureError } from "./lib/sentry";
 import { initThemeFromStore } from "./lib/theme";
 import { useSettingsStore } from "./stores/useSettingsStore";
+import { useHistoryStore } from "./stores/useHistoryStore";
 import { installConsoleForwarding } from "./lib/logger";
 import i18n from "./i18n";
 import "./style.css";
@@ -45,8 +46,10 @@ async function bootstrap() {
   app.use(pinia).use(i18n).use(router);
 
   // DB 必須在 mount 之前初始化，否則 View 的 onMounted 會因 getDatabase() 拋錯而全部失敗
+  let isDatabaseReady = false;
   try {
     await initializeDatabase();
+    isDatabaseReady = true;
     // migration 完成：先註冊 ping 回應再廣播，通知 HUD 可安全存取連線池
     await listenToEvent(DATABASE_READY_PING, () => {
       void emitEvent(DATABASE_READY);
@@ -66,6 +69,11 @@ async function bootstrap() {
   await settingsStore.loadSettings();
   await settingsStore.consumeUpgradeNotice();
   await settingsStore.initializeAutoStart();
+
+  // 選單列最近 5 句：設定載入後（語系已定）才建，標題才是使用者的語言
+  if (isDatabaseReady) {
+    await useHistoryStore().startTrayRecentSync();
+  }
 
   // C2 過渡（v0.16）：沒有 Groq Key 就進設定模式「轉錄與整理」；v0.17 改接第一次啟動引導
   if (!settingsStore.hasApiKey) {

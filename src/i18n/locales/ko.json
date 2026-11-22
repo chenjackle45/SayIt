@@ -524,5 +524,10 @@
       "title": "기록",
       "description": "모든 텍스트 변환 결과가 저장됩니다. 검색, 텍스트 복사, 삭제, 녹음 재생이 가능합니다."
     }
+  },
+  "tray": {
+    "recentHint": "최근 말한 내용 · 클릭하여 복사",
+    "openMain": "SayIt 열기",
+    "quit": "SayIt 종료"
   }
 }

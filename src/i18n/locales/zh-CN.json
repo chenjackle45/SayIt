@@ -524,5 +524,10 @@
       "title": "历史记录",
       "description": "所有转录结果都会保存，可搜索、复制文字、删除记录，也可以重新播放录音文件。"
     }
+  },
+  "tray": {
+    "recentHint": "最近说的话・点一下复制",
+    "openMain": "打开 SayIt",
+    "quit": "退出 SayIt"
   }
 }

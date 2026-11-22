@@ -524,5 +524,10 @@
       "title": "History",
       "description": "All transcriptions are saved. Search, copy text, delete records, or replay the original audio recording."
     }
+  },
+  "tray": {
+    "recentHint": "Recent · click to copy",
+    "openMain": "Open SayIt",
+    "quit": "Quit SayIt"
   }
 }

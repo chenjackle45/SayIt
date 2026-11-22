@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, watch } from "vue";
+import i18n from "../i18n";
 import type {
   TranscriptionRecord,
   DashboardStats,
@@ -28,6 +29,7 @@ import { useSettingsStore } from "./useSettingsStore";
 import { useVocabularyStore } from "./useVocabularyStore";
 import {
   emitToWindow,
+  listenToEvent,
   TRANSCRIPTION_COMPLETED,
 } from "../composables/useTauriEvents";
 
@@ -41,6 +43,11 @@ export interface HistoryRetryResult {
 }
 
 const PAGE_SIZE = 20;
+
+// 選單列最近 5 句（v0.16 #6）：只取成功記錄，文字以整理後優先
+const TRAY_RECENT_LIMIT = 5;
+const TRAY_RECENT_SQL = `SELECT id, raw_text, processed_text FROM transcriptions
+  WHERE status = 'success' ORDER BY timestamp DESC LIMIT $1`;
 
 interface RawTranscriptionRow {
   id: string;
@@ -571,6 +578,7 @@ export const useHistoryStore = defineStore("history", () => {
       transcriptionList.value = transcriptionList.value.filter(
         (r) => r.id !== id,
       );
+      void refreshTrayRecent();
     } catch (err) {
       console.error(
         `[useHistoryStore] deleteTranscription failed: ${extractErrorMessage(err)}`,
@@ -665,7 +673,9 @@ export const useHistoryStore = defineStore("history", () => {
       return { ok: false, errorKey: "history.retranscribeFailed" };
     }
     try {
-      return await retranscribeRecordUnlocked(record);
+      const result = await retranscribeRecordUnlocked(record);
+      if (result.ok) void refreshTrayRecent();
+      return result;
     } catch (err) {
       captureError(err, { source: "history", step: "retranscribe" });
       return { ok: false, errorKey: "history.retranscribeFailed" };
@@ -784,7 +794,9 @@ export const useHistoryStore = defineStore("history", () => {
       return { ok: false, errorKey: "history.reEnhanceFailed" };
     }
     try {
-      return await reEnhanceRecordUnlocked(record);
+      const result = await reEnhanceRecordUnlocked(record);
+      if (result.ok) void refreshTrayRecent();
+      return result;
     } catch (err) {
       captureError(err, { source: "history", step: "reenhance" });
       return { ok: false, errorKey: "history.reEnhanceFailed" };
@@ -866,6 +878,51 @@ export const useHistoryStore = defineStore("history", () => {
     return { ok: true, record: updated };
   }
 
+  // 「查詢 → 送 Rust」整段串行：較早的查詢若晚到，會把剛刪掉的句子放回選單
+  let trayRefreshQueue: Promise<void> = Promise.resolve();
+
+  /** 查最近 5 筆成功記錄交給 Rust 重建選單列選單（主視窗是 DB owner，只在主視窗呼叫） */
+  function refreshTrayRecent(): Promise<void> {
+    trayRefreshQueue = trayRefreshQueue.then(syncTrayRecentOnce);
+    return trayRefreshQueue;
+  }
+
+  async function syncTrayRecentOnce(): Promise<void> {
+    try {
+      const rows = await getDatabase().select<
+        Array<{ id: string; raw_text: string; processed_text: string | null }>
+      >(TRAY_RECENT_SQL, [TRAY_RECENT_LIMIT]);
+      const t = i18n.global.t;
+      await invoke("update_tray_recent", {
+        items: rows.map((row) => ({ id: row.id, text: row.processed_text ?? row.raw_text })),
+        labels: {
+          recentHint: t("tray.recentHint"),
+          openMain: t("tray.openMain"),
+          quit: t("tray.quit"),
+        },
+      });
+    } catch (err) {
+      captureError(err, { source: "history", step: "tray-recent" });
+    }
+  }
+
+  /**
+   * 主視窗啟動時呼叫一次：先刷新，之後在 HUD 新增／重送成功（TRANSCRIPTION_COMPLETED）與切語系時刷新；
+   * 刪除、重新辨識、重新整理由各自的 store action 刷新。掛在 store 層，不綁記錄頁元件。
+   */
+  async function startTrayRecentSync(): Promise<void> {
+    await listenToEvent(TRANSCRIPTION_COMPLETED, () => {
+      void refreshTrayRecent();
+    });
+    watch(
+      () => i18n.global.locale.value,
+      () => {
+        void refreshTrayRecent();
+      },
+    );
+    await refreshTrayRecent();
+  }
+
   return {
     transcriptionList,
     isLoading,
@@ -890,5 +947,7 @@ export const useHistoryStore = defineStore("history", () => {
     retryingAction,
     retranscribeRecord,
     reEnhanceRecord,
+    refreshTrayRecent,
+    startTrayRecentSync,
   };
 });

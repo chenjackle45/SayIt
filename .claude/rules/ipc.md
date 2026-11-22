@@ -20,6 +20,7 @@ paths:
 | `update_hotkey_config` | `lib.rs` | useSettingsStore | `trigger_key: TriggerKey, trigger_mode: TriggerMode` | `Result<(), String>` |
 | `get_hud_target_position` | `lib.rs` | — | `app: AppHandle` | `Result<HudTargetPosition, String>` |
 | `get_os_theme` | `lib.rs` | lib/theme.ts | — | `Option<String>`（`"dark"` \| `"light"`，非 Windows 回 `null`） |
+| `update_tray_recent` | `lib.rs` | useHistoryStore（主視窗） | `items: { id, text }[]`（最近 5 筆成功記錄，整理後優先）, `labels: { recentHint, openMain, quit }` | `Result<(), String>`（重建選單列選單；點最近某句＝以記錄 ID 找回完整文字寫剪貼簿） |
 | `set_dock_icon_hidden` | `lib.rs` | useSettingsStore | `hidden: bool` | `Result<(), String>`（macOS 切換啟用策略 Accessory／Regular，其他平台不做事；gh-82） |
 | `reassert_hud_topmost` | `lib.rs` | useVoiceFlowStore | `app: AppHandle` | `Result<(), String>`（Windows：HUD 每次顯示後 `SetWindowPos(HWND_TOPMOST)` 不搶焦點重排；前端只在 Windows 呼叫；其他平台不做事；gh-88） |
 | `paste_text` | `plugins/clipboard_paste.rs` | useVoiceFlowStore | `text: String` | `Result<(), ClipboardError>` |

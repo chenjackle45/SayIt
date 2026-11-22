@@ -11,7 +11,7 @@ mod plugins;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{
     command,
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     AppHandle, Manager, Runtime,
 };
@@ -202,6 +202,123 @@ fn reassert_hud_topmost<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
 #[command]
 fn get_os_theme() -> Option<String> {
     current_os_theme_is_dark().map(|dark| if dark { "dark" } else { "light" }.to_string())
+}
+
+// ── 選單列：最近 5 句（v0.16 #6） ──
+// 主視窗（DB owner）查最近成功記錄 → update_tray_recent → 這裡重建選單；
+// 完整文字留在 Rust 端，以記錄 ID 對應，點一下只寫剪貼簿。
+const TRAY_ID: &str = "main-tray";
+const TRAY_RECENT_ID_PREFIX: &str = "recent:";
+const TRAY_TITLE_MAX_CHARS: usize = 40;
+
+#[derive(serde::Deserialize)]
+struct TrayRecentItem {
+    id: String,
+    text: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TrayMenuLabels {
+    recent_hint: String,
+    open_main: String,
+    quit: String,
+}
+
+#[derive(Default)]
+struct TrayRecentState(std::sync::Mutex<Vec<TrayRecentItem>>);
+
+/// 選單標題：換行與連續空白收成一個空格、超過上限截斷加「…」；
+/// `&` 一律寫成 `&&`（muda 在 Windows 把單一 `&` 當快捷字元，macOS 也會把 `&&` 還原成 `&`）。
+fn format_tray_title(text: &str) -> String {
+    let single_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let title = if single_line.chars().count() > TRAY_TITLE_MAX_CHARS {
+        let head: String = single_line.chars().take(TRAY_TITLE_MAX_CHARS).collect();
+        format!("{head}…")
+    } else {
+        single_line
+    };
+    title.replace('&', "&&")
+}
+
+fn build_tray_menu<R: Runtime>(
+    app: &AppHandle<R>,
+    items: &[TrayRecentItem],
+    labels: &TrayMenuLabels,
+) -> tauri::Result<Menu<R>> {
+    let menu = Menu::new(app)?;
+    if !items.is_empty() {
+        menu.append(&MenuItem::with_id(
+            app,
+            "recent-hint",
+            format_tray_title(&labels.recent_hint),
+            false,
+            None::<&str>,
+        )?)?;
+        for item in items {
+            menu.append(&MenuItem::with_id(
+                app,
+                format!("{TRAY_RECENT_ID_PREFIX}{}", item.id),
+                format_tray_title(&item.text),
+                true,
+                None::<&str>,
+            )?)?;
+        }
+        menu.append(&PredefinedMenuItem::separator(app)?)?;
+    }
+    menu.append(&MenuItem::with_id(
+        app,
+        "open-dashboard",
+        format_tray_title(&labels.open_main),
+        true,
+        None::<&str>,
+    )?)?;
+    menu.append(&MenuItem::with_id(
+        app,
+        "quit",
+        format_tray_title(&labels.quit),
+        true,
+        None::<&str>,
+    )?)?;
+    Ok(menu)
+}
+
+#[command]
+fn update_tray_recent<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, TrayRecentState>,
+    items: Vec<TrayRecentItem>,
+    labels: TrayMenuLabels,
+) -> Result<(), String> {
+    let menu = build_tray_menu(&app, &items, &labels).map_err(|e| e.to_string())?;
+    *state.0.lock().map_err(|e| e.to_string())? = items;
+    let tray = app
+        .tray_by_id(TRAY_ID)
+        .ok_or_else(|| "tray not found".to_string())?;
+    tray.set_menu(Some(menu)).map_err(|e| e.to_string())
+}
+
+/// 點了最近某句：用記錄 ID 找回完整文字寫進剪貼簿（找不到就不動）
+fn copy_tray_recent_text<R: Runtime>(app: &AppHandle<R>, menu_id: &str) {
+    let Some(record_id) = menu_id.strip_prefix(TRAY_RECENT_ID_PREFIX) else {
+        return;
+    };
+    let text = app
+        .state::<TrayRecentState>()
+        .0
+        .lock()
+        .ok()
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|item| item.id == record_id)
+                .map(|item| item.text.clone())
+        });
+    if let Some(text) = text {
+        if let Err(e) = plugins::clipboard_paste::copy_to_clipboard(text) {
+            log::error!("[tray] copy recent text failed: {e}");
+        }
+    }
 }
 
 /// HUD 視窗邏輯寬度（pixels），對應前端 CSS 470px
@@ -515,6 +632,7 @@ pub fn run() {
             update_hotkey_config,
             get_hud_target_position,
             get_os_theme,
+            update_tray_recent,
             set_dock_icon_hidden,
             plugins::audio_control::mute_system_audio,
             plugins::audio_control::restore_system_audio,
@@ -616,6 +734,7 @@ pub fn run() {
             app.manage(plugins::audio_control::AudioControlState::new());
             // 初始化 clipboard focus 狀態（Windows 貼上前恢復焦點）
             app.manage(plugins::clipboard_paste::FocusState::new());
+            app.manage(TrayRecentState::default());
             // 初始化 audio recorder 狀態
             app.manage(plugins::audio_recorder::AudioRecorderState::new());
             // 初始化 audio preview 狀態（音量預覽）
@@ -653,7 +772,7 @@ pub fn run() {
             // Windows 不設應用程式選單（會變成每個視窗的選單列），由前端 Ctrl+, 與側欄齒輪進入。
             #[cfg(target_os = "macos")]
             {
-                use tauri::menu::{MenuItemKind, PredefinedMenuItem};
+                use tauri::menu::MenuItemKind;
                 let app_menu = Menu::default(app.handle())?;
                 if let Some(MenuItemKind::Submenu(app_submenu)) =
                     app_menu.items()?.into_iter().next()
@@ -687,7 +806,7 @@ pub fn run() {
             let quit_item = MenuItem::with_id(app, "quit", "Quit SayIt", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open_dashboard_item, &quit_item])?;
 
-            TrayIconBuilder::new()
+            TrayIconBuilder::with_id(TRAY_ID)
                 .icon(tauri::image::Image::from_bytes(include_bytes!(
                     "../icons/tray-icon.png"
                 ))?)
@@ -702,7 +821,7 @@ pub fn run() {
                     "quit" => {
                         app.exit(0);
                     }
-                    _ => {}
+                    id => copy_tray_recent_text(app, id),
                 })
                 .build(app)?;
 
@@ -829,6 +948,24 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tray_title_collapses_whitespace_truncates_and_escapes_ampersand() {
+        assert_eq!(
+            format_tray_title("第一行\n第二行  　尾"),
+            "第一行 第二行 尾"
+        );
+        assert_eq!(format_tray_title("A & B"), "A && B");
+        let long = "字".repeat(TRAY_TITLE_MAX_CHARS + 5);
+        let title = format_tray_title(&long);
+        assert_eq!(title.chars().count(), TRAY_TITLE_MAX_CHARS + 1);
+        assert!(title.ends_with('…'));
+        assert_eq!(
+            format_tray_title(&"字".repeat(TRAY_TITLE_MAX_CHARS)),
+            "字".repeat(TRAY_TITLE_MAX_CHARS)
+        );
+        assert_eq!(format_tray_title("😀🎉 emoji"), "😀🎉 emoji");
+    }
 
     // ============================================================
     // calculate_centered_window_x 測試
