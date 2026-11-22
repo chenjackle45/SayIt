@@ -299,6 +299,17 @@
     "toggleDetail": "세부 정보 표시/숨기기",
     "retryLoad": "다시 불러오기"
   },
+  "preferences": {
+    "back": "뒤로",
+    "tabs": {
+      "general": "일반",
+      "hotkey": "단축키",
+      "ai": "받아쓰기와 정리",
+      "mic": "마이크",
+      "advanced": "고급",
+      "about": "정보"
+    }
+  },
   "dictionary": {
     "termCount": "{count} 단어",
     "inputPlaceholder": "새 단어 입력...",

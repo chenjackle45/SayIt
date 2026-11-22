@@ -299,6 +299,17 @@
     "toggleDetail": "顯示或隱藏細節",
     "retryLoad": "重試載入"
   },
+  "preferences": {
+    "back": "返回",
+    "tabs": {
+      "general": "一般",
+      "hotkey": "快捷鍵",
+      "ai": "轉錄與整理",
+      "mic": "麥克風",
+      "advanced": "進階",
+      "about": "關於"
+    }
+  },
   "dictionary": {
     "termCount": "{count} 詞彙",
     "inputPlaceholder": "輸入新詞彙...",

@@ -27,7 +27,7 @@ export function useAudioPreview() {
 
   async function startPreview(deviceName: string): Promise<void> {
     const currentRequestId = ++startRequestId;
-    await stopPreview();
+    await stopPreviewOutput();
 
     // F12 fix: 如果在 stopPreview 期間有新的 startPreview 呼叫，放棄本次
     if (currentRequestId !== startRequestId) return;
@@ -57,7 +57,7 @@ export function useAudioPreview() {
     }
   }
 
-  async function stopPreview(): Promise<void> {
+  async function stopPreviewOutput(): Promise<void> {
     isPreviewActive.value = false;
     pause();
     targetLevel = 0;
@@ -73,8 +73,13 @@ export function useAudioPreview() {
     }
   }
 
-  onUnmounted(() => {
+  /** 停止預覽，並作廢還在等待中的 startPreview（否則它完成後會把預覽重新打開） */
+  function stopPreview(): Promise<void> {
     startRequestId += 1;
+    return stopPreviewOutput();
+  }
+
+  onUnmounted(() => {
     void stopPreview();
   });
 

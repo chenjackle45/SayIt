@@ -2,10 +2,16 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
+  ArrowLeft,
   AudioLines,
   BookOpen,
   Download,
+  Info,
+  Keyboard,
+  Mic,
   Settings,
+  SlidersHorizontal,
+  Sparkles,
 } from "lucide-vue-next";
 import { useI18n } from "vue-i18n";
 import { computed, markRaw, onMounted, onUnmounted, ref, watch } from "vue";
@@ -26,7 +32,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useFeedbackMessage } from "./composables/useFeedbackMessage";
 import { useCrossWindowSettingsSync } from "./composables/useCrossWindowSettingsSync";
-import { listenToEvent, VOCABULARY_CHANGED } from "./composables/useTauriEvents";
+import {
+  listenToEvent,
+  MAIN_WINDOW_NAVIGATE,
+  VOCABULARY_CHANGED,
+} from "./composables/useTauriEvents";
+import { useSettingsNavigation } from "./composables/useSettingsNavigation";
+import type { PreferencesTab } from "./types/settings";
 import { useSettingsStore } from "./stores/useSettingsStore";
 import { useVocabularyStore } from "./stores/useVocabularyStore";
 import { captureError } from "./lib/sentry";
@@ -51,21 +63,32 @@ declare const __APP_VERSION__: string;
 const appVersion = __APP_VERSION__;
 const { t } = useI18n();
 
-// 改版側欄只留兩項；偏好設定在側欄底部（v0.16 #4 改開獨立視窗），
-// 功能介紹 v0.17 才移除、路由保留。
+// 改版側欄只留兩項；偏好設定在側欄底部，按下進入「設定模式」（側欄換成設定分類）。
+// 功能介紹 v0.17 才移除、路由保留（設定「關於」有連結）。
 const navItems = computed(() => [
   { path: "/records", label: t("mainApp.nav.records"), icon: markRaw(AudioLines) },
   { path: "/dictionary", label: t("mainApp.nav.words"), icon: markRaw(BookOpen) },
 ]);
 
+// 設定分類：順序照拍板 demo，各設定放哪一頁照計畫功能去向表
+const settingsTabItems: Array<{ id: PreferencesTab; icon: object }> = [
+  { id: "general", icon: markRaw(Settings) },
+  { id: "hotkey", icon: markRaw(Keyboard) },
+  { id: "ai", icon: markRaw(Sparkles) },
+  { id: "mic", icon: markRaw(Mic) },
+  { id: "advanced", icon: markRaw(SlidersHorizontal) },
+  { id: "about", icon: markRaw(Info) },
+];
+
 const route = useRoute();
+const { isInSettings, openSettings, exitSettings } = useSettingsNavigation();
 const PAGE_TITLE_KEYS: Record<string, string> = {
   "/records": "mainApp.nav.records",
   "/dictionary": "mainApp.nav.words",
-  "/settings": "mainApp.nav.preferences",
   "/guide": "mainApp.nav.guide",
 };
 const currentPageTitle = computed(() => {
+  if (isInSettings.value) return t(`preferences.tabs.${String(route.params.tab ?? "general")}`);
   const matched = Object.keys(PAGE_TITLE_KEYS).find((p) => route.path.startsWith(p));
   return matched ? t(PAGE_TITLE_KEYS[matched]) : "SayIt";
 });
@@ -232,8 +255,23 @@ useCrossWindowSettingsSync();
 
 const vocabularyStore = useVocabularyStore();
 let unlistenVocabularyChanged: UnlistenFn | null = null;
+let unlistenMainWindowNavigate: UnlistenFn | null = null;
+
+// ⌘, / Ctrl+,：進入設定模式（已在設定模式就不動，不打斷目前分頁）
+function handlePreferencesShortcut(event: KeyboardEvent) {
+  if (event.isComposing || event.key !== ",") return;
+  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+  event.preventDefault();
+  void openSettings();
+}
 
 onMounted(async () => {
+  window.addEventListener("keydown", handlePreferencesShortcut);
+  // macOS 應用程式選單「Settings… ⌘,」：Rust 已叫出主視窗，這裡只進入設定模式
+  unlistenMainWindowNavigate = await listenToEvent(MAIN_WINDOW_NAVIGATE, () => {
+    void openSettings();
+  });
+
   // 監聽詞彙變更（HUD 視窗 AI 新增詞彙時同步 Dashboard）
   unlistenVocabularyChanged = await listenToEvent(VOCABULARY_CHANGED, () => {
     console.log("[main-window] VOCABULARY_CHANGED received, refreshing termList");
@@ -265,6 +303,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("keydown", handlePreferencesShortcut);
+  unlistenMainWindowNavigate?.();
   unlistenVocabularyChanged?.();
   if (autoCheckTimeoutId) clearTimeout(autoCheckTimeoutId);
   if (autoCheckIntervalId) clearInterval(autoCheckIntervalId);
@@ -287,7 +327,30 @@ onUnmounted(() => {
         <span class="text-base font-semibold text-sidebar-foreground tracking-wide" style="font-family: 'SF Pro Display', 'Inter', system-ui, sans-serif;">SayIt</span>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
+        <!-- 設定模式：側欄換成返回＋設定分類 -->
+        <SidebarGroup v-if="isInSettings" data-testid="settings-sidebar">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton data-testid="exit-settings" @click="exitSettings">
+                  <ArrowLeft />
+                  <span>{{ $t("preferences.back") }}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+            <SidebarMenu class="mt-2">
+              <SidebarMenuItem v-for="item in settingsTabItems" :key="item.id">
+                <SidebarMenuButton as-child :is-active="route.params.tab === item.id">
+                  <RouterLink :to="`/settings/${item.id}`" :data-testid="`settings-tab-${item.id}`">
+                    <component :is="item.icon" />
+                    <span>{{ $t(`preferences.tabs.${item.id}`) }}</span>
+                  </RouterLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup v-else>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem v-for="item in navItems" :key="item.path">
@@ -306,13 +369,11 @@ onUnmounted(() => {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter class="gap-3 px-3 py-3">
-        <SidebarMenu>
+        <SidebarMenu v-if="!isInSettings">
           <SidebarMenuItem>
-            <SidebarMenuButton as-child :is-active="route.path.startsWith('/settings')">
-              <RouterLink to="/settings">
-                <Settings />
-                <span>{{ $t("mainApp.nav.preferences") }}</span>
-              </RouterLink>
+            <SidebarMenuButton data-testid="open-preferences" @click="openSettings()">
+              <Settings />
+              <span>{{ $t("mainApp.nav.preferences") }}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -648,6 +648,40 @@ pub fn run() {
                 });
             }
 
+            // macOS 應用程式選單：沿用系統預設選單（保留編輯選單的複製貼上），在「關於」後面插入 Settings… ⌘,，
+            // 按下叫出主視窗並進入設定模式（主視窗隱藏、焦點在 HUD 時也有效）。
+            // Windows 不設應用程式選單（會變成每個視窗的選單列），由前端 Ctrl+, 與側欄齒輪進入。
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{MenuItemKind, PredefinedMenuItem};
+                let app_menu = Menu::default(app.handle())?;
+                if let Some(MenuItemKind::Submenu(app_submenu)) =
+                    app_menu.items()?.into_iter().next()
+                {
+                    let settings_item = MenuItem::with_id(
+                        app,
+                        "open-settings",
+                        "Settings…",
+                        true,
+                        Some("CmdOrCtrl+,"),
+                    )?;
+                    app_submenu.insert(&settings_item, 2)?;
+                    app_submenu.insert(&PredefinedMenuItem::separator(app)?, 3)?;
+                }
+                app.set_menu(app_menu)?;
+                app.on_menu_event(|app, event| {
+                    if event.id().as_ref() == "open-settings" {
+                        use tauri::Emitter;
+                        show_main_window(app);
+                        let _ = app.emit_to(
+                            "main-window",
+                            "main-window:navigate",
+                            serde_json::json!({ "path": "/settings" }),
+                        );
+                    }
+                });
+            }
+
             let open_dashboard_item =
                 MenuItem::with_id(app, "open-dashboard", "開啟 Dashboard", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit SayIt", true, None::<&str>)?;

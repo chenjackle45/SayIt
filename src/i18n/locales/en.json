@@ -299,6 +299,17 @@
     "toggleDetail": "Show or hide details",
     "retryLoad": "Retry loading"
   },
+  "preferences": {
+    "back": "Back",
+    "tabs": {
+      "general": "General",
+      "hotkey": "Shortcut",
+      "ai": "Transcription & AI",
+      "mic": "Microphone",
+      "advanced": "Advanced",
+      "about": "About"
+    }
+  },
   "dictionary": {
     "termCount": "{count} terms",
     "inputPlaceholder": "Enter a new term...",

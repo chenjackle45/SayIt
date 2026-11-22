@@ -54,7 +54,7 @@ import {
   getWhisperCodeForTranscriptionLocale,
 } from "../i18n/languageConfig";
 import { emitEvent, SETTINGS_UPDATED } from "../composables/useTauriEvents";
-import type { SettingsUpdatedPayload } from "../types/events";
+import type { SettingsKey, SettingsUpdatedPayload } from "../types/events";
 import { applyTheme, DEFAULT_THEME_MODE, isThemeMode } from "../lib/theme";
 import {
   DEFAULT_LLM_MODEL_ID,
@@ -213,6 +213,12 @@ export const useSettingsStore = defineStore("settings", () => {
       );
       captureError(err, { source: "settings", step: "sync-hotkey" });
     }
+  }
+
+  /** 只通知「哪一類設定變了」，其他視窗收到後自己從 store 檔重讀（不經事件傳設定值）。 */
+  async function emitSettingsChanged(key: SettingsKey) {
+    const payload: SettingsUpdatedPayload = { key, value: null };
+    await emitEvent(SETTINGS_UPDATED, payload);
   }
 
   async function loadSettings() {
@@ -858,6 +864,7 @@ export const useSettingsStore = defineStore("settings", () => {
       await store.set("openaiApiKey", trimmedKey);
       await store.save();
       openaiApiKey.value = trimmedKey;
+      await emitSettingsChanged("providerApiKey");
       console.log("[useSettingsStore] OpenAI API Key saved");
     } catch (err) {
       console.error(
@@ -875,6 +882,7 @@ export const useSettingsStore = defineStore("settings", () => {
       await store.delete("openaiApiKey");
       await store.save();
       openaiApiKey.value = "";
+      await emitSettingsChanged("providerApiKey");
       console.log("[useSettingsStore] OpenAI API Key deleted");
     } catch (err) {
       console.error(
@@ -895,6 +903,7 @@ export const useSettingsStore = defineStore("settings", () => {
       await store.set("anthropicApiKey", trimmedKey);
       await store.save();
       anthropicApiKey.value = trimmedKey;
+      await emitSettingsChanged("providerApiKey");
       console.log("[useSettingsStore] Anthropic API Key saved");
     } catch (err) {
       console.error(
@@ -915,6 +924,7 @@ export const useSettingsStore = defineStore("settings", () => {
       await store.delete("anthropicApiKey");
       await store.save();
       anthropicApiKey.value = "";
+      await emitSettingsChanged("providerApiKey");
       console.log("[useSettingsStore] Anthropic API Key deleted");
     } catch (err) {
       console.error(
@@ -935,6 +945,7 @@ export const useSettingsStore = defineStore("settings", () => {
       await store.set("geminiApiKey", trimmedKey);
       await store.save();
       geminiApiKey.value = trimmedKey;
+      await emitSettingsChanged("providerApiKey");
       console.log("[useSettingsStore] Gemini API Key saved");
     } catch (err) {
       console.error(
@@ -955,6 +966,7 @@ export const useSettingsStore = defineStore("settings", () => {
       await store.delete("geminiApiKey");
       await store.save();
       geminiApiKey.value = "";
+      await emitSettingsChanged("providerApiKey");
       console.log("[useSettingsStore] Gemini API Key deleted");
     } catch (err) {
       console.error(
@@ -1284,6 +1296,7 @@ export const useSettingsStore = defineStore("settings", () => {
       isRecordingAutoCleanupEnabled.value = enabled;
       recordingAutoCleanupDays.value = validatedDays;
 
+      await emitSettingsChanged("recordingAutoCleanup");
       console.log(
         `[useSettingsStore] Recording auto cleanup saved: enabled=${enabled}, days=${validatedDays}`,
       );
@@ -1311,6 +1324,7 @@ export const useSettingsStore = defineStore("settings", () => {
       // 即時通知 Rust 切換檔案 Log 開關（關閉時 Rust 會順手清掉記錄檔）
       await setFileLoggingEnabled(enabled);
 
+      await emitSettingsChanged("debugLog");
       console.log(`[useSettingsStore] Debug log saved: enabled=${enabled}`);
     } catch (err) {
       console.error(

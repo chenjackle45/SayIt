@@ -67,8 +67,9 @@ async function bootstrap() {
   await settingsStore.consumeUpgradeNotice();
   await settingsStore.initializeAutoStart();
 
+  // C2 過渡（v0.16）：沒有 Groq Key 就進設定模式「轉錄與整理」；v0.17 改接第一次啟動引導
   if (!settingsStore.hasApiKey) {
-    await router.push("/settings");
+    await router.push("/settings/ai");
     await nextTick();
     const currentWindow = getCurrentWindow();
     await currentWindow.show();

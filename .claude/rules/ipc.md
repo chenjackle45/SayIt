@@ -72,6 +72,7 @@ paths:
 | `theme:os-changed` | lib.rs（Windows 輪詢登錄檔） | `THEME_OS_CHANGED` | `"dark"` \| `"light"` |
 | `audio:waveform` | audio_recorder.rs | `AUDIO_WAVEFORM` | `WaveformPayload { levels: [f32; 6] }` |
 | `audio:preview-level` | audio_recorder.rs | `AUDIO_PREVIEW_LEVEL` | `AudioPreviewLevelPayload { level: f32 }` |
+| `main-window:navigate` | lib.rs（macOS 應用程式選單「Settings… ⌘,」，先 show 主視窗） | `MAIN_WINDOW_NAVIGATE` | `{ path: string }`（目前只送 `/settings`；前端不讀 payload，收到就進入設定模式） |
 
 ## Frontend-only Events（不經 Rust）
 
@@ -79,7 +80,7 @@ paths:
 |-------|------|--------|--------|
 | `voice-flow:state-changed` | `VOICE_FLOW_STATE_CHANGED` | HUD VoiceFlow | Dashboard |
 | `transcription:completed` | `TRANSCRIPTION_COMPLETED` | VoiceFlow | Main Window |
-| `settings:updated` | `SETTINGS_UPDATED` | SettingsStore | All Windows |
+| `settings:updated` | `SETTINGS_UPDATED` | SettingsStore | All Windows（收到只 refresh；金鑰類只送 `{ key, value: null }`） |
 | `vocabulary:changed` | `VOCABULARY_CHANGED` | VocabularyStore | All Windows |
 | `vocabulary:learned` | `VOCABULARY_LEARNED` | VoiceFlowStore | HUD NotchHud |
 

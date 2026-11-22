@@ -2,6 +2,7 @@
 
 > 建立：2026-11-21 · 狀態：計劃閘 R1 NO-GO（4 HIGH、8 MED、1 LOW）→ 全收 → R2 NO-GO（3 HIGH、4 MED、1 LOW）→ 全收 → R3 NO-GO（1 HIGH、1 MED、1 LOW）→ 全收 → **R4 GO（無 finding）**，可動工
 > 拍板（2026-11-21 使用者，決策頁複製摘要）：Q1 照新資訊架構（記錄合併、設定改獨立偏好設定視窗 ⌘,、刪功能介紹）／Q2 ⌘K＋選單列最近 5 句都做／Q3 全做、分兩版出
+> **改拍板（2026-11-22 使用者）**：偏好設定**不另開視窗**，改為主視窗內「設定模式」（⌘, 或齒輪進入，側欄換成 6 個設定分類＋「← 返回」，Esc 回到進入前那頁）。理由與不做清單見 C1。
 > **規格以 demo 為準**：`docs/demos/ui-redesign-v2/prototype.html`（段 4 可操作原型），**但以下三類例外以本檔為準**：①「功能去向表」列出的現有功能，demo 沒畫不代表刪除；②「代決」段改掉的 demo 文案；③**流程、狀態、錯誤互動一律以 C1～C4 契約為準**（demo 只決定視覺與版面）——包括 demo 未畫的引導 API Key 步驟與真實試講輸入框（C2）、HUD 不畫假進度、既有錯誤的滑鼠互動與重試保留（C3）。
 > 前提：建立在 v0.15（#81、#84、#88、#82）之上；分支 `feat/ui-redesign-v2` 自 `verify/v0.15-integration` 分出。
 
@@ -21,7 +22,7 @@
 |---|---|
 | 儀表板＋歷史記錄 | **記錄**：頂部一行統計＋依日期分組時間軸＋右側細節窗格 |
 | 自訂字典 | **詞庫**（v0.16 先沿用現有 DictionaryView＋#81；v0.17 改新版＋收件匣） |
-| 設定（11 卡） | **偏好設定視窗**（獨立 Tauri 視窗，label `preferences`；macOS ⌘,、Windows Ctrl+,、側欄齒輪） |
+| 設定（11 卡） | **設定模式**（主視窗內，路由 `/settings/:tab`；macOS ⌘,〔應用程式選單＋鍵盤〕、Windows Ctrl+,、側欄齒輪；2026-11-22 改拍板，原為獨立視窗） |
 | 功能介紹 | v0.17 才刪，同版上第一次啟動引導；v0.16 保留舊頁（側欄收進偏好設定「關於」分頁的連結） |
 | — | **⌘K 指令面板**（v0.17） |
 | 選單列 2 項寫死 | **原生選單**最近 5 句（v0.16） |
@@ -49,20 +50,18 @@
 
 ## 契約（R1 HIGH 補齊）
 
-### C1 偏好設定第三視窗（F1）
-- 新增入口 `preferences.html`＋`src/preferences.ts`，Vite input、`tauri.conf.json` 視窗（預設不建立，Rust 指令 `open_preferences(tab?)` 單例建立／聚焦）、capability 加 `preferences` label。不套 HUD 的 always-on-top／skipTaskbar／noactivate。
-- **關閉＝先清理再銷毀**（R2-1：原生銷毀不保證跑完 Vue 卸載）：Rust 攔 `preferences` 的 CloseRequested → `prevent_close` → emit `preferences:before-close` → 前端 **await** `stop_audio_preview` 與 `cancel_hotkey_recording` 兩個 IPC 都回傳（現有錄鍵終止只送不等，需改為等待）→ invoke `close_preferences` 銷毀。不設逾時強關（R3-2 消融採納）。驗收：關窗後麥克風指示燈熄、全域快捷鍵可用、錄鍵中關窗後觸發鍵恢復正常。
-- 現有缺口：OpenAI／Anthropic／Gemini Key 的儲存與刪除、錄音清理設定、除錯設定目前**不 emit** `settings:updated`，本卡一併補齊。
-- **設定載入（R2-2）**：偏好設定視窗初始化用**純讀**路徑（只讀 store 檔＋refresh 記憶體），**不呼叫 `update_hotkey_config`**；只有使用者真的改了快捷鍵才送 Rust。主視窗啟動流程不變。驗收：錄音中（hold 與 toggle 各一）開啟／重開偏好設定，錄音照常結束、不誤觸開始。
-- 同步：任何視窗寫入後 emit 既有 `settings:updated`（現有 emit 在 settings store 的儲存／刪除 actions，HUD 雙擊經 `savePromptMode`）；**主視窗、HUD、偏好設定三方都監聽、收到只 refresh，不反向 emit、不重跑完整載入**。
-- migration、更新摘要、清理排程只由主視窗執行；偏好設定入口不呼叫。
-- macOS 應用程式選單綁 ⌘,（保留原生編輯選單）；Windows 用 Ctrl+, 與齒輪。
+### C1 設定模式（F1；2026-11-22 改拍板，取代「偏好設定第三視窗」）
+- **形態**：主視窗內。進入：側欄齒輪、⌘/Ctrl+,（已在設定模式時不動，不把人從目前分頁拉走）、macOS 應用程式選單「Settings… ⌘,」（Rust 叫出主視窗並 emit `main-window:navigate`，主視窗隱藏或焦點在 HUD 時也有效）。側欄換成「← 返回」＋6 分類（一般、快捷鍵、轉錄與整理、麥克風、進階、關於）；返回與 Esc 回到進入前那一頁。路由 `/settings/:tab`，不認得的分頁導回一般。
+- **分頁生命週期**：SettingsView 一次只顯示一個分頁的卡片；離開「麥克風」停預覽（裝置清單載入期間切走就不開預覽）、離開「快捷鍵」停錄鍵；離開設定模式＝元件卸載，沿用既有 onBeforeUnmount 清理。
+- **Esc 讓位**：錄鍵中、焦點在輸入框、下拉選單／對話框／選單開著時不離開。
+- **同步**：三家 API 金鑰存刪、錄音清理、除錯記錄原本不 emit `settings:updated`（HUD 會用舊值），本卡補齊；事件只帶 `{ key, value: null }`，不經事件傳金鑰。
+- **不做（附理由，勿再提案）**：獨立偏好設定視窗。設定多半只在安裝時調、之後偶爾換麥克風或模型，多一個視窗換來的是第三個 WebView（數十 MB）、關窗攔截與清理、三窗同步、另一窗連資料庫、標題列外觀與 Windows 雙標題列等機制，對使用者沒有對應收益；實機試做後使用者判定「沒有比較好」。原 C1 的純讀載入（R2-2）與關窗先清理（R2-1）都只為獨立視窗存在，隨之刪除。
 
 ### C2 第一次啟動引導（F2，v0.17）
 - 觸發：新安裝（無完成旗標，且 consume 前讀到的 `lastSeenVersion` 不存在）→ 顯示；升級使用者（`lastSeenVersion` 存在，或有歷史記錄、或已有 Key，任一成立）→ 不顯示、直接設完成旗標；略過 → 設旗標；偏好設定「關於」可「重新顯示引導」；已完成但權限被撤銷 → 沿用現有 AccessibilityGuide 偵測與 reinitialize，不重播引導。
 - 步驟：①（僅 macOS）輔助使用權限：「打開系統設定」＋沿用權限輪詢＋授權後 reinitialize listener ②Groq API Key：輸入＋測試連線（沿用現有元件）③快捷鍵：讀實際設定、可改 ④試講：提供真實輸入框，按實際觸發鍵走既有錄音流程。
 - 與更新摘要不疊：引導顯示時延後更新摘要到下次啟動。
-- **v0.16 過渡（R2-4）**：現有「首次無 Groq Key 導向 /settings」改為開啟偏好設定視窗「轉錄與整理」分頁；v0.17 再改接引導。
+- **v0.16 過渡（R2-4）**：現有「首次無 Groq Key 導向 /settings」改為進設定模式「轉錄與整理」分頁（`/settings/ai`）；v0.17 再改接引導。
 
 ### C3 HUD 狀態映射（F3）
 | 現有狀態／事件 | 新畫面 | 條件 |
@@ -93,7 +92,7 @@
 | 1 | 設計 token 改版（深淺兩套全 AA）、清寫死色（全 src 固定色 token 56 個＋NotchHud 色碼改接 token） | rg 無固定色 class；對比腳本實測 |
 | 2 | 側欄＋外殼：記錄、詞庫兩項＋齒輪＋狀態區（讀實際設定）；保留 ⌘/Ctrl+B 側欄快捷鍵 | 元件測試 |
 | 3 | 記錄頁：日期分組、↑↓／Enter 複製（輸入框聚焦、IME 組字、文字選取時讓位）、細節窗格、功能去向表的歷史操作、失敗列重試；沿用 20 筆分頁 | 元件測試；9,428 筆合成資料量測首屏／搜尋／捲動（互動 < 100ms 為目標），超標且證明是 DOM 才考慮虛擬化 |
-| 4 | 偏好設定視窗（C1）：SettingsView 依副作用邊界拆 6 分頁，處理方法與 store action 原樣搬 | 分頁生命週期（離頁停預覽／停錄鍵）、三窗同步、關窗銷毀、Windows 前景錄鍵整合測試；既有 store 測試全綠 |
+| 4 | 設定模式（C1）：SettingsView 依副作用邊界拆 6 分頁（同一元件依分頁顯示，處理方法與 store action 原樣搬），側欄換分類＋返回 | 分頁生命週期（離頁停預覽／停錄鍵）、Esc 讓位、返回原頁、補 emit 的 8 個寫入；Windows 前景錄鍵整合測試；既有 store 測試全綠 |
 | 5 | HUD（C3） | NotchHud 測試補各態；五語系 320px 溢字檢查 |
 | 6 | 選單列原生選單：最近 5 筆成功記錄（主視窗 DB owner 直接查 DB → 新 IPC `update_tray_recent(items)` → Rust 重建 Menu）；觸發（R2-6，`useHistoryStore` 五條落地路徑全部要刷新）：啟動、新增、HUD 重送成功、刪除、重新辨識完成、重新整理完成，加上切語系；刷新掛在 store 層（主視窗常駐），不綁歷史頁元件，主視窗隱藏或在詞庫頁也有效；項目以記錄 ID 綁完整文字、標題截斷；點擊只寫剪貼簿 | Rust 測試；五條路徑各一條測試；Windows 實機左右鍵、選單開著時更新、& 與 Unicode 標題 |
 | 7 | inline 回饋：**成功類**改 toast（新增 shadcn `sonner`）；持續錯誤、連線測試結果、可重試提示維持原位；原生 button 改 shadcn；Hold/Toggle 進 i18n | rg 驗證 |

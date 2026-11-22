@@ -36,7 +36,10 @@ export type SettingsKey =
   | "copyTranscriptionToClipboard"
   | "hideDockIcon"
   | "startHidden"
-  | "theme";
+  | "theme"
+  | "providerApiKey"
+  | "recordingAutoCleanup"
+  | "debugLog";
 
 export interface SettingsUpdatedPayload {
   key: SettingsKey;

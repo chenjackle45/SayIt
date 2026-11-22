@@ -33,6 +33,9 @@ export const HOTKEY_MODE_TOGGLE = "hotkey:mode-toggle" as const;
 export const HOTKEY_RECORDING_CAPTURED = "hotkey:recording-captured" as const;
 export const HOTKEY_RECORDING_REJECTED = "hotkey:recording-rejected" as const;
 
+// macOS 應用程式選單「Settings… ⌘,」：請主視窗進入設定模式並顯示
+export const MAIN_WINDOW_NAVIGATE = "main-window:navigate" as const;
+
 // Dashboard 完成 DB migration 後廣播；HUD 收到才開始存取連線池
 export const DATABASE_READY = "database:ready" as const;
 // HUD 請 Dashboard 重新廣播 DATABASE_READY（解決事件早於監聽的競態）

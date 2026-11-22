@@ -299,6 +299,17 @@
     "toggleDetail": "詳細の表示・非表示",
     "retryLoad": "読み込みを再試行"
   },
+  "preferences": {
+    "back": "戻る",
+    "tabs": {
+      "general": "一般",
+      "hotkey": "ショートカット",
+      "ai": "文字起こしと整形",
+      "mic": "マイク",
+      "advanced": "詳細",
+      "about": "情報"
+    }
+  },
   "dictionary": {
     "termCount": "{count} 語",
     "inputPlaceholder": "新しい語彙を入力...",

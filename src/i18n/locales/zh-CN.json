@@ -299,6 +299,17 @@
     "toggleDetail": "显示或隐藏详情",
     "retryLoad": "重试加载"
   },
+  "preferences": {
+    "back": "返回",
+    "tabs": {
+      "general": "通用",
+      "hotkey": "快捷键",
+      "ai": "转录与整理",
+      "mic": "麦克风",
+      "advanced": "高级",
+      "about": "关于"
+    }
+  },
   "dictionary": {
     "termCount": "{count} 词汇",
     "inputPlaceholder": "输入新词汇...",

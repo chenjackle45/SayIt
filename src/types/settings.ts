@@ -66,3 +66,11 @@ export type PresetPromptMode = Exclude<PromptMode, "custom">;
 
 export const THEME_MODE_VALUES = ["light", "dark", "system"] as const;
 export type ThemeMode = (typeof THEME_MODE_VALUES)[number];
+
+/** 設定模式的分頁（路由 `/settings/:tab`） */
+export const PREFERENCES_TAB_VALUES = ["general", "hotkey", "ai", "mic", "advanced", "about"] as const;
+export type PreferencesTab = (typeof PREFERENCES_TAB_VALUES)[number];
+
+export function isPreferencesTab(value: unknown): value is PreferencesTab {
+  return typeof value === "string" && (PREFERENCES_TAB_VALUES as readonly string[]).includes(value);
+}

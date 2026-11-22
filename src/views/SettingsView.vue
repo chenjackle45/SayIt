@@ -52,7 +52,7 @@ import {
   type TranscriptionLocale,
 } from "../i18n/languageConfig";
 
-import { PROMPT_MODE_VALUES, type PromptMode, THEME_MODE_VALUES, type ThemeMode } from "../types/settings";
+import { PROMPT_MODE_VALUES, type PromptMode, THEME_MODE_VALUES, type ThemeMode, type PreferencesTab } from "../types/settings";
 import {
   Card,
   CardContent,
@@ -105,6 +105,10 @@ import {
   testLlmConnection,
   testWhisperConnection,
 } from "../lib/connectionTest";
+
+// 主視窗設定模式（v0.16 #4）一次只顯示一個分頁的卡片；有副作用的分頁在離開時收尾
+const props = defineProps<{ tab: PreferencesTab }>();
+const emit = defineEmits<{ exit: [] }>();
 
 const settingsStore = useSettingsStore();
 const historyStore = useHistoryStore();
@@ -931,6 +935,13 @@ async function loadAudioInputDeviceList() {
   }
 }
 
+// 預覽只在「麥克風」分頁開；非同步操作完成時可能已切走或已離開設定
+let isViewUnmounted = false;
+function startPreviewIfMicTabVisible(deviceName: string) {
+  if (isViewUnmounted || props.tab !== "mic") return;
+  void startPreview(deviceName);
+}
+
 async function handleRefreshAudioInputDeviceList() {
   isRefreshingDeviceList.value = true;
   try {
@@ -941,7 +952,7 @@ async function handleRefreshAudioInputDeviceList() {
         count: audioInputDeviceList.value.length,
       }),
     );
-    void startPreview(settingsStore.selectedAudioInputDeviceName);
+    startPreviewIfMicTabVisible(settingsStore.selectedAudioInputDeviceName);
   } catch (err) {
     audioInputFeedback.show("error", extractErrorMessage(err));
   } finally {
@@ -953,17 +964,41 @@ async function handleAudioInputDeviceChange(deviceName: string) {
   try {
     await settingsStore.saveAudioInputDevice(deviceName);
     audioInputFeedback.show("success", t("settings.audioInput.updated"));
-    void startPreview(deviceName);
+    startPreviewIfMicTabVisible(deviceName);
   } catch (err) {
     audioInputFeedback.show("error", extractErrorMessage(err));
   }
 }
 
+// 麥克風預覽只在「麥克風」分頁開著；錄鍵只在「快捷鍵」分頁進行
+watch(
+  () => props.tab,
+  (tab, previousTab) => {
+    if (previousTab === "mic") void stopPreview();
+    if (previousTab === "hotkey") stopKeyRecording();
+    if (tab === "mic") {
+      // F5 fix: 先載入裝置列表，完成後再啟動預覽（避免 cpal 並行 host 查詢）
+      void loadAudioInputDeviceList().then(() => {
+        startPreviewIfMicTabVisible(settingsStore.selectedAudioInputDeviceName);
+      });
+    }
+  },
+  { immediate: true },
+);
+
+// Esc 離開設定模式。讓位給：錄鍵中、輸入框、開著的下拉選單／對話框／選單
+const ESCAPE_YIELD_SELECTOR =
+  "input, textarea, select, [contenteditable='true'], [role='combobox'], [role='dialog'], [role='alertdialog'], [role='listbox'], [role='menu']";
+function handleEscapeKey(event: KeyboardEvent) {
+  if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+  if (isRecording.value) return;
+  if (event.target instanceof Element && event.target.closest(ESCAPE_YIELD_SELECTOR)) return;
+  if (document.querySelector("[role='dialog'], [role='alertdialog'], [role='listbox'], [role='menu']")) return;
+  emit("exit");
+}
+
 onMounted(async () => {
-  // F5 fix: 先載入裝置列表，完成後再啟動預覽（避免 cpal 並行 host 查詢）
-  void loadAudioInputDeviceList().then(() => {
-    void startPreview(settingsStore.selectedAudioInputDeviceName);
-  });
+  window.addEventListener("keydown", handleEscapeKey);
   selectedPromptMode.value = settingsStore.promptMode;
   promptInput.value = settingsStore.getAiPrompt();
   isPresetDirty.value = false;
@@ -987,6 +1022,8 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  isViewUnmounted = true;
+  window.removeEventListener("keydown", handleEscapeKey);
   void stopPreview();
   stopKeyRecording();
   hotkeyFeedback.clearTimer();
@@ -1018,7 +1055,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="p-6 space-y-6 text-foreground">
     <!-- 關於 SayIt -->
-    <Card>
+    <Card v-if="tab === 'about'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.about.title") }}</CardTitle>
       </CardHeader>
@@ -1067,7 +1104,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 快捷鍵設定 -->
-    <Card>
+    <Card v-if="tab === 'hotkey'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.hotkey.title") }}</CardTitle>
       </CardHeader>
@@ -1250,7 +1287,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 語音轉錄：金鑰 → 模型｜語言 → 測試連線（設計 A，金鑰跟著功能走） -->
-    <Card>
+    <Card v-if="tab === 'ai'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.stt.title") }}</CardTitle>
       </CardHeader>
@@ -1428,7 +1465,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 文字整理：服務 → 金鑰 → 測試連線 → 模型 -->
-    <Card>
+    <Card v-if="tab === 'ai'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.llm.title") }}</CardTitle>
       </CardHeader>
@@ -1628,7 +1665,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- AI 整理 Prompt -->
-    <Card>
+    <Card v-if="tab === 'ai'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.prompt.title") }}</CardTitle>
       </CardHeader>
@@ -1725,7 +1762,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 短文字門檻 -->
-    <Card>
+    <Card v-if="tab === 'ai'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.threshold.title") }}</CardTitle>
       </CardHeader>
@@ -1777,7 +1814,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 智慧字典學習（macOS: AXUIElement；Windows: UI Automation） -->
-    <Card>
+    <Card v-if="tab === 'ai'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.smartDictionary.title") }}</CardTitle>
       </CardHeader>
@@ -1816,7 +1853,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 輸入裝置 -->
-    <Card>
+    <Card v-if="tab === 'mic'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.audioInput.title") }}</CardTitle>
       </CardHeader>
@@ -1857,6 +1894,7 @@ onBeforeUnmount(() => {
               variant="outline"
               size="icon"
               :disabled="isRefreshingDeviceList"
+              :aria-label="$t('settings.audioInput.refresh')"
               @click="handleRefreshAudioInputDeviceList"
             >
               <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isRefreshingDeviceList }" />
@@ -1893,7 +1931,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 錄音儲存管理 -->
-    <Card>
+    <Card v-if="tab === 'advanced'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.recording.title") }}</CardTitle>
       </CardHeader>
@@ -1977,7 +2015,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 應用程式 -->
-    <Card>
+    <Card v-if="tab === 'general'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base">{{ $t("settings.app.title") }}</CardTitle>
       </CardHeader>
@@ -2241,7 +2279,7 @@ onBeforeUnmount(() => {
     </Card>
 
     <!-- 進階：除錯記錄（Debug Log）-->
-    <Card>
+    <Card v-if="tab === 'advanced'">
       <CardHeader class="border-b border-border">
         <CardTitle class="text-base flex items-center gap-2">
           <Bug class="h-4 w-4" />
