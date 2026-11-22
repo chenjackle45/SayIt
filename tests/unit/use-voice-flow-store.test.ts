@@ -1108,6 +1108,29 @@ describe("useVoiceFlowStore", () => {
     expect(store.message).toBe("errors.hotkey.accessibilityPermission");
   });
 
+  it("[P1] 「到記錄重試」提示只給剛存失敗記錄的那次錯誤；停留期間的權限錯誤照原文案", async () => {
+    mockInvoke.mockImplementation(
+      createMockInvokeHandler({
+        transcribeResult: { rawText: "", transcriptionDurationMs: 280, noSpeechProbability: 0.95 },
+      }),
+    );
+    const store = useVoiceFlowStore();
+    await store.initialize();
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => expect(mockInvoke).toHaveBeenCalledWith("start_recording", { deviceName: "" }));
+    triggerHotkeyEvent("hotkey:released");
+    await vi.waitFor(() => expect(store.status).toBe("error"));
+    expect(store.isRetryInRecordsHintVisible).toBe(true);
+
+    listenerCallbackMap.get("hotkey:error")?.({
+      payload: { error: HOTKEY_ERROR_CODES.ACCESSIBILITY_PERMISSION, message: "accessibility permission revoked" },
+    } as never);
+    expect(store.status).toBe("error");
+    expect(store.canRetry).toBe(true);
+    expect(store.isRetryInRecordsHintVisible).toBe(false);
+    store.cleanup();
+  });
+
   it("[P1] success auto-hide 應廣播 idle 事件", async () => {
     vi.useFakeTimers();
     const store = useVoiceFlowStore();
@@ -1235,6 +1258,9 @@ describe("useVoiceFlowStore", () => {
       );
       expect(store.status).toBe("success");
       expect(store.message).toBe("voiceFlow.pasteSuccess");
+      // HUD「已貼上・N 字」取實際貼上的整理後文字（多一個句號），不是原文長度
+      expect(store.pastedCharacterCount).toBe("這是一段超過十個字的測試轉錄文字內容。".length);
+      expect(store.pastedCharacterCount).not.toBe(longText.length);
 
       expect(mockEmit).toHaveBeenCalledWith("voice-flow:state-changed", {
         status: "enhancing",

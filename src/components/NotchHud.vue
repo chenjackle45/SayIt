@@ -34,6 +34,8 @@ const props = defineProps<{
   promptModeLabel: string;
   modeSwitchLabel: string;
   isEditMode: boolean;
+  pastedCharacterCount: number;
+  isRetryInRecordsHintVisible: boolean;
 }>();
 
 defineEmits<{
@@ -83,12 +85,32 @@ function buildNotchPath(p: NotchShapeParams): string {
   return `path('M 0,0 Q ${tr},0 ${tr},${tr} L ${tr},${h - br} Q ${tr},${h} ${tr + br},${h} L ${w - tr - br},${h} Q ${w - tr},${h} ${w - tr},${h - br} L ${w - tr},${tr} Q ${w - tr},0 ${w},0 Z')`;
 }
 
-const hasErrorMessage = computed(
-  () => visualMode.value === "error" && props.message !== "",
+// C3：剛存了失敗記錄且有錄音的轉錄錯誤說「辨識失敗・到記錄重試」，其餘照具體錯誤文案
+const displayedErrorMessage = computed(() =>
+  props.isRetryInRecordsHintVisible ? t("voiceFlow.hud.failedGoRetry") : props.message,
 );
 
+const hasErrorMessage = computed(
+  () => visualMode.value === "error" && displayedErrorMessage.value !== "",
+);
+
+// C3：轉錄中／整理中・模式／編輯中分開說（動畫仍共用同一個 transcribing 視覺）
+const processingLabel = computed(() => {
+  if (visualMode.value !== "morphing" && visualMode.value !== "transcribing") return "";
+  if (props.status === "editing") return t("voiceFlow.hud.editing");
+  if (props.status === "enhancing") {
+    return t("voiceFlow.hud.enhancingWithMode", { mode: props.promptModeLabel });
+  }
+  if (props.status === "transcribing") return t("voiceFlow.hud.transcribing");
+  return "";
+});
+
 const isExpandedMode = computed(
-  () => hasErrorMessage.value || visualMode.value === "learned",
+  () =>
+    hasErrorMessage.value ||
+    visualMode.value === "learned" ||
+    visualMode.value === "success" ||
+    processingLabel.value !== "",
 );
 
 const notchStyle = computed(() => {
@@ -424,7 +446,6 @@ onUnmounted(() => {
               <path
                 d="M4 12l6 6L20 6"
                 fill="none"
-                stroke="#22c55e"
                 stroke-width="3"
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -465,8 +486,19 @@ onUnmounted(() => {
         <span class="learned-terms">{{ learnedDisplayText }}</span>
       </div>
 
+      <!-- C3 狀態文字放瀏海下方第二行：HUD 貼齊螢幕頂端，右欄在瀏海機只露約 77px，英日韓放不下 -->
+      <div v-if="processingLabel" class="status-row">
+        <span class="status-label" data-testid="hud-processing-label">{{ processingLabel }}</span>
+      </div>
+      <div v-else-if="visualMode === 'success'" class="status-row">
+        <span class="status-label" data-testid="hud-success-label">
+          <span class="hud-mark" aria-hidden="true">言</span>
+          {{ t('voiceFlow.hud.pasted', { count: props.pastedCharacterCount }) }}
+        </span>
+      </div>
+
       <div v-if="hasErrorMessage" class="error-message-row">
-        <span class="error-message">{{ props.message }}</span>
+        <span class="error-message">{{ displayedErrorMessage }}</span>
       </div>
     </div>
   </div>
@@ -484,7 +516,7 @@ onUnmounted(() => {
   animation: notchEnter 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.notch-hud {
+.notch-wrapper {
   --notch-bg: #ffffff;
   --notch-fg: #18181b;
   --notch-fg-soft: rgba(24, 24, 27, 0.4);
@@ -492,6 +524,11 @@ onUnmounted(() => {
   --notch-mode: #6d28d9;
   --notch-edit-bg: rgba(180, 83, 9, 0.15);
   --notch-edit-fg: #b45309;
+  --notch-success: #16733a;
+  --notch-warn: #c2410c;
+}
+
+.notch-hud {
   background: var(--notch-bg);
   display: flex;
   align-items: center;
@@ -503,7 +540,7 @@ onUnmounted(() => {
     background 0.3s ease;
 }
 
-html.dark .notch-hud {
+html.dark .notch-wrapper {
   --notch-bg: #000000;
   --notch-fg: #ffffff;
   --notch-fg-soft: rgba(255, 255, 255, 0.4);
@@ -511,6 +548,8 @@ html.dark .notch-hud {
   --notch-mode: rgba(167, 139, 250, 0.95);
   --notch-edit-bg: rgba(251, 191, 36, 0.25);
   --notch-edit-fg: rgba(251, 191, 36, 0.9);
+  --notch-success: #30d158;
+  --notch-warn: #ff9f0a;
 }
 
 @keyframes notchEnter {
@@ -638,6 +677,7 @@ html.dark .notch-hud {
   left: 0;
 }
 .checkmark-svg path {
+  stroke: var(--notch-success);
   stroke-dasharray: 30;
   stroke-dashoffset: 30;
   animation: drawCheck 0.3s ease-out 0.35s forwards;
@@ -650,8 +690,8 @@ html.dark .notch-hud {
 .notch-wrapper-success {
   filter:
     drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))
-    drop-shadow(0 0 10px rgba(34, 197, 94, 0.5))
-    drop-shadow(0 0 25px rgba(34, 197, 94, 0.2));
+    drop-shadow(0 0 10px color-mix(in srgb, var(--notch-success) 50%, transparent))
+    drop-shadow(0 0 25px color-mix(in srgb, var(--notch-success) 20%, transparent));
   animation: successGlow 0.8s ease-out forwards;
 }
 
@@ -659,13 +699,13 @@ html.dark .notch-hud {
   0% {
     filter:
       drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))
-      drop-shadow(0 0 12px rgba(34, 197, 94, 0.6))
-      drop-shadow(0 0 30px rgba(34, 197, 94, 0.3));
+      drop-shadow(0 0 12px color-mix(in srgb, var(--notch-success) 60%, transparent))
+      drop-shadow(0 0 30px color-mix(in srgb, var(--notch-success) 30%, transparent));
   }
   100% {
     filter:
       drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))
-      drop-shadow(0 0 2px rgba(34, 197, 94, 0));
+      drop-shadow(0 0 2px transparent);
   }
 }
 
@@ -674,8 +714,8 @@ html.dark .notch-hud {
 .notch-wrapper-learned {
   filter:
     drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))
-    drop-shadow(0 0 10px rgba(59, 130, 246, 0.5))
-    drop-shadow(0 0 25px rgba(59, 130, 246, 0.2));
+    drop-shadow(0 0 10px color-mix(in srgb, var(--notch-learned) 50%, transparent))
+    drop-shadow(0 0 25px color-mix(in srgb, var(--notch-learned) 20%, transparent));
   animation: learnedGlow 2s ease-out forwards;
 }
 
@@ -683,13 +723,13 @@ html.dark .notch-hud {
   0% {
     filter:
       drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))
-      drop-shadow(0 0 12px rgba(59, 130, 246, 0.6))
-      drop-shadow(0 0 30px rgba(59, 130, 246, 0.3));
+      drop-shadow(0 0 12px color-mix(in srgb, var(--notch-learned) 60%, transparent))
+      drop-shadow(0 0 30px color-mix(in srgb, var(--notch-learned) 30%, transparent));
   }
   100% {
     filter:
       drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3))
-      drop-shadow(0 0 2px rgba(59, 130, 246, 0));
+      drop-shadow(0 0 2px transparent);
   }
 }
 
@@ -792,7 +832,7 @@ html.dark .notch-hud .prompt-mode-badge { background: rgba(255, 255, 255, 0.2); 
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #f97316;
+  background: var(--notch-warn);
   animation: dotScatter 0.4s ease-out forwards;
 }
 .waveform-scatter:nth-child(1) { --scatter-offset: -6; }
@@ -855,7 +895,7 @@ html.dark .notch-hud .prompt-mode-badge { background: rgba(255, 255, 255, 0.2); 
 }
 
 .error-message {
-  color: #f97316;
+  color: var(--notch-warn);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -870,9 +910,42 @@ html.dark .notch-hud .prompt-mode-badge { background: rgba(255, 255, 255, 0.2); 
 
 /* ---- Retry Icon ---- */
 .retry-icon {
-  color: #f97316;
+  color: var(--notch-warn);
   font-size: 16px;
   cursor: pointer;
+}
+
+/* ---- C3 狀態文字（轉錄中／整理中・模式／編輯中／已貼上・N 字）：瀏海下方第二行 ---- */
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 40px 6px;
+  animation: errorMessageFadeIn 0.3s ease-out 0.1s both;
+}
+
+.status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--notch-fg);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.hud-mark {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--notch-fg);
+  color: var(--notch-bg);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: "Songti TC", "PingFang TC", serif;
+  line-height: 1;
 }
 
 /* ---- Collapsing: 內容淡出 ---- */
@@ -881,5 +954,20 @@ html.dark .notch-hud .prompt-mode-badge { background: rgba(255, 255, 255, 0.2); 
 .notch-collapsing .learned-terms-row {
   opacity: 0;
   transition: opacity 0.15s ease;
+}
+
+/* 系統「減少動態效果」：關掉補間、光暈、抖動與循環動畫，狀態直接切換 */
+@media (prefers-reduced-motion: reduce) {
+  .notch-wrapper,
+  .notch-hud,
+  .notch-hud *,
+  .notch-wrapper-success,
+  .notch-wrapper-learned {
+    animation: none !important;
+    transition: none !important;
+  }
+  .checkmark-svg path {
+    stroke-dashoffset: 0;
+  }
 }
 </style>

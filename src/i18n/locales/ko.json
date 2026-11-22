@@ -379,7 +379,14 @@
     "retryFailed": "인식 실패, 다시 녹음해 주세요",
     "cancelled": "취소됨",
     "modeSwitched": "{mode} 모드로 전환되었습니다",
-    "commandMode": "명령"
+    "commandMode": "명령",
+    "hud": {
+      "transcribing": "전사 중",
+      "enhancingWithMode": "정리 중 · {mode}",
+      "editing": "편집 중",
+      "pasted": "붙여넣기 완료 · {count}자",
+      "failedGoRetry": "인식 실패 · 기록에서 재시도"
+    }
   },
   "errors": {
     "databaseInitFailed": "데이터베이스 초기화에 실패했습니다. 기록을 일시적으로 사용할 수 없습니다. 앱을 다시 시작해 주세요.",

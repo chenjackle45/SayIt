@@ -379,7 +379,14 @@
     "retryFailed": "识别失败，请重新录音",
     "cancelled": "已取消",
     "modeSwitched": "已切换至{mode}模式",
-    "commandMode": "指令"
+    "commandMode": "指令",
+    "hud": {
+      "transcribing": "转录中",
+      "enhancingWithMode": "整理中・{mode}",
+      "editing": "编辑中",
+      "pasted": "已粘贴・{count} 字",
+      "failedGoRetry": "识别失败・到记录重试"
+    }
   },
   "errors": {
     "databaseInitFailed": "数据库初始化失败，历史记录暂时无法使用。请重新启动应用程序。",

@@ -161,6 +161,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   // 本世代的編輯模式已判定：之後才落地的探測結果不得再改寫（拒收晚到）
   let windowsSelectionDecidedEpoch = -1;
   const isRetryAttempt = ref<boolean>(false);
+  // HUD「已貼上・N 字」：實際貼上文字的字數（record.charCount 是原文長度，不可沿用）
+  const pastedCharacterCount = ref<number>(0);
+  // HUD「辨識失敗・到記錄重試」：只給「剛存了失敗記錄且有錄音」的那一次錯誤；
+  // 不能用 canRetry 判斷——錯誤停留期間收到的其他錯誤（例如權限被撤銷）會沿用舊的重送狀態
+  let isRetryInRecordsHintPending = false;
+  const isRetryInRecordsHintVisible = ref<boolean>(false);
   const canRetry = computed<boolean>(
     () =>
       status.value === "error" &&
@@ -398,6 +404,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     clearCollapseHideTimer();
     status.value = nextStatus;
     message.value = nextMessage;
+    isRetryInRecordsHintVisible.value = nextStatus === "error" && isRetryInRecordsHintPending;
+    isRetryInRecordsHintPending = false;
     emitVoiceFlowStateChanged(nextStatus, nextMessage);
 
     if (nextStatus === "idle") {
@@ -834,6 +842,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         restoreClipboard: !settingsStore.isCopyTranscriptionToClipboardEnabled,
       });
       isRecording.value = false;
+      pastedCharacterCount.value = params.text.length;
       transitionTo("success", params.successMessage);
       startQualityMonitorAfterPaste();
       // api_usage FK 依賴 transcriptions — 必須等 transcription 寫入後才存 usage
@@ -1308,6 +1317,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         if (audioFilePath) {
           lastFailedTranscriptionId.value = transcriptionId;
           lastFailedAudioFilePath.value = audioFilePath;
+          isRetryInRecordsHintPending = true;
           lastFailedRecordingDurationMs.value = recordingDurationMs;
           lastFailedPeakEnergyLevel.value = peakEnergyLevel;
           lastFailedRmsEnergyLevel.value = rmsEnergyLevel;
@@ -1356,6 +1366,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         if (audioFilePath) {
           lastFailedTranscriptionId.value = transcriptionId;
           lastFailedAudioFilePath.value = audioFilePath;
+          isRetryInRecordsHintPending = true;
           lastFailedRecordingDurationMs.value = recordingDurationMs;
           lastFailedPeakEnergyLevel.value = peakEnergyLevel;
           lastFailedRmsEnergyLevel.value = rmsEnergyLevel;
@@ -1586,6 +1597,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
         // 設定重送狀態（API 錯誤：暫時性問題，重送有意義）
         lastFailedTranscriptionId.value = transcriptionId;
         lastFailedAudioFilePath.value = audioFilePath;
+        isRetryInRecordsHintPending = true;
         lastFailedRecordingDurationMs.value = recordingDurationMs;
         lastFailedPeakEnergyLevel.value = peakEnergyLevel;
         lastFailedRmsEnergyLevel.value = rmsEnergyLevel;
@@ -2064,6 +2076,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     recordingElapsedSeconds,
     lastWasModified,
     canRetry,
+    pastedCharacterCount,
+    isRetryInRecordsHintVisible,
     modeSwitchLabel,
     isEditMode,
     initialize,

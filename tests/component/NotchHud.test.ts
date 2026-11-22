@@ -20,6 +20,13 @@ const i18n = createI18n({
       voiceFlow: {
         vocabularyLearned: "已學習：{terms}",
         vocabularyLearnedTruncated: "已學習：{terms} 等 {count} 個詞",
+        hud: {
+          transcribing: "轉錄中",
+          enhancingWithMode: "整理中・{mode}",
+          editing: "編輯中",
+          pasted: "已貼上・{count} 字",
+          failedGoRetry: "辨識失敗・到記錄重試",
+        },
       },
     },
   },
@@ -27,7 +34,7 @@ const i18n = createI18n({
 
 function mountNotchHud(props: Record<string, unknown>) {
   return mount(NotchHud, {
-    props: { isEditMode: false, ...props },
+    props: { isEditMode: false, pastedCharacterCount: 0, promptModeLabel: "", isRetryInRecordsHintVisible: false, ...props },
     global: {
       plugins: [i18n],
     },
@@ -72,23 +79,21 @@ describe("NotchHud", () => {
     });
 
     expect(wrapper.find(".checkmark-svg").exists()).toBe(true);
-    expect(wrapper.find(".checkmark-svg path").attributes("stroke")).toBe(
-      "#22c55e",
-    );
     expect(wrapper.findAll(".waveform-converge").length).toBe(6);
   });
 
-  it("[P0] error 狀態無 message 且 canRetry=true 應顯示 scatter dots 和 retry icon", () => {
+  it("[P0] 剛存了失敗記錄的轉錄錯誤應顯示 scatter dots、retry icon 與「辨識失敗・到記錄重試」", () => {
     const wrapper = mountNotchHud({
       status: "error",
       recordingElapsedSeconds: 0,
-      message: "",
+      message: "未偵測到語音",
       canRetry: true,
+      isRetryInRecordsHintVisible: true,
     });
 
     expect(wrapper.findAll(".waveform-scatter").length).toBe(6);
     expect(wrapper.find(".retry-icon").exists()).toBe(true);
-    expect(wrapper.find(".error-message").exists()).toBe(false);
+    expect(wrapper.find(".error-message").text()).toBe("辨識失敗・到記錄重試");
   });
 
   it("[P0] error 狀態 canRetry=false 不應顯示 retry icon", () => {
@@ -255,5 +260,28 @@ describe("NotchHud", () => {
     await Promise.resolve();
 
     expect(mockUnlisten).toHaveBeenCalledTimes(1);
+  });
+
+  describe("C3 狀態文字", () => {
+    it("transcribing／enhancing／editing 分別說轉錄中、整理中・模式、編輯中", async () => {
+      const wrapper = mountNotchHud({ status: "transcribing", recordingElapsedSeconds: 0, message: "", promptModeLabel: "積極" });
+      expect(wrapper.get("[data-testid='hud-processing-label']").text()).toBe("轉錄中");
+      await wrapper.setProps({ status: "enhancing" });
+      expect(wrapper.get("[data-testid='hud-processing-label']").text()).toBe("整理中・積極");
+      await wrapper.setProps({ status: "editing" });
+      expect(wrapper.get("[data-testid='hud-processing-label']").text()).toBe("編輯中");
+    });
+
+    it("success 顯示言標與實際貼上的字數", () => {
+      const wrapper = mountNotchHud({ status: "success", recordingElapsedSeconds: 0, message: "已貼上 ✓", pastedCharacterCount: 11 });
+      const label = wrapper.get("[data-testid='hud-success-label']");
+      expect(label.find(".hud-mark").text()).toBe("言");
+      expect(label.text()).toContain("已貼上・11 字");
+    });
+
+    it("沒有導流提示的錯誤照原本的具體文案（即使 canRetry 仍為 true）", () => {
+      const wrapper = mountNotchHud({ status: "error", recordingElapsedSeconds: 0, message: "需要輔助使用權限", canRetry: true });
+      expect(wrapper.find(".error-message").text()).toBe("需要輔助使用權限");
+    });
   });
 });

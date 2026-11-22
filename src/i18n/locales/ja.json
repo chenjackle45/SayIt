@@ -379,7 +379,14 @@
     "retryFailed": "認識失敗、もう一度録音してください",
     "cancelled": "キャンセル",
     "modeSwitched": "{mode}モードに切り替えました",
-    "commandMode": "コマンド"
+    "commandMode": "コマンド",
+    "hud": {
+      "transcribing": "文字起こし中",
+      "enhancingWithMode": "整理中・{mode}",
+      "editing": "編集中",
+      "pasted": "貼り付け完了・{count} 文字",
+      "failedGoRetry": "認識失敗・記録から再試行"
+    }
   },
   "errors": {
     "databaseInitFailed": "データベースの初期化に失敗しました。履歴が一時的に使用できません。アプリを再起動してください。",

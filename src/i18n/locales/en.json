@@ -379,7 +379,14 @@
     "retryFailed": "Recognition failed, please record again",
     "cancelled": "Cancelled",
     "modeSwitched": "Switched to {mode} mode",
-    "commandMode": "Command"
+    "commandMode": "Command",
+    "hud": {
+      "transcribing": "Transcribing",
+      "enhancingWithMode": "Enhancing · {mode}",
+      "editing": "Editing",
+      "pasted": "Pasted · {count} chars",
+      "failedGoRetry": "Failed · retry in Records"
+    }
   },
   "errors": {
     "databaseInitFailed": "Database initialization failed. History is temporarily unavailable. Please restart the app.",

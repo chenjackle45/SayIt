@@ -88,3 +88,33 @@ describe.each([
     }
   });
 });
+
+// HUD 藥丸底色跟主題切換（淺色白底、深色黑底），用自己的 --notch-* 變數；
+// 狀態文字（成功、警示）是 12px 小字，兩套都要達 AA
+const hudCss = readFileSync(resolve(__dirname, "../../src/components/NotchHud.vue"), "utf-8");
+function readHudBlock(selector: string): Record<string, string> {
+  // 同一 selector 可能有多個區塊（版面與變數分開寫），取宣告 --notch-bg 的那個
+  // 比對行首，避免 ".notch-wrapper" 配到 "html.dark .notch-wrapper"
+  const start = hudCss.indexOf(`\n${selector} {\n  --notch-bg`);
+  if (start < 0) return {};
+  const block = hudCss.slice(start, hudCss.indexOf("}", start));
+  const tokens: Record<string, string> = {};
+  for (const match of block.matchAll(/--(notch-[a-z-]+):\s*(#[0-9a-fA-F]{6})\s*;/g)) {
+    tokens[match[1]] = match[2];
+  }
+  return tokens;
+}
+
+describe("HUD 狀態色對比（WCAG AA 4.5:1）", () => {
+  const themes = { light: readHudBlock(".notch-wrapper"), dark: readHudBlock("html.dark .notch-wrapper") };
+  for (const [theme, tokens] of Object.entries(themes)) {
+    for (const name of ["notch-success", "notch-warn"]) {
+      it(`${theme}：${name} 疊在 notch-bg`, () => {
+        expect(tokens[name], `${theme} 缺 --${name}`).toBeDefined();
+        const bg = tokens["notch-bg"] ?? (theme === "light" ? "#ffffff" : "#000000");
+        expect(contrastRatio(tokens[name], bg)).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});
+

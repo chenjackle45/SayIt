@@ -379,7 +379,14 @@
     "retryFailed": "辨識失敗，請重新錄音",
     "cancelled": "已取消",
     "modeSwitched": "已切換至{mode}模式",
-    "commandMode": "指令"
+    "commandMode": "指令",
+    "hud": {
+      "transcribing": "轉錄中",
+      "enhancingWithMode": "整理中・{mode}",
+      "editing": "編輯中",
+      "pasted": "已貼上・{count} 字",
+      "failedGoRetry": "辨識失敗・到記錄重試"
+    }
   },
   "errors": {
     "databaseInitFailed": "資料庫初始化失敗，歷史記錄暫時無法使用。請重新啟動應用程式。",
