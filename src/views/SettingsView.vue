@@ -1112,31 +1112,27 @@ onBeforeUnmount(() => {
         <!-- 簡易 / 自訂 模式切換 -->
         <div class="flex items-center justify-between">
           <Label>{{ $t("settings.hotkey.triggerKeyMode") }}</Label>
-          <div class="flex rounded-lg border border-border overflow-hidden">
-            <button
+          <div class="flex rounded-lg border border-border overflow-hidden" role="group">
+            <Button
               type="button"
-              class="px-4 py-2 text-sm font-medium transition-colors"
-              :class="
-                !isCustomMode
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent'
-              "
+              size="sm"
+              :variant="!isCustomMode ? 'default' : 'ghost'"
+              class="rounded-none"
+              :aria-pressed="!isCustomMode"
               @click="switchToPreset"
             >
               {{ $t("settings.hotkey.preset") }}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              class="px-4 py-2 text-sm font-medium transition-colors"
-              :class="
-                isCustomMode
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent'
-              "
+              size="sm"
+              :variant="isCustomMode ? 'default' : 'ghost'"
+              class="rounded-none"
+              :aria-pressed="isCustomMode"
               @click="switchToCustom"
             >
               {{ $t("settings.hotkey.custom") }}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1214,8 +1210,7 @@ onBeforeUnmount(() => {
             <Transition name="fade">
               <p
                 v-if="reportFeedback.message.value !== ''"
-                class="text-sm"
-                :class="reportFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
+                class="text-sm text-destructive"
               >
                 {{ reportFeedback.message.value }}
               </p>
@@ -1226,31 +1221,27 @@ onBeforeUnmount(() => {
         <!-- 觸發模式 -->
         <div class="flex items-center justify-between">
           <Label for="trigger-mode">{{ $t("settings.hotkey.triggerMode") }}</Label>
-          <div class="flex rounded-lg border border-border overflow-hidden">
-            <button
+          <div class="flex rounded-lg border border-border overflow-hidden" role="group">
+            <Button
               type="button"
-              class="px-4 py-2 text-sm font-medium transition-colors"
-              :class="
-                settingsStore.triggerMode === 'hold'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent'
-              "
+              size="sm"
+              :variant="settingsStore.triggerMode === 'hold' ? 'default' : 'ghost'"
+              class="rounded-none"
+              :aria-pressed="settingsStore.triggerMode === 'hold'"
               @click="handleTriggerModeChange('hold')"
             >
-              Hold
-            </button>
-            <button
+              {{ $t("settings.hotkey.modeHold") }}
+            </Button>
+            <Button
               type="button"
-              class="px-4 py-2 text-sm font-medium transition-colors"
-              :class="
-                settingsStore.triggerMode === 'toggle'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent'
-              "
+              size="sm"
+              :variant="settingsStore.triggerMode === 'toggle' ? 'default' : 'ghost'"
+              class="rounded-none"
+              :aria-pressed="settingsStore.triggerMode === 'toggle'"
               @click="handleTriggerModeChange('toggle')"
             >
-              Toggle
-            </button>
+              {{ $t("settings.hotkey.modeToggle") }}
+            </Button>
           </div>
         </div>
 
@@ -1273,12 +1264,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="hotkeyFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              hotkeyFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ hotkeyFeedback.message.value }}
           </p>
@@ -1356,10 +1342,7 @@ onBeforeUnmount(() => {
             <transition name="feedback-fade">
               <p
                 v-if="apiKeyFeedback.message.value !== ''"
-                class="text-sm"
-                :class="
-                  apiKeyFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'
-                "
+                class="text-sm text-destructive"
               >
                 {{ apiKeyFeedback.message.value }}
               </p>
@@ -1441,8 +1424,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="whisperModelFeedback.message.value !== ''"
-            class="text-sm"
-            :class="whisperModelFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
+            class="text-sm text-destructive"
           >
             {{ whisperModelFeedback.message.value }}
           </p>
@@ -1451,12 +1433,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="transcriptionLocaleFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              transcriptionLocaleFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ transcriptionLocaleFeedback.message.value }}
           </p>
@@ -1612,8 +1589,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="providerFeedback.message.value !== ''"
-            class="text-sm"
-            :class="providerFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
+            class="text-sm text-destructive"
           >
             {{ providerFeedback.message.value }}
           </p>
@@ -1655,8 +1631,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="llmModelFeedback.message.value !== ''"
-            class="text-sm"
-            :class="llmModelFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
+            class="text-sm text-destructive"
           >
             {{ llmModelFeedback.message.value }}
           </p>
@@ -1748,12 +1723,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="promptFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              promptFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ promptFeedback.message.value }}
           </p>
@@ -1800,12 +1770,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="enhancementThresholdFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              enhancementThresholdFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ enhancementThresholdFeedback.message.value }}
           </p>
@@ -1839,12 +1804,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="smartDictionaryFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              smartDictionaryFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ smartDictionaryFeedback.message.value }}
           </p>
@@ -1921,8 +1881,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="audioInputFeedback.message.value !== ''"
-            class="text-sm"
-            :class="audioInputFeedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
+            class="text-sm text-destructive"
           >
             {{ audioInputFeedback.message.value }}
           </p>
@@ -2001,12 +1960,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="recordingCleanupFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              recordingCleanupFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ recordingCleanupFeedback.message.value }}
           </p>
@@ -2045,12 +1999,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="themeFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              themeFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ themeFeedback.message.value }}
           </p>
@@ -2081,12 +2030,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="localeFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              localeFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ localeFeedback.message.value }}
           </p>
@@ -2109,12 +2053,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="muteOnRecordingFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              muteOnRecordingFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ muteOnRecordingFeedback.message.value }}
           </p>
@@ -2149,12 +2088,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="copyTranscriptionToClipboardFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              copyTranscriptionToClipboardFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ copyTranscriptionToClipboardFeedback.message.value }}
           </p>
@@ -2177,12 +2111,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="soundFeedbackFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              soundFeedbackFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ soundFeedbackFeedback.message.value }}
           </p>
@@ -2207,12 +2136,7 @@ onBeforeUnmount(() => {
           <transition name="feedback-fade">
             <p
               v-if="hideDockIconFeedback.message.value !== ''"
-              class="text-sm"
-              :class="
-                hideDockIconFeedback.type.value === 'success'
-                  ? 'text-success'
-                  : 'text-destructive'
-              "
+              class="text-sm text-destructive"
             >
               {{ hideDockIconFeedback.message.value }}
             </p>
@@ -2237,12 +2161,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="autoStartFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              autoStartFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ autoStartFeedback.message.value }}
           </p>
@@ -2265,12 +2184,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="startHiddenFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              startHiddenFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ startHiddenFeedback.message.value }}
           </p>
@@ -2313,12 +2227,7 @@ onBeforeUnmount(() => {
         <transition name="feedback-fade">
           <p
             v-if="debugLogFeedback.message.value !== ''"
-            class="text-sm"
-            :class="
-              debugLogFeedback.type.value === 'success'
-                ? 'text-success'
-                : 'text-destructive'
-            "
+            class="text-sm text-destructive"
           >
             {{ debugLogFeedback.message.value }}
           </p>

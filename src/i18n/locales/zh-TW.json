@@ -26,6 +26,8 @@
       "record": "錄製",
       "systemKeyHint": "Fn、媒體鍵等系統鍵請使用簡易模式",
       "triggerMode": "觸發模式",
+      "modeHold": "按住",
+      "modeToggle": "切換",
       "holdDescription": "按住錄音，放開停止",
       "toggleDescription": "按一下開始，再按停止",
       "updated": "觸發鍵已更新",
@@ -297,7 +299,10 @@
     "selectHint": "選一筆記錄看細節",
     "copyRaw": "複製原文",
     "toggleDetail": "顯示或隱藏細節",
-    "retryLoad": "重試載入"
+    "retryLoad": "重試載入",
+    "deleted": "已刪除",
+    "retranscribed": "已重新辨識",
+    "reEnhanced": "已重新整理"
   },
   "preferences": {
     "back": "返回",

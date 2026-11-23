@@ -20,6 +20,7 @@ import AccessibilityGuide from "./components/AccessibilityGuide.vue";
 import SiteHeader from "./components/SiteHeader.vue";
 import SidebarStatus from "./components/SidebarStatus.vue";
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -407,8 +408,7 @@ onUnmounted(() => {
         </div>
         <p
           v-if="updateFeedback.message.value"
-          class="mt-1 text-xs"
-          :class="updateFeedback.type.value === 'success' ? 'text-link' : 'text-destructive'"
+          class="mt-1 text-xs text-destructive"
         >
           {{ updateFeedback.message.value }}
         </p>
@@ -429,6 +429,9 @@ onUnmounted(() => {
       </div>
     </SidebarInset>
   </SidebarProvider>
+
+  <!-- 成功類回饋（儲存、切換、刪除…）統一由這裡淡出 -->
+  <Toaster position="bottom-right" :duration="2500" />
 
   <AccessibilityGuide
     :visible="showAccessibilityGuide"

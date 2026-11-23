@@ -26,6 +26,8 @@
       "record": "录制",
       "systemKeyHint": "Fn、媒体键等系统键请使用简易模式",
       "triggerMode": "触发模式",
+      "modeHold": "按住",
+      "modeToggle": "切换",
       "holdDescription": "按住录音，放开停止",
       "toggleDescription": "按一下开始，再按停止",
       "updated": "触发键已更新",
@@ -297,7 +299,10 @@
     "selectHint": "选一条记录查看详情",
     "copyRaw": "复制原文",
     "toggleDetail": "显示或隐藏详情",
-    "retryLoad": "重试加载"
+    "retryLoad": "重试加载",
+    "deleted": "已删除",
+    "retranscribed": "已重新识别",
+    "reEnhanced": "已重新整理"
   },
   "preferences": {
     "back": "返回",

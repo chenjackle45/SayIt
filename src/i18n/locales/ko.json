@@ -26,6 +26,8 @@
       "record": "녹화",
       "systemKeyHint": "Fn, 미디어 키 등 시스템 키는 간편 모드를 사용하세요",
       "triggerMode": "트리거 모드",
+      "modeHold": "길게 누르기",
+      "modeToggle": "토글",
       "holdDescription": "길게 눌러 녹음, 놓으면 중지",
       "toggleDescription": "한 번 누르면 시작, 다시 누르면 중지",
       "updated": "트리거 키가 업데이트되었습니다",
@@ -297,7 +299,10 @@
     "selectHint": "기록을 선택하면 세부 정보가 표시돼요",
     "copyRaw": "원문 복사",
     "toggleDetail": "세부 정보 표시/숨기기",
-    "retryLoad": "다시 불러오기"
+    "retryLoad": "다시 불러오기",
+    "deleted": "삭제됨",
+    "retranscribed": "다시 인식함",
+    "reEnhanced": "다시 정리함"
   },
   "preferences": {
     "back": "뒤로",

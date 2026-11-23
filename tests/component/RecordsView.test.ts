@@ -17,6 +17,10 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 vi.mock("../../src/lib/sentry", () => ({ captureError: vi.fn() }));
 
+// v0.16 #7：成功回饋改 toast
+const toastSuccess = vi.hoisted(() => vi.fn());
+vi.mock("vue-sonner", () => ({ toast: { success: toastSuccess } }));
+
 // 視窗寬度：預設寬版；窄版測試改成 true
 const narrowFlag = ref(false);
 vi.mock("@vueuse/core", async (importOriginal) => ({
@@ -186,8 +190,11 @@ describe("RecordsView 清單與分組", () => {
 
     await list.trigger("keydown", { key: "ArrowDown" });
     expect(wrapper.find('[data-testid="detail-text"]').text()).toBe("第二句");
+    toastSuccess.mockClear();
     await list.trigger("keydown", { key: "Enter" });
     expect(invokeMock).toHaveBeenCalledWith("copy_to_clipboard", { text: "第二句" });
+    await flushPromises();
+    expect(toastSuccess).toHaveBeenCalledWith("已複製");
     wrapper.unmount();
   });
 
@@ -314,6 +321,7 @@ describe("RecordsView 清單與分組", () => {
     await wrapper.find('[data-testid="detail-delete"]').trigger("click");
     await flushPromises();
     expect(historyState.deleteTranscription).toHaveBeenCalledWith("a");
+    expect(toastSuccess).toHaveBeenCalledWith("已刪除");
     expect(wrapper.find('[data-testid="detail-text"]').text()).toBe("第二句");
     expect(historyState.refreshDashboard).toHaveBeenCalledTimes(1);
     wrapper.unmount();
@@ -366,11 +374,14 @@ describe("RecordsView 重試（沿用歷史頁的禁用條件）", () => {
     const record = createRecord({ rawText: "可整理的原文" });
     const wrapper = await mountWith(record);
     (historyState.refreshDashboard as ReturnType<typeof vi.fn>).mockClear();
+    toastSuccess.mockClear();
 
     await wrapper.find('[data-testid="retranscribe-button"]').trigger("click");
     await flushPromises();
+    expect(toastSuccess).toHaveBeenLastCalledWith("已重新辨識");
     await wrapper.find('[data-testid="reenhance-button"]').trigger("click");
     await flushPromises();
+    expect(toastSuccess).toHaveBeenLastCalledWith("已重新整理");
     expect(historyState.retranscribeRecord).toHaveBeenCalledTimes(1);
     expect(historyState.reEnhanceRecord).toHaveBeenCalledTimes(1);
     expect(historyState.refreshDashboard).toHaveBeenCalledTimes(2);

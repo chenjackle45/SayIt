@@ -26,6 +26,8 @@
       "record": "Record",
       "systemKeyHint": "For Fn, media keys, etc., use Preset mode",
       "triggerMode": "Trigger Mode",
+      "modeHold": "Hold",
+      "modeToggle": "Toggle",
       "holdDescription": "Hold to record, release to stop",
       "toggleDescription": "Press once to start, press again to stop",
       "updated": "Trigger key updated",
@@ -297,7 +299,10 @@
     "selectHint": "Select a record to see details",
     "copyRaw": "Copy original",
     "toggleDetail": "Show or hide details",
-    "retryLoad": "Retry loading"
+    "retryLoad": "Retry loading",
+    "deleted": "Deleted",
+    "retranscribed": "Re-transcribed",
+    "reEnhanced": "Re-enhanced"
   },
   "preferences": {
     "back": "Back",

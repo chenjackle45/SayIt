@@ -26,6 +26,8 @@
       "record": "録音",
       "systemKeyHint": "Fn、メディアキーなどのシステムキーはシンプルモードをご利用ください",
       "triggerMode": "トリガーモード",
+      "modeHold": "長押し",
+      "modeToggle": "切り替え",
       "holdDescription": "Hold で録音、離すと停止",
       "toggleDescription": "一度押すと開始、もう一度押すと停止",
       "updated": "トリガーキーが更新されました",
@@ -297,7 +299,10 @@
     "selectHint": "記録を選ぶと詳細が表示されます",
     "copyRaw": "原文をコピー",
     "toggleDetail": "詳細の表示・非表示",
-    "retryLoad": "読み込みを再試行"
+    "retryLoad": "読み込みを再試行",
+    "deleted": "削除しました",
+    "retranscribed": "再認識しました",
+    "reEnhanced": "再整理しました"
   },
   "preferences": {
     "back": "戻る",

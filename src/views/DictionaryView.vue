@@ -347,8 +347,7 @@ onBeforeUnmount(() => {
     <transition name="feedback-fade">
       <p
         v-if="feedback.message.value !== ''"
-        class="mt-3 text-sm"
-        :class="feedback.type.value === 'success' ? 'text-success' : 'text-destructive'"
+        class="mt-3 text-sm text-destructive"
       >
         {{ feedback.message.value }}
       </p>

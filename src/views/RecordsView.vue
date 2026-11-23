@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useFeedbackMessage } from "../composables/useFeedbackMessage";
 import { useMediaQuery } from "@vueuse/core";
 import { invoke } from "@tauri-apps/api/core";
 import type { UnlistenFn } from "@tauri-apps/api/event";
@@ -224,10 +225,13 @@ function handleListKeydown(event: KeyboardEvent) {
 }
 
 // ── 複製、刪除、重試 ──
+// 成功回饋走共用出口（v0.16 #7：成功類改 toast，與設定頁一致）
+const feedback = useFeedbackMessage();
 
 async function copyText(key: string, text: string) {
   try {
     await invoke("copy_to_clipboard", { text });
+    feedback.show("success", t("history.copied"));
     if (copiedTimer) clearTimeout(copiedTimer);
     copiedKey.value = key;
     copiedTimer = setTimeout(() => {
@@ -242,6 +246,7 @@ async function handleDelete(record: TranscriptionRecord) {
   try {
     // 刪掉後選取由列表 watcher 退回現存第一筆
     await historyStore.deleteTranscription(record.id);
+    feedback.show("success", t("records.deleted"));
     void historyStore.refreshDashboard();
   } catch {
     // DB 刪除失敗，靜默處理（Sentry 已在 store 層捕獲）
@@ -253,6 +258,7 @@ async function handleRetranscribe(record: TranscriptionRecord) {
   retryError.value = null;
   const result = await historyStore.retranscribeRecord(record);
   if (result.ok) {
+    feedback.show("success", t("records.retranscribed"));
     void historyStore.refreshDashboard();
   } else {
     retryError.value = { id: record.id, key: result.errorKey ?? "history.retranscribeFailed" };
@@ -264,6 +270,7 @@ async function handleReEnhance(record: TranscriptionRecord) {
   retryError.value = null;
   const result = await historyStore.reEnhanceRecord(record);
   if (result.ok) {
+    feedback.show("success", t("records.reEnhanced"));
     void historyStore.refreshDashboard();
   } else {
     retryError.value = { id: record.id, key: result.errorKey ?? "history.reEnhanceFailed" };

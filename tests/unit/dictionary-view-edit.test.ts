@@ -10,11 +10,14 @@ import DictionaryView from "../../src/views/DictionaryView.vue";
 import { useVocabularyStore } from "../../src/stores/useVocabularyStore";
 import i18n from "../../src/i18n";
 
-const { execute, select, emit } = vi.hoisted(() => ({
+const { execute, select, emit, toastSuccess } = vi.hoisted(() => ({
   execute: vi.fn(),
   select: vi.fn(),
   emit: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
+// v0.16 #7：成功回饋改 toast
+vi.mock("vue-sonner", () => ({ toast: { success: toastSuccess } }));
 vi.mock("../../src/lib/database", () => ({
   getDatabase: () => ({ execute, select }),
 }));
@@ -170,7 +173,7 @@ describe("DictionaryView 搜尋＋編輯（#81）", () => {
       ["AI New", "c"],
     );
     expect(editInput(wrapper).exists()).toBe(false);
-    expect(wrapper.text()).toContain("已將「AI Gamma」改為「AI New」");
+    expect(toastSuccess).toHaveBeenCalledWith("已將「AI Gamma」改為「AI New」");
   });
 
   it("清單重抓（別的視窗改字典）時不把焦點從搜尋框拉回編輯框", async () => {
