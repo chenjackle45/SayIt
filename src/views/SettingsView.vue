@@ -1149,7 +1149,7 @@ onBeforeUnmount(() => {
             <SelectContent>
               <SelectItem
                 v-for="opt in triggerKeyOptions"
-                :key="opt.value"
+                :key="`${opt.value}-${$i18n.locale}`"
                 :value="opt.value"
               >
                 {{ opt.label }}
@@ -1405,7 +1405,7 @@ onBeforeUnmount(() => {
               <SelectContent>
                 <SelectItem
                   v-for="opt in TRANSCRIPTION_LANGUAGE_OPTIONS"
-                  :key="opt.locale"
+                  :key="`${opt.locale}-${$i18n.locale}`"
                   :value="opt.locale"
                 >
                   {{ opt.locale === 'auto' ? $t('settings.app.autoDetect') : opt.displayName }}
@@ -1832,7 +1832,7 @@ onBeforeUnmount(() => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_default">
+                <SelectItem :key="$i18n.locale" value="_default">
                   {{
                     defaultInputDeviceName
                       ? $t("settings.audioInput.systemDefaultWithDevice", {
@@ -1987,7 +1987,7 @@ onBeforeUnmount(() => {
             <SelectContent>
               <SelectItem
                 v-for="mode in THEME_MODE_VALUES"
-                :key="mode"
+                :key="`${mode}-${$i18n.locale}`"
                 :value="mode"
               >
                 {{ $t(`settings.app.theme_${mode}`) }}

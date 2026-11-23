@@ -378,7 +378,7 @@
     "editSuccess": "Edited ✓",
     "editFailed": "Edit failed",
     "recordingTooShort": "Recording too short",
-    "vocabularyLearnedLabel": "Added to dictionary",
+    "vocabularyLearnedLabel": "Learned",
     "vocabularyLearned": "{terms}",
     "vocabularyLearnedTruncated": "{terms} +{count} more",
     "retryFailed": "Recognition failed, please record again",
@@ -480,10 +480,10 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Triggering with Alt or Shift on Windows no longer types a stray C — selected text now enters Edit mode as expected, and pasting no longer opens the menu bar",
-      "item2": "More reliable AI cleanup — speaking Chinese is no longer flagged as \"too different\" or translated into the interface language, and words you add to the dictionary yourself now take priority",
-      "item3": "Updated AI model list — Groq and Gemini now default to newer models, and if your chosen model was retired you're moved to a replacement from the same provider; OpenAI and Anthropic gain newer, cheaper models",
-      "item4": "Anthropic (Claude) works again — a valid key used to show \"invalid or expired\" and AI cleanup kept falling back to the original text; connection tests and cleanup now work normally",
+      "item1": "Redesigned main window: the Records page combines the dashboard and history — search directly, pick a line with ↑↓ and press Enter to copy",
+      "item2": "Preferences now have their own settings mode with six categories: press ⌘/Ctrl+, to open, Esc to go back",
+      "item3": "Clearer recording overlay: Transcribing, Enhancing (current mode), Pasted N characters; failed recognitions point you to Records to retry",
+      "item4": "The menu bar (system tray on Windows) icon can copy your last 5 lines; success messages like saved or deleted now fade in at the bottom right",
       "dismiss": "Got it"
     },
     "status": {

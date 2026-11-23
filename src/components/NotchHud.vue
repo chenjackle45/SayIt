@@ -110,6 +110,7 @@ const isExpandedMode = computed(
     hasErrorMessage.value ||
     visualMode.value === "learned" ||
     visualMode.value === "success" ||
+    visualMode.value === "mode-switch" ||
     processingLabel.value !== "",
 );
 
@@ -463,9 +464,6 @@ onUnmounted(() => {
           <span v-else-if="visualMode === 'learned'" class="learned-label">
             {{ $t('voiceFlow.vocabularyLearnedLabel') }}
           </span>
-          <span v-else-if="visualMode === 'mode-switch'" class="mode-switch-label">
-            {{ props.modeSwitchLabel }}
-          </span>
           <template v-else-if="visualMode === 'recording'">
             <span v-if="props.isEditMode" class="hud-badge edit-mode-badge">{{ t('voiceFlow.editMode') }}</span>
             <span v-else-if="props.promptModeLabel" class="hud-badge prompt-mode-badge">{{ props.promptModeLabel }}</span>
@@ -489,6 +487,10 @@ onUnmounted(() => {
       <!-- C3 狀態文字放瀏海下方第二行：HUD 貼齊螢幕頂端，右欄在瀏海機只露約 77px，英日韓放不下 -->
       <div v-if="processingLabel" class="status-row">
         <span class="status-label" data-testid="hud-processing-label">{{ processingLabel }}</span>
+      </div>
+      <!-- 模式切換提示同樣放第二行：右欄五語系都放不下（日文 192px > 右欄 150px） -->
+      <div v-else-if="visualMode === 'mode-switch'" class="status-row">
+        <span class="status-label mode-switch-label" data-testid="hud-mode-switch-label">{{ props.modeSwitchLabel }}</span>
       </div>
       <div v-else-if="visualMode === 'success'" class="status-row">
         <span class="status-label" data-testid="hud-success-label">
@@ -802,15 +804,7 @@ html.dark .notch-wrapper {
 /* ---- Mode Switch ---- */
 .mode-switch-label {
   color: var(--notch-mode);
-  font-size: 14px;
   font-weight: 600;
-  white-space: nowrap;
-  animation: modeSwitchFadeIn 0.3s ease-out;
-}
-
-@keyframes modeSwitchFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ---- HUD Badge (shared base) ---- */

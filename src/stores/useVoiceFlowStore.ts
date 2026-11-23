@@ -163,9 +163,10 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
   const isRetryAttempt = ref<boolean>(false);
   // HUD「已貼上・N 字」：實際貼上文字的字數（record.charCount 是原文長度，不可沿用）
   const pastedCharacterCount = ref<number>(0);
-  // HUD「辨識失敗・到記錄重試」：只給「剛存了失敗記錄且有錄音」的那一次錯誤；
-  // 不能用 canRetry 判斷——錯誤停留期間收到的其他錯誤（例如權限被撤銷）會沿用舊的重送狀態
-  let isRetryInRecordsHintPending = false;
+  // HUD「辨識失敗・到記錄重試」：只給「剛存了失敗記錄且有錄音」的那一次錯誤，且等記錄真的存進 DB 才顯示
+  // （先顯示具體錯誤）。不能用 canRetry 判斷——錯誤停留期間收到的其他錯誤會沿用舊的重送狀態
+  let retryHintRecordSave: Promise<boolean> | null = null;
+  let hudTransitionCount = 0;
   const isRetryInRecordsHintVisible = ref<boolean>(false);
   const canRetry = computed<boolean>(
     () =>
@@ -350,15 +351,17 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
 
   async function saveTranscriptionRecord(
     record: TranscriptionRecord,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const historyStore = useHistoryStore();
     try {
       await historyStore.addTranscription(record);
+      return true;
     } catch (err) {
       writeErrorLog(
         `useVoiceFlowStore: addTranscription failed: ${extractErrorMessage(err)}`,
       );
       captureError(err, { source: "voice-flow", step: "save-transcription" });
+      return false;
     }
   }
 
@@ -404,8 +407,15 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
     clearCollapseHideTimer();
     status.value = nextStatus;
     message.value = nextMessage;
-    isRetryInRecordsHintVisible.value = nextStatus === "error" && isRetryInRecordsHintPending;
-    isRetryInRecordsHintPending = false;
+    const recordSave = nextStatus === "error" ? retryHintRecordSave : null;
+    retryHintRecordSave = null;
+    isRetryInRecordsHintVisible.value = false;
+    const transitionId = ++hudTransitionCount;
+    if (recordSave) {
+      void recordSave.then((isSaved) => {
+        if (isSaved && hudTransitionCount === transitionId) isRetryInRecordsHintVisible.value = true;
+      });
+    }
     emitVoiceFlowStateChanged(nextStatus, nextMessage);
 
     if (nextStatus === "idle") {
@@ -996,7 +1006,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       nextMode === "minimal"
         ? t("settings.prompt.modeMinimal")
         : t("settings.prompt.modeActive");
-    modeSwitchLabel.value = modeLabel;
+    // C3：HUD 說「已切換至〇〇模式」（第二行顯示）
+    modeSwitchLabel.value = t("voiceFlow.modeSwitched", { mode: modeLabel });
     clearModeSwitchLabelTimer();
 
     // Show HUD with mode-switch visual
@@ -1311,13 +1322,13 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           audioFilePath,
           status: "failed",
         });
-        void saveTranscriptionRecord(failedRecord);
+        const failedRecordSave = saveTranscriptionRecord(failedRecord);
 
         // 設定重送狀態（空轉錄：主要重送目標）
         if (audioFilePath) {
           lastFailedTranscriptionId.value = transcriptionId;
           lastFailedAudioFilePath.value = audioFilePath;
-          isRetryInRecordsHintPending = true;
+          retryHintRecordSave = failedRecordSave;
           lastFailedRecordingDurationMs.value = recordingDurationMs;
           lastFailedPeakEnergyLevel.value = peakEnergyLevel;
           lastFailedRmsEnergyLevel.value = rmsEnergyLevel;
@@ -1360,13 +1371,13 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           audioFilePath,
           status: "failed",
         });
-        void saveTranscriptionRecord(failedRecord);
+        const failedRecordSave = saveTranscriptionRecord(failedRecord);
 
         // 設定重送狀態
         if (audioFilePath) {
           lastFailedTranscriptionId.value = transcriptionId;
           lastFailedAudioFilePath.value = audioFilePath;
-          isRetryInRecordsHintPending = true;
+          retryHintRecordSave = failedRecordSave;
           lastFailedRecordingDurationMs.value = recordingDurationMs;
           lastFailedPeakEnergyLevel.value = peakEnergyLevel;
           lastFailedRmsEnergyLevel.value = rmsEnergyLevel;
@@ -1592,12 +1603,12 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           audioFilePath,
           status: "failed",
         });
-        void saveTranscriptionRecord(failedRecord);
+        const failedRecordSave = saveTranscriptionRecord(failedRecord);
 
         // 設定重送狀態（API 錯誤：暫時性問題，重送有意義）
         lastFailedTranscriptionId.value = transcriptionId;
         lastFailedAudioFilePath.value = audioFilePath;
-        isRetryInRecordsHintPending = true;
+        retryHintRecordSave = failedRecordSave;
         lastFailedRecordingDurationMs.value = recordingDurationMs;
         lastFailedPeakEnergyLevel.value = peakEnergyLevel;
         lastFailedRmsEnergyLevel.value = rmsEnergyLevel;

@@ -186,6 +186,8 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
     hasLlmApiKey: true,
     refreshEnhancementThreshold: vi.fn().mockResolvedValue(undefined),
     triggerMode: mockSettingsState.triggerMode,
+    promptMode: "minimal",
+    savePromptMode: vi.fn().mockResolvedValue(undefined),
     get isEnhancementThresholdEnabled() {
       return mockSettingsState.isEnhancementThresholdEnabled;
     },
@@ -361,6 +363,14 @@ describe("useVoiceFlowStore", () => {
     mockWebviewWindowGetByLabel.mockClear();
     mockMainWindowShow.mockClear().mockResolvedValue(undefined);
     mockMainWindowSetFocus.mockClear().mockResolvedValue(undefined);
+  });
+
+  it("[P1] 按兩下切換模式：HUD 收到「已切換至〇〇模式」整句（C3）", async () => {
+    const store = useVoiceFlowStore();
+    await store.initialize();
+    listenerCallbackMap.get("hotkey:mode-toggle")?.({ payload: undefined } as never);
+    // 本檔 i18n 回傳 key：送出的是整句 key，不是只有模式名稱
+    expect(store.modeSwitchLabel).toBe("voiceFlow.modeSwitched");
   });
 
   it("[P0] initialize 應載入設定並註冊所有熱鍵事件", async () => {
@@ -1120,13 +1130,60 @@ describe("useVoiceFlowStore", () => {
     await vi.waitFor(() => expect(mockInvoke).toHaveBeenCalledWith("start_recording", { deviceName: "" }));
     triggerHotkeyEvent("hotkey:released");
     await vi.waitFor(() => expect(store.status).toBe("error"));
-    expect(store.isRetryInRecordsHintVisible).toBe(true);
+    await vi.waitFor(() => expect(store.isRetryInRecordsHintVisible).toBe(true));
 
     listenerCallbackMap.get("hotkey:error")?.({
       payload: { error: HOTKEY_ERROR_CODES.ACCESSIBILITY_PERMISSION, message: "accessibility permission revoked" },
     } as never);
     expect(store.status).toBe("error");
     expect(store.canRetry).toBe(true);
+    expect(store.isRetryInRecordsHintVisible).toBe(false);
+    store.cleanup();
+  });
+
+  it("[P1] 失敗記錄沒存進 DB → 不說「到記錄重試」，照具體錯誤文案", async () => {
+    mockInvoke.mockImplementation(
+      createMockInvokeHandler({
+        transcribeResult: { rawText: "", transcriptionDurationMs: 280, noSpeechProbability: 0.95 },
+      }),
+    );
+    mockAddTranscription.mockRejectedValue(new Error("database is locked"));
+    const store = useVoiceFlowStore();
+    await store.initialize();
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => expect(mockInvoke).toHaveBeenCalledWith("start_recording", { deviceName: "" }));
+    triggerHotkeyEvent("hotkey:released");
+    await vi.waitFor(() => expect(store.status).toBe("error"));
+    await vi.waitFor(() => expect(mockAddTranscription).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
+    expect(store.isRetryInRecordsHintVisible).toBe(false);
+    expect(store.message).toBe("voiceFlow.noSpeechDetected");
+    store.cleanup();
+  });
+
+  it("[P1] 存檔較慢、期間又來別的錯誤 → 存好後也不把提示掛到後來那個錯誤上", async () => {
+    mockInvoke.mockImplementation(
+      createMockInvokeHandler({
+        transcribeResult: { rawText: "", transcriptionDurationMs: 280, noSpeechProbability: 0.95 },
+      }),
+    );
+    const pendingSaves: Array<() => void> = [];
+    mockAddTranscription.mockImplementation(() => new Promise<void>((resolve) => { pendingSaves.push(resolve); }));
+    const finishSave = () => pendingSaves.forEach((resolve) => resolve());
+    const store = useVoiceFlowStore();
+    await store.initialize();
+    triggerHotkeyEvent("hotkey:pressed");
+    await vi.waitFor(() => expect(mockInvoke).toHaveBeenCalledWith("start_recording", { deviceName: "" }));
+    triggerHotkeyEvent("hotkey:released");
+    await vi.waitFor(() => expect(store.status).toBe("error"));
+    await vi.waitFor(() => expect(mockAddTranscription).toHaveBeenCalled());
+
+    listenerCallbackMap.get("hotkey:error")?.({
+      payload: { error: HOTKEY_ERROR_CODES.ACCESSIBILITY_PERMISSION, message: "accessibility permission revoked" },
+    } as never);
+    await vi.waitFor(() => expect(store.message).toBe("errors.hotkey.accessibilityPermission"));
+    finishSave();
+    await new Promise((r) => setTimeout(r, 0));
     expect(store.isRetryInRecordsHintVisible).toBe(false);
     store.cleanup();
   });

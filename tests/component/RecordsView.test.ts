@@ -198,6 +198,22 @@ describe("RecordsView 清單與分組", () => {
     wrapper.unmount();
   });
 
+  it("[P1] ↓ 移到已載入的最後一筆時補下一頁（捲動不一定讓 sentinel 進入畫面）", async () => {
+    historyState = makeHistory([
+      createRecord({ id: "a", rawText: "第一句" }),
+      createRecord({ id: "b", rawText: "第二句" }),
+    ]);
+    historyState.hasMore = true;
+    const wrapper = mountRecords();
+    await flushPromises();
+    (historyState.loadMore as ReturnType<typeof vi.fn>).mockClear();
+
+    await wrapper.find('[data-testid="records-list"]').trigger("keydown", { key: "ArrowDown" });
+    await flushPromises();
+    expect(historyState.loadMore).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+
   it("[P1] IME 組字中的 Enter 不複製", async () => {
     historyState = makeHistory([createRecord({ rawText: "第一句" })]);
     const wrapper = mountRecords();
@@ -370,6 +386,24 @@ describe("RecordsView 重試（沿用歷史頁的禁用條件）", () => {
     wrapper.unmount();
   });
 
+  it("[P1] 掛載後才有重試在途 → 按鈕即時 disabled", async () => {
+    const wrapper = await mountWith(createRecord({ rawText: "有原文" }));
+    expect(wrapper.find('[data-testid="reenhance-button"]').attributes("disabled")).toBeUndefined();
+    historyState.retryingId = "other-record";
+    historyState.retryingAction = "transcribe";
+    await flushPromises();
+    expect(wrapper.find('[data-testid="retranscribe-button"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.find('[data-testid="reenhance-button"]').attributes("disabled")).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it("[P1] 已整理的成功記錄：重新辨識與重新整理都在", async () => {
+    const wrapper = await mountWith(createRecord({ rawText: "原文", processedText: "整理後", wasEnhanced: true }));
+    expect(wrapper.find('[data-testid="retranscribe-button"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="reenhance-button"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it("[P1] 點重新辨識／重新整理呼叫 store，成功後刷新統計", async () => {
     const record = createRecord({ rawText: "可整理的原文" });
     const wrapper = await mountWith(record);
@@ -384,7 +418,39 @@ describe("RecordsView 重試（沿用歷史頁的禁用條件）", () => {
     expect(toastSuccess).toHaveBeenLastCalledWith("已重新整理");
     expect(historyState.retranscribeRecord).toHaveBeenCalledTimes(1);
     expect(historyState.reEnhanceRecord).toHaveBeenCalledTimes(1);
+    expect(historyState.retranscribeRecord).toHaveBeenCalledWith(record);
+    expect(historyState.reEnhanceRecord).toHaveBeenCalledWith(record);
     expect(historyState.refreshDashboard).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it("[P1] 失敗但留有原文（例：判為幻覺）：原文看得到、可複製、可重新整理，仍可重試", async () => {
+    const wrapper = await mountWith(createRecord({ status: "failed", rawText: "可能被誤判的原文" }));
+    expect(wrapper.find('[data-testid="failed-box"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="detail-text"]').text()).toBe("可能被誤判的原文");
+    expect(wrapper.find('[data-testid="detail-retry"]').exists()).toBe(true);
+    await wrapper.find('[data-testid="detail-copy"]').trigger("click");
+    expect(invokeMock).toHaveBeenCalledWith("copy_to_clipboard", { text: "可能被誤判的原文" });
+    expect(wrapper.find('[data-testid="reenhance-button"]').attributes("disabled")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("[P1] 失敗記錄重新整理後（仍標失敗）：可切回原文、看得到字數", async () => {
+    const wrapper = await mountWith(
+      createRecord({ status: "failed", rawText: "原始逐字稿", processedText: "整理後的文字", wasEnhanced: true }),
+    );
+    expect(wrapper.find('[data-testid="detail-text"]').text()).toBe("整理後的文字");
+    await wrapper.find('[data-testid="view-raw"]').trigger("click");
+    expect(wrapper.find('[data-testid="detail-text"]').text()).toBe("原始逐字稿");
+    expect(wrapper.text()).toContain("字數");
+    wrapper.unmount();
+  });
+
+  it("[P1] 失敗且沒有原文：不顯示文字、複製與重新整理", async () => {
+    const wrapper = await mountWith(createRecord({ status: "failed", rawText: "" }));
+    expect(wrapper.find('[data-testid="detail-text"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="detail-copy"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="reenhance-button"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -421,6 +487,7 @@ describe("RecordsView 統計列", () => {
     expect(text).toContain("今天 3 句・120 字");
     expect(text).toContain("本週 900 字");
     expect(text).toContain("免費額度 剩");
+    expect(text).toMatch(/剩 \d+%/);
     expect(text).not.toContain("計費");
     wrapper.unmount();
   });
@@ -432,6 +499,7 @@ describe("RecordsView 統計列", () => {
     await flushPromises();
     const text = wrapper.find('[data-testid="records-stats"]').text();
     expect(text).toContain("免費額度 剩");
+    expect(text).toMatch(/剩 \d+%/);
     expect(text).toContain("計費");
     expect(text).toContain("LLM：8 次 · 4,500 tokens");
     expect(text).toContain("付費方案 — 無免費額度限制");

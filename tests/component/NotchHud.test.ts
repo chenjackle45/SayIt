@@ -279,6 +279,14 @@ describe("NotchHud", () => {
       expect(label.text()).toContain("已貼上・11 字");
     });
 
+    it("模式切換提示放瀏海下方第二行（右欄放不下），HUD 展開成兩行高", async () => {
+      const wrapper = mountNotchHud({ status: "idle", recordingElapsedSeconds: 0, message: "", modeSwitchLabel: "" });
+      await wrapper.setProps({ modeSwitchLabel: "已切換至積極模式" });
+      expect(wrapper.get(".status-row [data-testid='hud-mode-switch-label']").text()).toBe("已切換至積極模式");
+      expect(wrapper.find(".notch-right").text()).not.toContain("已切換");
+      expect(wrapper.find(".notch-hud").classes()).toContain("notch-hud-expanded");
+    });
+
     it("沒有導流提示的錯誤照原本的具體文案（即使 canRetry 仍為 true）", () => {
       const wrapper = mountNotchHud({ status: "error", recordingElapsedSeconds: 0, message: "需要輔助使用權限", canRetry: true });
       expect(wrapper.find(".error-message").text()).toBe("需要輔助使用權限");

@@ -162,6 +162,10 @@ function isFailed(record: TranscriptionRecord): boolean {
   return record.status === "failed";
 }
 
+function hasFailedRawText(record: TranscriptionRecord): boolean {
+  return isFailed(record) && record.rawText.trim() !== "";
+}
+
 function canRetranscribe(record: TranscriptionRecord): boolean {
   return !!record.audioFilePath && !record.isEditMode && retryingId.value === null;
 }
@@ -195,7 +199,7 @@ function moveSelection(delta: number) {
   const index = list.findIndex((r) => r.id === selectedId.value);
   const next = Math.max(0, Math.min(list.length - 1, (index < 0 ? 0 : index) + delta));
   selectRecord(list[next].id, true);
-  // 按到最後一筆時順手載下一頁（列高變矮後，捲動不一定觸發 sentinel）
+  // 按到最後一筆時順手載下一頁：捲動只到「看得見該列」，底下的 sentinel 不一定進入畫面
   if (next === list.length - 1) void loadMoreSafely();
 }
 
@@ -662,7 +666,7 @@ onBeforeUnmount(() => {
           <div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>{{ formatFullDate(selectedRecord.timestamp) }}</span>
             <div
-              v-if="!isFailed(selectedRecord) && hasDistinctRawText"
+              v-if="(!isFailed(selectedRecord) || hasFailedRawText(selectedRecord)) && hasDistinctRawText"
               class="inline-flex rounded-md border border-border p-0.5"
               role="group"
               :aria-label="$t('records.contentVersion')"
@@ -689,7 +693,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- 失敗記錄 -->
+          <!-- 失敗記錄（留有原文時原文接在下面，沿用舊歷史頁可看、可複製、可重新整理） -->
           <div v-if="isFailed(selectedRecord)" class="flex gap-2.5 rounded-lg bg-destructive/10 p-3 text-sm text-destructive" data-testid="failed-box">
             <AlertCircle class="mt-0.5 h-4 w-4 shrink-0" />
             <div>
@@ -701,7 +705,7 @@ onBeforeUnmount(() => {
           </div>
 
           <p
-            v-else
+            v-if="!isFailed(selectedRecord) || hasFailedRawText(selectedRecord)"
             class="select-text whitespace-pre-wrap break-words text-[15px] leading-relaxed"
             :class="showRawText && hasDistinctRawText ? 'text-muted-foreground' : 'text-foreground'"
             data-testid="detail-text"
@@ -729,8 +733,8 @@ onBeforeUnmount(() => {
             </span>
           </div>
 
-          <!-- 工具列 -->
-          <div class="flex items-center gap-1.5">
+          <!-- 工具列（失敗但有原文時有四顆，窄窗格放不下就換行） -->
+          <div class="flex flex-wrap items-center gap-1.5">
             <Button
               v-if="isFailed(selectedRecord)"
               size="sm"
@@ -742,12 +746,12 @@ onBeforeUnmount(() => {
               <RefreshCw v-else class="h-3.5 w-3.5" />
               {{ $t("records.retry") }}
             </Button>
-            <template v-else>
-              <Button size="sm" data-testid="detail-copy" @click="copyText(selectedRecord.id, detailText)">
+            <template v-if="!isFailed(selectedRecord) || hasFailedRawText(selectedRecord)">
+              <Button size="sm" :variant="isFailed(selectedRecord) ? 'outline' : 'default'" data-testid="detail-copy" @click="copyText(selectedRecord.id, detailText)">
                 <Check v-if="copiedKey === selectedRecord.id" class="h-3.5 w-3.5" />
                 <Copy v-else class="h-3.5 w-3.5" />
                 {{ copiedKey === selectedRecord.id ? $t("history.copied") : $t("history.copy") }}
-                <kbd class="ml-0.5 rounded border border-primary-foreground/50 px-1 text-[11px] font-normal">↵</kbd>
+                <kbd v-if="!isFailed(selectedRecord)" class="ml-0.5 rounded border border-primary-foreground/50 px-1 text-[11px] font-normal">↵</kbd>
               </Button>
               <span class="flex-1" />
               <Button
@@ -762,7 +766,7 @@ onBeforeUnmount(() => {
                 {{ isRetrying(selectedRecord, "enhance") ? $t("history.reEnhancing") : $t("history.reEnhance") }}
               </Button>
             </template>
-            <span v-if="isFailed(selectedRecord)" class="flex-1" />
+            <span v-if="isFailed(selectedRecord) && !hasFailedRawText(selectedRecord)" class="flex-1" />
 
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
@@ -780,11 +784,11 @@ onBeforeUnmount(() => {
                   <RefreshCw />
                   {{ isRetrying(selectedRecord, "transcribe") ? $t("history.retranscribing") : $t("history.retranscribe") }}
                 </DropdownMenuItem>
-                <DropdownMenuItem v-if="!isFailed(selectedRecord)" @select="copyText(`${selectedRecord.id}:raw`, selectedRecord.rawText)">
+                <DropdownMenuItem v-if="!isFailed(selectedRecord) || hasFailedRawText(selectedRecord)" @select="copyText(`${selectedRecord.id}:raw`, selectedRecord.rawText)">
                   <Copy />
                   {{ $t("records.copyRaw") }}
                 </DropdownMenuItem>
-                <DropdownMenuSeparator v-if="!isFailed(selectedRecord)" />
+                <DropdownMenuSeparator v-if="!isFailed(selectedRecord) || hasFailedRawText(selectedRecord)" />
                 <DropdownMenuItem variant="destructive" data-testid="detail-delete" @select="handleDelete(selectedRecord)">
                   <Trash2 />
                   {{ $t("history.delete") }}
@@ -802,7 +806,7 @@ onBeforeUnmount(() => {
             <span>{{ $t("history.recordingLabel") }}{{ formatDurationMs(selectedRecord.recordingDurationMs) }}</span>
             <span v-if="selectedRecord.transcriptionDurationMs > 0">{{ $t("history.transcriptionLabel") }}{{ formatDurationMs(selectedRecord.transcriptionDurationMs) }}</span>
             <span v-if="selectedRecord.enhancementDurationMs !== null">{{ $t("history.aiLabel") }}{{ formatDurationMs(selectedRecord.enhancementDurationMs) }}</span>
-            <span v-if="!isFailed(selectedRecord)">{{ $t("history.charCountLabel") }}{{ selectedRecord.charCount }}</span>
+            <span v-if="!isFailed(selectedRecord) || hasFailedRawText(selectedRecord)">{{ $t("history.charCountLabel") }}{{ selectedRecord.charCount }}</span>
             <span>{{ $t("history.modeLabel") }}{{ selectedRecord.triggerMode === "hold" ? $t("history.holdMode") : $t("history.toggleMode") }}</span>
           </div>
         </template>

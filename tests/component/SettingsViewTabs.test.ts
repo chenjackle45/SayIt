@@ -198,3 +198,21 @@ describe("SettingsView 分頁生命週期", () => {
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("SettingsView 下拉選單跟著介面語言換字", () => {
+  it("切換介面語言後，佈景主題選單顯示的選項文字跟著換（不殘留舊語言）", async () => {
+    const wrapper = mount(SettingsView, {
+      props: { tab: "general" },
+      attachTo: document.body,
+      global: { plugins: [i18n], stubs: { AlertDialog: true, ConnectionTestButton: true } },
+    });
+    await flushPromises();
+    expect(wrapper.get("#theme-select").text()).toContain("跟隨系統");
+
+    i18n.global.locale.value = "en";
+    await flushPromises();
+    expect(wrapper.get("#theme-select").text()).toContain("System");
+    expect(wrapper.get("#theme-select").text()).not.toContain("跟隨系統");
+    wrapper.unmount();
+  });
+});
