@@ -447,10 +447,9 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Triggering with Alt or Shift on Windows no longer types a stray C — selected text now enters Edit mode as expected, and pasting no longer opens the menu bar",
-      "item2": "More reliable AI cleanup — speaking Chinese is no longer flagged as \"too different\" or translated into the interface language, and words you add to the dictionary yourself now take priority",
-      "item3": "Updated AI model list — Groq and Gemini now default to newer models, and if your chosen model was retired you're moved to a replacement from the same provider; OpenAI and Anthropic gain newer, cheaper models",
-      "item4": "Anthropic (Claude) works again — a valid key used to show \"invalid or expired\" and AI cleanup kept falling back to the original text; connection tests and cleanup now work normally",
+      "item1": "Search and edit your dictionary — no more hunting through the list for a word AI learned wrong; type a few letters to filter, then click the pencil to fix it",
+      "item2": "The recording box on Windows stays visible — it now appears above other windows, including after the computer wakes from sleep",
+      "item3": "Names and terms in your dictionary are applied more often — AI cleanup now changes similar-sounding words to the spelling in your dictionary",
       "dismiss": "Got it"
     }
   },
