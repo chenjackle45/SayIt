@@ -108,6 +108,22 @@ describe("DictionaryView 搜尋＋編輯（#81）", () => {
     expect(editInput(wrapper).exists()).toBe(false);
   });
 
+  it("macOS WebKit 組字結束後補送的 Enter（keyCode 229、isComposing false）不存檔；之後一般 Enter 才存", async () => {
+    const { wrapper } = await render();
+    await editButton(wrapper).trigger("click");
+    await editInput(wrapper).setValue("AI New");
+    // 2026-11-26 Safari＋注音實測順序：Enter(229, composing) → compositionend → Enter(229, 非 composing)
+    await editInput(wrapper).trigger("keydown", { key: "Enter", keyCode: 229, isComposing: true });
+    await editInput(wrapper).trigger("compositionend", { data: "你" });
+    await editInput(wrapper).trigger("keydown", { key: "Enter", keyCode: 229, isComposing: false });
+    await editInput(wrapper).trigger("keydown", { key: "Escape", keyCode: 229, isComposing: false });
+    expect(execute).not.toHaveBeenCalled();
+    expect(editInput(wrapper).exists()).toBe(true);
+    await editInput(wrapper).trigger("keydown", { key: "Enter", keyCode: 13 });
+    await flushPromises();
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
   it("搜尋同時篩兩張表；清空後編輯列回來但不搶走搜尋框焦點、草稿保留", async () => {
     const { wrapper } = await render();
     await editButton(wrapper, 1).trigger("click");

@@ -112,9 +112,13 @@ async function saveEdit(entry: VocabularyEntry) {
   }
 }
 
-/** 輸入法組字中（注音、倉頡選字）的 Enter／Esc 不觸發存檔或取消 */
+/**
+ * 輸入法組字中（注音、倉頡選字）的 Enter／Esc 不觸發存檔或取消。
+ * macOS WebKit 在 compositionend 之後會補送一次確認用的 Enter（keyCode 229、isComposing false），
+ * 只看 isComposing 會把選字的 Enter 當成存檔（2026-11-26 Safari＋注音實測）。
+ */
 function handleEditKeydown(event: KeyboardEvent, entry: VocabularyEntry) {
-  if (event.isComposing || isSavingEdit.value) return;
+  if (event.isComposing || event.keyCode === 229 || isSavingEdit.value) return;
   if (event.key === "Enter") void saveEdit(entry);
   else if (event.key === "Escape") cancelEdit();
 }
