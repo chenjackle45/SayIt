@@ -129,6 +129,12 @@ function getWeightVariant(weight: number): "default" | "secondary" | "outline" {
   return "outline";
 }
 
+/** 新增詞框的 Enter：與編輯框同一組字守衛（注音選字的 Enter 不新增半成品詞） */
+function handleAddTermKeydown(event: KeyboardEvent) {
+  if (event.isComposing || event.keyCode === 229) return;
+  void handleAddTerm();
+}
+
 async function handleAddTerm() {
   const term = newTermInput.value.trim();
   if (!term) return;
@@ -319,7 +325,7 @@ onBeforeUnmount(() => {
             v-model="newTermInput"
             :placeholder="$t('dictionary.inputPlaceholder')"
             class="w-48"
-            @keydown.enter="handleAddTerm"
+            @keydown.enter="handleAddTermKeydown"
           />
           <p v-if="showDuplicateHint" class="mt-1 text-xs text-destructive">
             {{ $t("dictionary.duplicateEntry") }}

@@ -127,6 +127,23 @@ describe("DictionaryView 搜尋＋編輯（#81）", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
+  it("新增詞框：組字中與 macOS WebKit 補送的 Enter（keyCode 229）不新增；之後一般 Enter 才新增", async () => {
+    const { wrapper } = await render();
+    const addInput = wrapper.find(`input[placeholder="${i18n.global.t("dictionary.inputPlaceholder")}"]`);
+    await addInput.setValue("你");
+    // 只帶 isComposing（keyCode 正常）也要擋：單獨守住 isComposing 判斷
+    await addInput.trigger("keydown", { key: "Enter", keyCode: 13, isComposing: true });
+    await addInput.trigger("keydown", { key: "Enter", keyCode: 229, isComposing: true });
+    await addInput.trigger("compositionend", { data: "你" });
+    await addInput.trigger("keydown", { key: "Enter", keyCode: 229, isComposing: false });
+    await flushPromises();
+    expect(execute).not.toHaveBeenCalled();
+    await addInput.trigger("keydown", { key: "Enter", keyCode: 13 });
+    await flushPromises();
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0][0]).toContain("INSERT INTO vocabulary");
+  });
+
   it("搜尋同時篩兩張表；清空後編輯列回來但不搶走搜尋框焦點、草稿保留", async () => {
     const { wrapper } = await render();
     await editButton(wrapper, 1).trigger("click");
