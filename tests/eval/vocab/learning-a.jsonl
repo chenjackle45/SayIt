@@ -1,0 +1,20 @@
+{"id":"la-1","lang":"zh-TW","pasted":"我跟阿親約明天看志令單","corrected":"我跟阿欽約明天看製令單","expectTerms":["阿欽","製令單"],"expectPairs":[{"term":"阿欽","misheard":"阿親"},{"term":"製令單","misheard":"志令單"}]}
+{"id":"la-2","lang":"zh-TW","pasted":"我們名天開會，討論部署","corrected":"我們明天開會，討論部署，改用 Kubernetes","expectTerms":[],"expectPairs":[]}
+{"id":"la-3","lang":"zh-TW","pasted":"這個會意改到下午","corrected":"這個會議改到下午","expectTerms":[],"expectPairs":[]}
+{"id":"la-4","lang":"zh-TW","pasted":"前端用陶里打包，陶里比較小","corrected":"前端用 Tauri 打包，Tauri 比較小","expectTerms":["Tauri"],"expectPairs":[{"term":"Tauri","misheard":"陶里"}]}
+{"id":"la-5","lang":"zh-TW","pasted":"請寄給陳太誠","corrected":"請寄給陳泰呈","expectTerms":["陳泰呈"],"expectPairs":[{"term":"陳泰呈","misheard":"陳太誠"}]}
+{"id":"la-6","lang":"zh-TW","pasted":"今天天氣很好我們出去走走","corrected":"今天天氣不錯，我們出去走走吧","expectTerms":[],"expectPairs":[]}
+{"id":"la-7","lang":"zh-CN","pasted":"后端用够浪写","corrected":"后端用 Golang 写","expectTerms":["Golang"],"expectPairs":[{"term":"Golang","misheard":"够浪"}]}
+{"id":"la-8","lang":"zh-CN","pasted":"请通知诸葛林和上关静","corrected":"请通知诸葛琳和上官靖","expectTerms":["诸葛琳","上官靖"],"expectPairs":[{"term":"诸葛琳","misheard":"诸葛林"},{"term":"上官靖","misheard":"上关静"}]}
+{"id":"la-9","lang":"zh-CN","pasted":"明天开会","corrected":"明天下午开会","expectTerms":[],"expectPairs":[]}
+{"id":"la-10","lang":"en","pasted":"Ask Annie and Area to present","corrected":"Ask Anny and Ariya to present","expectTerms":["Anny","Ariya"],"expectPairs":[{"term":"Anny","misheard":"Annie"},{"term":"Ariya","misheard":"Area"}]}
+{"id":"la-11","lang":"en","pasted":"We use super base for auth","corrected":"We use Supabase for auth","expectTerms":["Supabase"],"expectPairs":[{"term":"Supabase","misheard":"super base"}]}
+{"id":"la-12","lang":"en","pasted":"Send it to Telegram","corrected":"Send it to Teleg","expectTerms":[],"expectPairs":[]}
+{"id":"la-13","lang":"en","pasted":"the meeting is tomorrow","corrected":"The meeting is tomorrow.","expectTerms":[],"expectPairs":[]}
+{"id":"la-14","lang":"en","pasted":"Move from rabbit MQ to Kafka, rabbit MQ is slow","corrected":"Move from RabbitMQ to Kafka, RabbitMQ is slow","expectTerms":["RabbitMQ"],"expectPairs":[{"term":"RabbitMQ","misheard":"rabbit MQ"}]}
+{"id":"la-15","lang":"ja","pasted":"東海林先生に連絡してください","corrected":"東海林先生に連絡してください","expectTerms":[],"expectPairs":[]}
+{"id":"la-16","lang":"ja","pasted":"小鳥あそびさんに送ってください","corrected":"小鳥遊さんに送ってください","expectTerms":["小鳥遊"],"expectPairs":[{"term":"小鳥遊","misheard":"小鳥あそび"}]}
+{"id":"la-17","lang":"ja","pasted":"アクセシビリティの監査","corrected":"アクセシビリティの監査を来週やります","expectTerms":[],"expectPairs":[]}
+{"id":"la-18","lang":"ko","pasted":"쿠버네티즈로 옮겼어요","corrected":"쿠버네티스로 옮겼어요","expectTerms":["쿠버네티스"],"expectPairs":[{"term":"쿠버네티스","misheard":"쿠버네티즈"}]}
+{"id":"la-19","lang":"ko","pasted":"제갈 윤 씨에게 보내 주세요","corrected":"제갈윤 씨에게 보내 주세요","expectTerms":["제갈윤"],"expectPairs":[{"term":"제갈윤","misheard":"제갈 윤"}]}
+{"id":"la-20","lang":"ko","pasted":"내일 회의","corrected":"내일 회의는 취소됐어요","expectTerms":[],"expectPairs":[]}

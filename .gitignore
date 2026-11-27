@@ -38,3 +38,19 @@ playwright/.auth/
 
 # Auto-generated documentation scanner output
 docs/project-scan-report.json
+
+# v0.17 詞庫評估：API 回應快取不進庫（重跑會補）；只保留 vocabulary-selection-eval 測試用的 cases-a 辨識快取
+tests/eval/vocab/results/*
+!tests/eval/vocab/results/cache/
+tests/eval/vocab/results/cache/*
+!tests/eval/vocab/results/cache/whisper/
+tests/eval/vocab/results/cache/whisper/*
+!tests/eval/vocab/results/cache/whisper/none/
+!tests/eval/vocab/results/cache/whisper/current/
+tests/eval/vocab/results/cache/whisper/none/*
+tests/eval/vocab/results/cache/whisper/current/*
+!tests/eval/vocab/results/cache/whisper/none/a-*.json
+!tests/eval/vocab/results/cache/whisper/current/a-*.json
+# 使用者本人錄音不進庫
+tests/eval/vocab/real-voice/*.wav
+tests/eval/vocab/real-voice/*.m4a

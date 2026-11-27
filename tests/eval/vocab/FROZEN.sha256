@@ -1,0 +1,4 @@
+2fb8902489512e7609dfc0648bdc7781517c8ec1846ce8967ab3ab27489c8485  tests/eval/vocab/cases-a.jsonl
+470816f07418dc1e7774092a3530375b020519739ac40aa7f6f67acfe1cde126  tests/eval/vocab/cases-b.jsonl
+799520a59196a14a53c99bcbb1dd8eed26b9e60917c9c92a646f44a7a0e56ea9  tests/eval/vocab/learning-a.jsonl
+426467bfd1e7397adc2bcd7288ec3841d07f40d00a07b92718a62dcd636eec12  tests/eval/vocab/learning-b.jsonl

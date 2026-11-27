@@ -1,0 +1,20 @@
+{"id":"lb-1","lang":"zh-TW","pasted":"請查烏帕替泥的庫存，烏帕替泥的單子先不要送。","corrected":"請查烏帕替尼的庫存，烏帕替尼的單子先不要送。","expectTerms":["烏帕替尼"],"expectPairs":[{"term":"烏帕替尼","misheard":"烏帕替泥"}]}
+{"id":"lb-2","lang":"zh-TW","pasted":"幫我找第五其的信封，別拿第五其的名牌。","corrected":"幫我找第五琦的信封，別拿第五琦的名牌。","expectTerms":["第五琦"],"expectPairs":[{"term":"第五琦","misheard":"第五其"}]}
+{"id":"lb-3","lang":"zh-TW","pasted":"這份資料還沒看完。","corrected":"這份資料還沒看完，明天再給你。","expectTerms":[],"expectPairs":[]}
+{"id":"lb-4","lang":"zh-TW","pasted":"請把報告寄給我","corrected":"請把報告寄給我。","expectTerms":[],"expectPairs":[]}
+{"id":"lb-5","lang":"zh-CN","pasted":"把代为权的资料给我，代为权那页别漏了。","corrected":"把代位权的资料给我，代位权那页别漏了。","expectTerms":["代位权"],"expectPairs":[{"term":"代位权","misheard":"代为权"}]}
+{"id":"lb-6","lang":"zh-CN","pasted":"我想找尼拉帕力和达格列静的说明书。","corrected":"我想找尼拉帕利和达格列净的说明书。","expectTerms":["尼拉帕利","达格列净"],"expectPairs":[{"term":"尼拉帕利","misheard":"尼拉帕力"},{"term":"达格列净","misheard":"达格列静"}]}
+{"id":"lb-7","lang":"zh-CN","pasted":"这份报告挺不错。","corrected":"这份报告很好。","expectTerms":[],"expectPairs":[]}
+{"id":"lb-8","lang":"zh-CN","pasted":"我明天把文件发给你。","corrected":"明天我把文件发给你。","expectTerms":[],"expectPairs":[]}
+{"id":"lb-9","lang":"en","pasted":"Please restart tail scale and check the mile search logs.","corrected":"Please restart Tailscale and check the Meilisearch logs.","expectTerms":["Tailscale","Meilisearch"],"expectPairs":[{"term":"Tailscale","misheard":"tail scale"},{"term":"Meilisearch","misheard":"mile search"}]}
+{"id":"lb-10","lang":"en","pasted":"Keep the fee all raven tag and the fee all raven receipt.","corrected":"Keep the Fjällräven tag and the Fjällräven receipt.","expectTerms":["Fjällräven"],"expectPairs":[{"term":"Fjällräven","misheard":"fee all raven"}]}
+{"id":"lb-11","lang":"en","pasted":"Please save the final dra","corrected":"Please save the final draft.","expectTerms":[],"expectPairs":[]}
+{"id":"lb-12","lang":"en","pasted":"The meeting starts at noon.","corrected":"The meeting starts at noon in the small room.","expectTerms":[],"expectPairs":[]}
+{"id":"lb-13","lang":"ja","pasted":"デュピルマップの箱はまだ捨てないで。","corrected":"デュピルマブの箱はまだ捨てないで。","expectTerms":["デュピルマブ"],"expectPairs":[{"term":"デュピルマブ","misheard":"デュピルマップ"}]}
+{"id":"lb-14","lang":"ja","pasted":"ヘリノクスの椅子とヘリノクスの袋を持ってきて。","corrected":"ヘリノックスの椅子とヘリノックスの袋を持ってきて。","expectTerms":["ヘリノックス"],"expectPairs":[{"term":"ヘリノックス","misheard":"ヘリノクス"}]}
+{"id":"lb-15","lang":"ja","pasted":"この資料を見てください。","corrected":"この資料を確認してください。","expectTerms":[],"expectPairs":[]}
+{"id":"lb-16","lang":"ja","pasted":"明日の会議は午後です。","corrected":"明日の会議は午後です。資料も持ってきてください。","expectTerms":[],"expectPairs":[]}
+{"id":"lb-17","lang":"ko","pasted":"우스테키누만 상자는 남겨 줘.","corrected":"우스테키누맙 상자는 남겨 줘.","expectTerms":["우스테키누맙"],"expectPairs":[{"term":"우스테키누맙","misheard":"우스테키누만"}]}
+{"id":"lb-18","lang":"ko","pasted":"선우정하 초대장과 선우정하 명패를 확인해 줘.","corrected":"선우정아 초대장과 선우정아 명패를 확인해 줘.","expectTerms":["선우정아"],"expectPairs":[{"term":"선우정아","misheard":"선우정하"}]}
+{"id":"lb-19","lang":"ko","pasted":"나는 내일 서류를 보낼게.","corrected":"내일 나는 서류를 보낼게.","expectTerms":[],"expectPairs":[]}
+{"id":"lb-20","lang":"ko","pasted":"회의 자료를 보","corrected":"회의 자료를 보내 줘.","expectTerms":[],"expectPairs":[]}

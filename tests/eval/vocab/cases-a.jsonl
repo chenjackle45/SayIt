@@ -1,0 +1,128 @@
+{"id":"a-zhTW-med-1","lang":"zh-TW","domain":"medical","spoken":"病人昨天開始服用二甲雙胍，今天血糖降到一百二十","expected":"病人昨天開始服用二甲雙胍，今天血糖降到120","entities":["二甲雙胍"],"keep":["二甲雙胍","120","降到"],"selfCorrection":false}
+{"id":"a-zhTW-med-2","lang":"zh-TW","domain":"medical","spoken":"請幫我預約週三的胃鏡，不對，是大腸鏡檢查","expected":"請幫我預約週三的大腸鏡檢查","entities":["大腸鏡"],"keep":["週三","大腸鏡"],"selfCorrection":true}
+{"id":"a-zhTW-med-3","lang":"zh-TW","domain":"medical","spoken":"這位患者對盤尼西林過敏，絕對不要開阿莫西林","expected":"這位患者對盤尼西林過敏，絕對不要開阿莫西林","entities":["盤尼西林","阿莫西林"],"keep":["盤尼西林","不要","阿莫西林"],"selfCorrection":false}
+{"id":"a-zhTW-med-4","lang":"zh-TW","domain":"medical","spoken":"復健科的蕭瑋廷醫師說下週要做肌電圖","expected":"復健科的蕭瑋廷醫師說下週要做肌電圖","entities":["蕭瑋廷","肌電圖"],"keep":["蕭瑋廷","下週","肌電圖"],"selfCorrection":false}
+{"id":"a-zhTW-law-1","lang":"zh-TW","domain":"legal","spoken":"依照民法第一百八十四條，侵權行為要負損害賠償責任","expected":"依照民法第184條，侵權行為要負損害賠償責任","entities":["民法"],"keep":["184","侵權行為","損害賠償"],"selfCorrection":false}
+{"id":"a-zhTW-law-2","lang":"zh-TW","domain":"legal","spoken":"這份契約的違約金條款不能超過總價的百分之二十","expected":"這份契約的違約金條款不能超過總價的20%","entities":["違約金"],"keep":["違約金","不能","20%"],"selfCorrection":false}
+{"id":"a-zhTW-law-3","lang":"zh-TW","domain":"legal","spoken":"請寄存證信函給鄭毓珊律師，我是說寄給她的事務所","expected":"請寄存證信函給鄭毓珊律師的事務所","entities":["存證信函","鄭毓珊"],"keep":["存證信函","鄭毓珊","事務所"],"selfCorrection":true}
+{"id":"a-zhTW-law-4","lang":"zh-TW","domain":"legal","spoken":"假扣押的聲請已經被地方法院駁回了","expected":"假扣押的聲請已經被地方法院駁回了","entities":["假扣押"],"keep":["假扣押","駁回"],"selfCorrection":false}
+{"id":"a-zhTW-tech-1","lang":"zh-TW","domain":"tech","spoken":"我們把服務從 Heroku 搬到 Kubernetes 之後延遲少了三成","expected":"我們把服務從 Heroku 搬到 Kubernetes 之後延遲少了三成","entities":["Heroku","Kubernetes"],"keep":["Heroku","Kubernetes","三成"],"selfCorrection":false}
+{"id":"a-zhTW-tech-2","lang":"zh-TW","domain":"tech","spoken":"前端改用 Tauri 打包，不要再用 Electron 了","expected":"前端改用 Tauri 打包，不要再用 Electron 了","entities":["Tauri","Electron"],"keep":["Tauri","不要","Electron"],"selfCorrection":false}
+{"id":"a-zhTW-tech-3","lang":"zh-TW","domain":"tech","spoken":"資料庫連線池設成五十，喔不是，設成二十就好","expected":"資料庫連線池設成20就好","entities":["連線池"],"keep":["連線池","20"],"selfCorrection":true}
+{"id":"a-zhTW-tech-4","lang":"zh-TW","domain":"tech","spoken":"記得在 pnpm 的設定檔裡關掉 hoisting","expected":"記得在 pnpm 的設定檔裡關掉 hoisting","entities":["pnpm","hoisting"],"keep":["pnpm","關掉","hoisting"],"selfCorrection":false}
+{"id":"a-zhTW-game-1","lang":"zh-TW","domain":"gaming","spoken":"今晚七點開台打艾爾登法環，先打碎星將軍","expected":"今晚7點開台打艾爾登法環，先打碎星將軍","entities":["艾爾登法環","碎星將軍"],"keep":["7點","艾爾登法環","碎星將軍"],"selfCorrection":false}
+{"id":"a-zhTW-game-2","lang":"zh-TW","domain":"gaming","spoken":"感謝小魚乾斗內一百元，抖內記得留言","expected":"感謝小魚乾抖內100元，抖內記得留言","entities":["小魚乾","抖內"],"keep":["小魚乾","100元"],"selfCorrection":false}
+{"id":"a-zhTW-game-3","lang":"zh-TW","domain":"gaming","spoken":"這把我們選特戰英豪的捷特，不要選賽弗","expected":"這把我們選特戰英豪的捷特，不要選賽弗","entities":["特戰英豪","捷特","賽弗"],"keep":["捷特","不要","賽弗"],"selfCorrection":false}
+{"id":"a-zhTW-game-4","lang":"zh-TW","domain":"gaming","spoken":"下週四改成直播寶可夢朱紫，我說錯了，是下週五","expected":"下週五改成直播寶可夢朱紫","entities":["寶可夢朱紫"],"keep":["下週五","寶可夢朱紫"],"selfCorrection":true}
+{"id":"a-zhTW-name-1","lang":"zh-TW","domain":"names","spoken":"我跟阿欽約明天下午三點看製令單","expected":"我跟阿欽約明天下午3點看製令單","entities":["阿欽","製令單"],"keep":["阿欽","3點","製令單"],"selfCorrection":false}
+{"id":"a-zhTW-name-2","lang":"zh-TW","domain":"names","spoken":"請把報告寄給詹于萱和溫芷晴","expected":"請把報告寄給詹于萱和溫芷晴","entities":["詹于萱","溫芷晴"],"keep":["詹于萱","溫芷晴"],"selfCorrection":false}
+{"id":"a-zhTW-name-3","lang":"zh-TW","domain":"names","spoken":"小孩的彌月蛋糕要訂給游宸睿家","expected":"小孩的彌月蛋糕要訂給游宸睿家","entities":["彌月","游宸睿"],"keep":["彌月","游宸睿"],"selfCorrection":false}
+{"id":"a-zhTW-name-4","lang":"zh-TW","domain":"names","spoken":"會議改由蔡昀臻主持，柯品妤不用出席","expected":"會議改由蔡昀臻主持，柯品妤不用出席","entities":["蔡昀臻","柯品妤"],"keep":["蔡昀臻","柯品妤","不用"],"selfCorrection":false}
+{"id":"a-zhTW-brand-1","lang":"zh-TW","domain":"brands","spoken":"這季的聯名款是未來誌跟小日子一起做的","expected":"這季的聯名款是未來誌跟小日子一起做的","entities":["未來誌","小日子"],"keep":["未來誌","小日子"],"selfCorrection":false}
+{"id":"a-zhTW-brand-2","lang":"zh-TW","domain":"brands","spoken":"門市的飲料改進路易莎的豆子，不再用伯朗","expected":"門市的飲料改進路易莎的豆子，不再用伯朗","entities":["路易莎","伯朗"],"keep":["路易莎","不再","伯朗"],"selfCorrection":false}
+{"id":"a-zhTW-brand-3","lang":"zh-TW","domain":"brands","spoken":"廣告預算先給 Dcard，然後給 PTT，算了，全部給 Dcard","expected":"廣告預算全部給 Dcard","entities":["Dcard"],"keep":["全部","Dcard"],"selfCorrection":true}
+{"id":"a-zhTW-brand-4","lang":"zh-TW","domain":"brands","spoken":"請向犁記和佳德各訂三十盒鳳梨酥","expected":"請向犁記和佳德各訂30盒鳳梨酥","entities":["犁記","佳德"],"keep":["犁記","佳德","30盒"],"selfCorrection":false}
+{"id":"a-zhCN-med-1","lang":"zh-CN","domain":"medical","spoken":"病人对头孢曲松过敏，改用阿奇霉素","expected":"病人对头孢曲松过敏，改用阿奇霉素","entities":["头孢曲松","阿奇霉素"],"keep":["头孢曲松","过敏","阿奇霉素"],"selfCorrection":false}
+{"id":"a-zhCN-med-2","lang":"zh-CN","domain":"medical","spoken":"明天早上八点空腹抽血，不要吃早饭","expected":"明天早上8点空腹抽血，不要吃早饭","entities":["空腹"],"keep":["8点","空腹","不要"],"selfCorrection":false}
+{"id":"a-zhCN-med-3","lang":"zh-CN","domain":"medical","spoken":"请约骨科的欧阳晔主任，不对，是约他的助理","expected":"请约骨科欧阳晔主任的助理","entities":["欧阳晔"],"keep":["欧阳晔","助理"],"selfCorrection":true}
+{"id":"a-zhCN-med-4","lang":"zh-CN","domain":"medical","spoken":"核磁共振显示腰椎间盘突出","expected":"核磁共振显示腰椎间盘突出","entities":["核磁共振","腰椎间盘"],"keep":["核磁共振","腰椎间盘突出"],"selfCorrection":false}
+{"id":"a-zhCN-law-1","lang":"zh-CN","domain":"legal","spoken":"根据劳动合同法第三十九条可以解除合同","expected":"根据劳动合同法第39条可以解除合同","entities":["劳动合同法"],"keep":["劳动合同法","39","解除"],"selfCorrection":false}
+{"id":"a-zhCN-law-2","lang":"zh-CN","domain":"legal","spoken":"诉讼时效是三年，已经过了就不能再起诉","expected":"诉讼时效是3年，已经过了就不能再起诉","entities":["诉讼时效"],"keep":["诉讼时效","3年","不能"],"selfCorrection":false}
+{"id":"a-zhCN-law-3","lang":"zh-CN","domain":"legal","spoken":"把仲裁申请书交给司马昀律师","expected":"把仲裁申请书交给司马昀律师","entities":["仲裁","司马昀"],"keep":["仲裁申请书","司马昀"],"selfCorrection":false}
+{"id":"a-zhCN-law-4","lang":"zh-CN","domain":"legal","spoken":"保全申请下周一提交，我是说下周二","expected":"保全申请下周二提交","entities":["保全"],"keep":["保全申请","下周二"],"selfCorrection":true}
+{"id":"a-zhCN-tech-1","lang":"zh-CN","domain":"tech","spoken":"我们把模型部署到昇腾芯片上，吞吐提升了两倍","expected":"我们把模型部署到昇腾芯片上，吞吐提升了2倍","entities":["昇腾"],"keep":["昇腾","2倍"],"selfCorrection":false}
+{"id":"a-zhCN-tech-2","lang":"zh-CN","domain":"tech","spoken":"后端用 Golang 写，消息队列用 RocketMQ","expected":"后端用 Golang 写，消息队列用 RocketMQ","entities":["Golang","RocketMQ"],"keep":["Golang","RocketMQ"],"selfCorrection":false}
+{"id":"a-zhCN-tech-3","lang":"zh-CN","domain":"tech","spoken":"缓存先用 Redis，不对，先用 Memcached 测一下","expected":"缓存先用 Memcached 测一下","entities":["Memcached"],"keep":["Memcached"],"selfCorrection":true}
+{"id":"a-zhCN-tech-4","lang":"zh-CN","domain":"tech","spoken":"不要在主分支上直接 rebase","expected":"不要在主分支上直接 rebase","entities":["rebase"],"keep":["不要","主分支","rebase"],"selfCorrection":false}
+{"id":"a-zhCN-game-1","lang":"zh-CN","domain":"gaming","spoken":"今晚开黑打原神，先刷深境螺旋","expected":"今晚开黑打原神，先刷深境螺旋","entities":["原神","深境螺旋"],"keep":["原神","深境螺旋"],"selfCorrection":false}
+{"id":"a-zhCN-game-2","lang":"zh-CN","domain":"gaming","spoken":"谢谢老铁送的嘉年华，再来五个火箭","expected":"谢谢老铁送的嘉年华，再来5个火箭","entities":["嘉年华"],"keep":["嘉年华","5个火箭"],"selfCorrection":false}
+{"id":"a-zhCN-game-3","lang":"zh-CN","domain":"gaming","spoken":"这局玩黑神话悟空，打虎先锋别贪刀","expected":"这局玩黑神话悟空，打虎先锋别贪刀","entities":["黑神话悟空","虎先锋"],"keep":["黑神话悟空","虎先锋","别"],"selfCorrection":false}
+{"id":"a-zhCN-game-4","lang":"zh-CN","domain":"gaming","spoken":"明天下午两点直播，算了改成晚上九点","expected":"明天晚上9点直播","entities":[],"keep":["明天","晚上9点"],"selfCorrection":true}
+{"id":"a-zhCN-name-1","lang":"zh-CN","domain":"names","spoken":"请通知诸葛琳和上官靖明天开会","expected":"请通知诸葛琳和上官靖明天开会","entities":["诸葛琳","上官靖"],"keep":["诸葛琳","上官靖","明天"],"selfCorrection":false}
+{"id":"a-zhCN-name-2","lang":"zh-CN","domain":"names","spoken":"合同由綦晓阳签字，不用找鞠婷","expected":"合同由綦晓阳签字，不用找鞠婷","entities":["綦晓阳","鞠婷"],"keep":["綦晓阳","不用","鞠婷"],"selfCorrection":false}
+{"id":"a-zhCN-name-3","lang":"zh-CN","domain":"names","spoken":"快递寄给仝浩然，地址是滨江路十八号","expected":"快递寄给仝浩然，地址是滨江路18号","entities":["仝浩然"],"keep":["仝浩然","18号"],"selfCorrection":false}
+{"id":"a-zhCN-name-4","lang":"zh-CN","domain":"names","spoken":"周报发给冼嘉怡，我说错了，发给冉睿","expected":"周报发给冉睿","entities":["冉睿"],"keep":["周报","冉睿"],"selfCorrection":true}
+{"id":"a-zhCN-brand-1","lang":"zh-CN","domain":"brands","spoken":"这次联名找了喜茶和泡泡玛特","expected":"这次联名找了喜茶和泡泡玛特","entities":["喜茶","泡泡玛特"],"keep":["喜茶","泡泡玛特"],"selfCorrection":false}
+{"id":"a-zhCN-brand-2","lang":"zh-CN","domain":"brands","spoken":"投放先上小红书，不上抖音","expected":"投放先上小红书，不上抖音","entities":["小红书","抖音"],"keep":["小红书","不上","抖音"],"selfCorrection":false}
+{"id":"a-zhCN-brand-3","lang":"zh-CN","domain":"brands","spoken":"采购三百台蔚来，不对，是三百台理想","expected":"采购300台理想","entities":["理想"],"keep":["300台","理想"],"selfCorrection":true}
+{"id":"a-zhCN-brand-4","lang":"zh-CN","domain":"brands","spoken":"仓库改用菜鸟，退货走顺丰","expected":"仓库改用菜鸟，退货走顺丰","entities":["菜鸟","顺丰"],"keep":["菜鸟","顺丰"],"selfCorrection":false}
+{"id":"a-en-med-1","lang":"en","domain":"medical","spoken":"The patient started metformin yesterday and her A1C dropped to seven point two","expected":"The patient started metformin yesterday and her A1C dropped to 7.2","entities":["metformin","A1C"],"keep":["metformin","A1C","7.2"],"selfCorrection":false}
+{"id":"a-en-med-2","lang":"en","domain":"medical","spoken":"Do not give him ibuprofen, he is on warfarin","expected":"Do not give him ibuprofen, he is on warfarin","entities":["ibuprofen","warfarin"],"keep":["not","ibuprofen","warfarin"],"selfCorrection":false}
+{"id":"a-en-med-3","lang":"en","domain":"medical","spoken":"Book the echocardiogram for Tuesday, sorry, I mean Thursday","expected":"Book the echocardiogram for Thursday","entities":["echocardiogram"],"keep":["echocardiogram","Thursday"],"selfCorrection":true}
+{"id":"a-en-med-4","lang":"en","domain":"medical","spoken":"Doctor Nwachukwu wants a follow up in two weeks","expected":"Doctor Nwachukwu wants a follow up in 2 weeks","entities":["Nwachukwu"],"keep":["Nwachukwu","2 weeks"],"selfCorrection":false}
+{"id":"a-en-law-1","lang":"en","domain":"legal","spoken":"Under section two thirty of the Communications Decency Act the platform is not liable","expected":"Under Section 230 of the Communications Decency Act the platform is not liable","entities":["Communications Decency Act"],"keep":["230","not liable"],"selfCorrection":false}
+{"id":"a-en-law-2","lang":"en","domain":"legal","spoken":"Send the subpoena duces tecum to Ms. Szczepanski by Friday","expected":"Send the subpoena duces tecum to Ms. Szczepanski by Friday","entities":["subpoena duces tecum","Szczepanski"],"keep":["Szczepanski","Friday"],"selfCorrection":false}
+{"id":"a-en-law-3","lang":"en","domain":"legal","spoken":"The indemnification cap is one million, no wait, two million dollars","expected":"The indemnification cap is 2 million dollars","entities":["indemnification"],"keep":["indemnification","2 million"],"selfCorrection":true}
+{"id":"a-en-law-4","lang":"en","domain":"legal","spoken":"We should never waive attorney client privilege in this deposition","expected":"We should never waive attorney-client privilege in this deposition","entities":["attorney-client privilege"],"keep":["never","waive","deposition"],"selfCorrection":false}
+{"id":"a-en-tech-1","lang":"en","domain":"tech","spoken":"Move the queue from RabbitMQ to Kafka before the Q3 launch","expected":"Move the queue from RabbitMQ to Kafka before the Q3 launch","entities":["RabbitMQ","Kafka"],"keep":["RabbitMQ","Kafka","Q3"],"selfCorrection":false}
+{"id":"a-en-tech-2","lang":"en","domain":"tech","spoken":"Do not merge the PR until the Terraform plan is green","expected":"Do not merge the PR until the Terraform plan is green","entities":["Terraform"],"keep":["not","merge","Terraform"],"selfCorrection":false}
+{"id":"a-en-tech-3","lang":"en","domain":"tech","spoken":"Set the timeout to thirty seconds, actually make it sixty","expected":"Set the timeout to 60 seconds","entities":[],"keep":["timeout","60"],"selfCorrection":true}
+{"id":"a-en-tech-4","lang":"en","domain":"tech","spoken":"We use Supabase for auth and Vercel for hosting","expected":"We use Supabase for auth and Vercel for hosting","entities":["Supabase","Vercel"],"keep":["Supabase","Vercel"],"selfCorrection":false}
+{"id":"a-en-game-1","lang":"en","domain":"gaming","spoken":"Tonight we are speedrunning Hollow Knight Silksong","expected":"Tonight we are speedrunning Hollow Knight Silksong","entities":["Hollow Knight","Silksong"],"keep":["Hollow Knight","Silksong"],"selfCorrection":false}
+{"id":"a-en-game-2","lang":"en","domain":"gaming","spoken":"Thanks xQcLover for the five gifted subs","expected":"Thanks xQcLover for the 5 gifted subs","entities":["xQcLover"],"keep":["xQcLover","5"],"selfCorrection":false}
+{"id":"a-en-game-3","lang":"en","domain":"gaming","spoken":"Pick Jett and Sova, do not pick Reyna this round","expected":"Pick Jett and Sova, do not pick Reyna this round","entities":["Jett","Sova","Reyna"],"keep":["Jett","Sova","not","Reyna"],"selfCorrection":false}
+{"id":"a-en-game-4","lang":"en","domain":"gaming","spoken":"Stream starts at eight, sorry, nine pm Eastern","expected":"Stream starts at 9 pm Eastern","entities":[],"keep":["9 pm","Eastern"],"selfCorrection":true}
+{"id":"a-en-name-1","lang":"en","domain":"names","spoken":"Please loop in Siobhan and Aoife on the email","expected":"Please loop in Siobhan and Aoife on the email","entities":["Siobhan","Aoife"],"keep":["Siobhan","Aoife"],"selfCorrection":false}
+{"id":"a-en-name-2","lang":"en","domain":"names","spoken":"Anny and Ariya will present first","expected":"Anny and Ariya will present first","entities":["Anny","Ariya"],"keep":["Anny","Ariya","first"],"selfCorrection":false}
+{"id":"a-en-name-3","lang":"en","domain":"names","spoken":"Ask Joaquin, I mean ask Xavier, to review the doc","expected":"Ask Xavier to review the doc","entities":["Xavier"],"keep":["Xavier","review"],"selfCorrection":true}
+{"id":"a-en-name-4","lang":"en","domain":"names","spoken":"Kaitlyn Nguyen does not need to attend","expected":"Kaitlyn Nguyen does not need to attend","entities":["Kaitlyn","Nguyen"],"keep":["Kaitlyn Nguyen","not"],"selfCorrection":false}
+{"id":"a-en-brand-1","lang":"en","domain":"brands","spoken":"The collab is between Aesop and Le Labo","expected":"The collab is between Aesop and Le Labo","entities":["Aesop","Le Labo"],"keep":["Aesop","Le Labo"],"selfCorrection":false}
+{"id":"a-en-brand-2","lang":"en","domain":"brands","spoken":"Order forty units from Glossier, not from Fenty","expected":"Order 40 units from Glossier, not from Fenty","entities":["Glossier","Fenty"],"keep":["40","Glossier","not","Fenty"],"selfCorrection":false}
+{"id":"a-en-brand-3","lang":"en","domain":"brands","spoken":"Run the ads on Pinterest, scratch that, run them on Reddit","expected":"Run the ads on Reddit","entities":["Reddit"],"keep":["Reddit"],"selfCorrection":true}
+{"id":"a-en-brand-4","lang":"en","domain":"brands","spoken":"Ship with DHL and bill it to our Shopify account","expected":"Ship with DHL and bill it to our Shopify account","entities":["DHL","Shopify"],"keep":["DHL","Shopify"],"selfCorrection":false}
+{"id":"a-ja-med-1","lang":"ja","domain":"medical","spoken":"患者は昨日からメトホルミンを服用しています","expected":"患者は昨日からメトホルミンを服用しています","entities":["メトホルミン"],"keep":["メトホルミン","服用"],"selfCorrection":false}
+{"id":"a-ja-med-2","lang":"ja","domain":"medical","spoken":"ペニシリンにアレルギーがあるので絶対に使わないでください","expected":"ペニシリンにアレルギーがあるので絶対に使わないでください","entities":["ペニシリン"],"keep":["ペニシリン","使わないで"],"selfCorrection":false}
+{"id":"a-ja-med-3","lang":"ja","domain":"medical","spoken":"内視鏡検査は火曜日、いや、木曜日に予約してください","expected":"内視鏡検査は木曜日に予約してください","entities":["内視鏡"],"keep":["内視鏡","木曜日"],"selfCorrection":true}
+{"id":"a-ja-med-4","lang":"ja","domain":"medical","spoken":"東海林先生が二週間後に再診と言っていました","expected":"東海林先生が2週間後に再診と言っていました","entities":["東海林"],"keep":["東海林","2週間後","再診"],"selfCorrection":false}
+{"id":"a-ja-law-1","lang":"ja","domain":"legal","spoken":"民法第七百九条に基づいて損害賠償を請求します","expected":"民法第709条に基づいて損害賠償を請求します","entities":["民法"],"keep":["709","損害賠償"],"selfCorrection":false}
+{"id":"a-ja-law-2","lang":"ja","domain":"legal","spoken":"内容証明郵便を勅使河原弁護士に送ってください","expected":"内容証明郵便を勅使河原弁護士に送ってください","entities":["内容証明郵便","勅使河原"],"keep":["内容証明郵便","勅使河原"],"selfCorrection":false}
+{"id":"a-ja-law-3","lang":"ja","domain":"legal","spoken":"違約金は二十パーセントを超えてはいけません","expected":"違約金は20%を超えてはいけません","entities":["違約金"],"keep":["違約金","20%","いけません"],"selfCorrection":false}
+{"id":"a-ja-law-4","lang":"ja","domain":"legal","spoken":"仮差押えの申立ては来週の月曜、すみません、水曜に出します","expected":"仮差押えの申立ては来週の水曜に出します","entities":["仮差押え"],"keep":["仮差押え","水曜"],"selfCorrection":true}
+{"id":"a-ja-tech-1","lang":"ja","domain":"tech","spoken":"本番環境をKubernetesに移行したらレイテンシが三割減りました","expected":"本番環境をKubernetesに移行したらレイテンシが3割減りました","entities":["Kubernetes","レイテンシ"],"keep":["Kubernetes","3割"],"selfCorrection":false}
+{"id":"a-ja-tech-2","lang":"ja","domain":"tech","spoken":"アクセシビリティの監査はまだ終わっていません","expected":"アクセシビリティの監査はまだ終わっていません","entities":["アクセシビリティ"],"keep":["アクセシビリティ","まだ","終わっていません"],"selfCorrection":false}
+{"id":"a-ja-tech-3","lang":"ja","domain":"tech","spoken":"キャッシュはRedisで、いや、Memcachedで試します","expected":"キャッシュはMemcachedで試します","entities":["Memcached"],"keep":["Memcached"],"selfCorrection":true}
+{"id":"a-ja-tech-4","lang":"ja","domain":"tech","spoken":"mainブランチに直接pushしないでください","expected":"mainブランチに直接pushしないでください","entities":["push"],"keep":["main","push","しないで"],"selfCorrection":false}
+{"id":"a-ja-game-1","lang":"ja","domain":"gaming","spoken":"今夜はエルデンリングでマレニアに挑戦します","expected":"今夜はエルデンリングでマレニアに挑戦します","entities":["エルデンリング","マレニア"],"keep":["エルデンリング","マレニア"],"selfCorrection":false}
+{"id":"a-ja-game-2","lang":"ja","domain":"gaming","spoken":"スパチャありがとう、ゆずこしょうさん","expected":"スパチャありがとう、ゆずこしょうさん","entities":["スパチャ","ゆずこしょう"],"keep":["スパチャ","ゆずこしょう"],"selfCorrection":false}
+{"id":"a-ja-game-3","lang":"ja","domain":"gaming","spoken":"配信は八時から、じゃなくて九時からです","expected":"配信は9時からです","entities":[],"keep":["9時"],"selfCorrection":true}
+{"id":"a-ja-game-4","lang":"ja","domain":"gaming","spoken":"スプラトゥーンのバンカラマッチには行かないで","expected":"スプラトゥーンのバンカラマッチには行かないで","entities":["スプラトゥーン","バンカラマッチ"],"keep":["スプラトゥーン","バンカラマッチ","行かないで"],"selfCorrection":false}
+{"id":"a-ja-name-1","lang":"ja","domain":"names","spoken":"四月一日さんと小鳥遊さんに資料を送ってください","expected":"四月一日さんと小鳥遊さんに資料を送ってください","entities":["四月一日","小鳥遊"],"keep":["四月一日","小鳥遊"],"selfCorrection":false}
+{"id":"a-ja-name-2","lang":"ja","domain":"names","spoken":"会議は五十嵐さんが司会で、一ノ瀬さんは欠席です","expected":"会議は五十嵐さんが司会で、一ノ瀬さんは欠席です","entities":["五十嵐","一ノ瀬"],"keep":["五十嵐","一ノ瀬","欠席"],"selfCorrection":false}
+{"id":"a-ja-name-3","lang":"ja","domain":"names","spoken":"報告書は長谷部さん、いや、服部さんに渡してください","expected":"報告書は服部さんに渡してください","entities":["服部"],"keep":["服部"],"selfCorrection":true}
+{"id":"a-ja-name-4","lang":"ja","domain":"names","spoken":"御手洗さんは来なくて大丈夫です","expected":"御手洗さんは来なくて大丈夫です","entities":["御手洗"],"keep":["御手洗","来なくて"],"selfCorrection":false}
+{"id":"a-ja-brand-1","lang":"ja","domain":"brands","spoken":"今回のコラボは無印良品とサンリオです","expected":"今回のコラボは無印良品とサンリオです","entities":["無印良品","サンリオ"],"keep":["無印良品","サンリオ"],"selfCorrection":false}
+{"id":"a-ja-brand-2","lang":"ja","domain":"brands","spoken":"広告はメルカリに出して、楽天には出さないでください","expected":"広告はメルカリに出して、楽天には出さないでください","entities":["メルカリ","楽天"],"keep":["メルカリ","楽天","出さないで"],"selfCorrection":false}
+{"id":"a-ja-brand-3","lang":"ja","domain":"brands","spoken":"配送はヤマトで、すみません、佐川でお願いします","expected":"配送は佐川でお願いします","entities":["佐川"],"keep":["佐川"],"selfCorrection":true}
+{"id":"a-ja-brand-4","lang":"ja","domain":"brands","spoken":"ユニクロで三十枚注文してください","expected":"ユニクロで30枚注文してください","entities":["ユニクロ"],"keep":["ユニクロ","30枚"],"selfCorrection":false}
+{"id":"a-ko-med-1","lang":"ko","domain":"medical","spoken":"환자는 어제부터 메트포르민을 복용하고 있습니다","expected":"환자는 어제부터 메트포르민을 복용하고 있습니다","entities":["메트포르민"],"keep":["메트포르민","복용"],"selfCorrection":false}
+{"id":"a-ko-med-2","lang":"ko","domain":"medical","spoken":"페니실린 알레르기가 있으니 절대 처방하지 마세요","expected":"페니실린 알레르기가 있으니 절대 처방하지 마세요","entities":["페니실린"],"keep":["페니실린","처방하지 마세요"],"selfCorrection":false}
+{"id":"a-ko-med-3","lang":"ko","domain":"medical","spoken":"내시경은 화요일, 아니 목요일로 예약해 주세요","expected":"내시경은 목요일로 예약해 주세요","entities":["내시경"],"keep":["내시경","목요일"],"selfCorrection":true}
+{"id":"a-ko-med-4","lang":"ko","domain":"medical","spoken":"남궁민 교수님이 이주 후에 다시 오라고 하셨어요","expected":"남궁민 교수님이 2주 후에 다시 오라고 하셨어요","entities":["남궁민"],"keep":["남궁민","2주"],"selfCorrection":false}
+{"id":"a-ko-law-1","lang":"ko","domain":"legal","spoken":"민법 제칠백오십조에 따라 손해배상을 청구합니다","expected":"민법 제750조에 따라 손해배상을 청구합니다","entities":["민법"],"keep":["750","손해배상"],"selfCorrection":false}
+{"id":"a-ko-law-2","lang":"ko","domain":"legal","spoken":"내용증명을 선우진 변호사에게 보내 주세요","expected":"내용증명을 선우진 변호사에게 보내 주세요","entities":["내용증명","선우진"],"keep":["내용증명","선우진"],"selfCorrection":false}
+{"id":"a-ko-law-3","lang":"ko","domain":"legal","spoken":"위약금은 이십 퍼센트를 넘으면 안 됩니다","expected":"위약금은 20%를 넘으면 안 됩니다","entities":["위약금"],"keep":["위약금","20%","안 됩니다"],"selfCorrection":false}
+{"id":"a-ko-law-4","lang":"ko","domain":"legal","spoken":"가압류 신청은 월요일, 아니 수요일에 제출합니다","expected":"가압류 신청은 수요일에 제출합니다","entities":["가압류"],"keep":["가압류","수요일"],"selfCorrection":true}
+{"id":"a-ko-tech-1","lang":"ko","domain":"tech","spoken":"서버를 쿠버네티스로 옮긴 뒤 지연 시간이 삼십 퍼센트 줄었어요","expected":"서버를 쿠버네티스로 옮긴 뒤 지연 시간이 30% 줄었어요","entities":["쿠버네티스"],"keep":["쿠버네티스","30%"],"selfCorrection":false}
+{"id":"a-ko-tech-2","lang":"ko","domain":"tech","spoken":"메인 브랜치에 직접 푸시하지 마세요","expected":"메인 브랜치에 직접 푸시하지 마세요","entities":["브랜치"],"keep":["메인 브랜치","푸시하지 마세요"],"selfCorrection":false}
+{"id":"a-ko-tech-3","lang":"ko","domain":"tech","spoken":"캐시는 레디스로, 아니 멤캐시드로 테스트해요","expected":"캐시는 멤캐시드로 테스트해요","entities":["멤캐시드"],"keep":["멤캐시드"],"selfCorrection":true}
+{"id":"a-ko-tech-4","lang":"ko","domain":"tech","spoken":"테라폼 플랜이 통과하기 전에는 머지하지 마세요","expected":"테라폼 플랜이 통과하기 전에는 머지하지 마세요","entities":["테라폼"],"keep":["테라폼","머지하지 마세요"],"selfCorrection":false}
+{"id":"a-ko-game-1","lang":"ko","domain":"gaming","spoken":"오늘 밤에는 엘든 링에서 말레니아를 잡을 거예요","expected":"오늘 밤에는 엘든 링에서 말레니아를 잡을 거예요","entities":["엘든 링","말레니아"],"keep":["엘든 링","말레니아"],"selfCorrection":false}
+{"id":"a-ko-game-2","lang":"ko","domain":"gaming","spoken":"별풍선 백 개 감사합니다 초코칩님","expected":"별풍선 100개 감사합니다 초코칩님","entities":["별풍선","초코칩"],"keep":["별풍선","100개","초코칩"],"selfCorrection":false}
+{"id":"a-ko-game-3","lang":"ko","domain":"gaming","spoken":"방송은 여덟 시, 아니 아홉 시에 시작해요","expected":"방송은 9시에 시작해요","entities":[],"keep":["9시"],"selfCorrection":true}
+{"id":"a-ko-game-4","lang":"ko","domain":"gaming","spoken":"이번 판은 제트를 고르고 레이나는 고르지 마세요","expected":"이번 판은 제트를 고르고 레이나는 고르지 마세요","entities":["제트","레이나"],"keep":["제트","레이나","고르지 마세요"],"selfCorrection":false}
+{"id":"a-ko-name-1","lang":"ko","domain":"names","spoken":"제갈윤 씨와 독고현 씨에게 자료를 보내 주세요","expected":"제갈윤 씨와 독고현 씨에게 자료를 보내 주세요","entities":["제갈윤","독고현"],"keep":["제갈윤","독고현"],"selfCorrection":false}
+{"id":"a-ko-name-2","lang":"ko","domain":"names","spoken":"회의는 황보선 씨가 진행하고 사공민 씨는 불참합니다","expected":"회의는 황보선 씨가 진행하고 사공민 씨는 불참합니다","entities":["황보선","사공민"],"keep":["황보선","사공민","불참"],"selfCorrection":false}
+{"id":"a-ko-name-3","lang":"ko","domain":"names","spoken":"보고서는 서문혁 씨, 아니 탁지안 씨에게 주세요","expected":"보고서는 탁지안 씨에게 주세요","entities":["탁지안"],"keep":["탁지안"],"selfCorrection":true}
+{"id":"a-ko-name-4","lang":"ko","domain":"names","spoken":"편다은 씨는 오지 않아도 됩니다","expected":"편다은 씨는 오지 않아도 됩니다","entities":["편다은"],"keep":["편다은","않아도"],"selfCorrection":false}
+{"id":"a-ko-brand-1","lang":"ko","domain":"brands","spoken":"이번 콜라보는 젠틀몬스터와 탬버린즈입니다","expected":"이번 콜라보는 젠틀몬스터와 탬버린즈입니다","entities":["젠틀몬스터","탬버린즈"],"keep":["젠틀몬스터","탬버린즈"],"selfCorrection":false}
+{"id":"a-ko-brand-2","lang":"ko","domain":"brands","spoken":"광고는 당근마켓에 하고 쿠팡에는 하지 마세요","expected":"광고는 당근마켓에 하고 쿠팡에는 하지 마세요","entities":["당근마켓","쿠팡"],"keep":["당근마켓","쿠팡","하지 마세요"],"selfCorrection":false}
+{"id":"a-ko-brand-3","lang":"ko","domain":"brands","spoken":"배송은 한진으로, 아니 CJ대한통운으로 해 주세요","expected":"배송은 CJ대한통운으로 해 주세요","entities":["CJ대한통운"],"keep":["CJ대한통운"],"selfCorrection":true}
+{"id":"a-ko-brand-4","lang":"ko","domain":"brands","spoken":"무신사에서 서른 벌 주문해 주세요","expected":"무신사에서 30벌 주문해 주세요","entities":["무신사"],"keep":["무신사","30벌"],"selfCorrection":false}
+{"id":"a-yue-1","lang":"yue","domain":"names","spoken":"我哋聽日同歐陽靖琳傾吓個計劃","expected":"我哋聽日同歐陽靖琳傾吓個計劃","entities":["歐陽靖琳"],"keep":["聽日","歐陽靖琳"],"selfCorrection":false}
+{"id":"a-yue-2","lang":"yue","domain":"tech","spoken":"唔好直接 push 去 main 呀","expected":"唔好直接 push 去 main 呀","entities":["push"],"keep":["唔好","push","main"],"selfCorrection":false}
+{"id":"a-yue-3","lang":"yue","domain":"brands","spoken":"今次合作搵咗維他奶同美心","expected":"今次合作搵咗維他奶同美心","entities":["維他奶","美心"],"keep":["維他奶","美心"],"selfCorrection":false}
+{"id":"a-yue-4","lang":"yue","domain":"medical","spoken":"佢對盤尼西林敏感，千祈唔好開俾佢","expected":"佢對盤尼西林敏感，千祈唔好開俾佢","entities":["盤尼西林"],"keep":["盤尼西林","唔好"],"selfCorrection":false}
+{"id":"a-yue-5","lang":"yue","domain":"gaming","spoken":"今晚八點開台，唔係，九點先開","expected":"今晚9點先開台","entities":[],"keep":["9點"],"selfCorrection":true}
+{"id":"a-yue-6","lang":"yue","domain":"legal","spoken":"份合約嘅違約金唔可以超過兩成","expected":"份合約嘅違約金唔可以超過兩成","entities":["違約金"],"keep":["違約金","唔可以","兩成"],"selfCorrection":false}
+{"id":"a-yue-7","lang":"yue","domain":"names","spoken":"份報告交俾司徒樂詩，唔使搵區家朗","expected":"份報告交俾司徒樂詩，唔使搵區家朗","entities":["司徒樂詩","區家朗"],"keep":["司徒樂詩","唔使","區家朗"],"selfCorrection":false}
+{"id":"a-yue-8","lang":"yue","domain":"brands","spoken":"買三十盒奇華餅家嘅老婆餅","expected":"買30盒奇華餅家嘅老婆餅","entities":["奇華餅家"],"keep":["30盒","奇華餅家"],"selfCorrection":false}

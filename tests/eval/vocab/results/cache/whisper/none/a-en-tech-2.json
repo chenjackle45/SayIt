@@ -1,0 +1,7 @@
+{
+  "prompt": null,
+  "promptBytes": 0,
+  "status": 200,
+  "text": "Do not merge the PR until the Terraform plan is green.",
+  "raw": "Do not merge the PR until the Terraform plan is green."
+}

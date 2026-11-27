@@ -1,0 +1,7 @@
+{
+  "prompt": null,
+  "promptBytes": 0,
+  "status": 200,
+  "text": "缓存先用redis,不对,先用mintorch,错一下。",
+  "raw": "缓存先用redis,不对,先用mintorch,错一下。"
+}

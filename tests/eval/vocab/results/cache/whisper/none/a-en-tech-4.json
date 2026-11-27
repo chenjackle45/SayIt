@@ -1,0 +1,7 @@
+{
+  "prompt": null,
+  "promptBytes": 0,
+  "status": 200,
+  "text": "We use Supabase for auth and Vercel for hosting.",
+  "raw": "We use Supabase for auth and Vercel for hosting."
+}
