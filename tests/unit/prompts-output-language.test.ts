@@ -3,19 +3,20 @@ import {
   getAutoLanguagePrompt,
   getPromptForModeAndLocale,
 } from "../../src/i18n/prompts";
-import { BUILTIN_PROMPTS_V0141 } from "../support/fixtures/builtin-prompts-v0.14.1";
 
 // #83：辨識語言設為「自動」時整理不該翻譯。本檔守住「辨識語言明確設定的人什麼都沒變」。
 describe("prompts — 輸出語言插槽（#83）", () => {
   const modes = ["minimal", "active"] as const;
 
-  describe("[AC3] 明確語言：與 v0.14.1 逐字相同", () => {
+  describe("[AC3] 明確語言：指示寫出該語言的語言句", () => {
+    const explicit = {
+      minimal: { "zh-TW": "繁體中文 zh-TW。", en: "Use English.", ja: "日本語を使用。", "zh-CN": "简体中文 zh-CN。", ko: "한국어 사용." },
+      active: { "zh-TW": "，使用繁體中文", en: ", in English", ja: "日本語で", "zh-CN": "，使用简体中文", ko: "한국어로 " },
+    } as const;
     for (const mode of modes) {
-      for (const [locale, expected] of Object.entries(BUILTIN_PROMPTS_V0141[mode])) {
+      for (const [locale, rule] of Object.entries(explicit[mode])) {
         it(`${mode} × ${locale}`, () => {
-          expect(
-            getPromptForModeAndLocale(mode, locale as keyof (typeof BUILTIN_PROMPTS_V0141)[typeof mode]),
-          ).toBe(expected);
+          expect(getPromptForModeAndLocale(mode, locale as keyof (typeof explicit)[typeof mode])).toContain(rule);
         });
       }
     }

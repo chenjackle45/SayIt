@@ -8,6 +8,9 @@ use super::audio_recorder::AudioRecorderState;
 
 const GROQ_API_URL: &str = "https://api.groq.com/openai/v1/audio/transcriptions";
 const MAX_WHISPER_PROMPT_TERMS: usize = 50;
+/// Groq 的 prompt 上限（2026-11-27 實測：896 位元組過、993 位元組回 400）；超過整筆轉錄失敗
+const MAX_WHISPER_PROMPT_BYTES: usize = 896;
+const WHISPER_PROMPT_PREFIX: &str = "Important Vocabulary: ";
 const MINIMUM_AUDIO_SIZE: usize = 1000;
 /// Groq free tier 上限 25MB
 const MAX_AUDIO_FILE_SIZE: usize = 25 * 1024 * 1024;
@@ -102,14 +105,24 @@ struct WhisperSegment {
 
 /// `term_list` 依優先度由高到低。Whisper 的 prompt 只看尾端（OpenAI 文件：最後 224 token），
 /// 前段會被捨棄，所以取完名額後反轉，讓優先度最高的詞落在尾端（#84）。
+/// 整段不超過 Groq 上限 `MAX_WHISPER_PROMPT_BYTES`：依優先度往下收，收不下的詞跳過、繼續試後面較短的詞。
 fn format_whisper_prompt(term_list: &[String]) -> String {
-    let terms: Vec<&str> = term_list
-        .iter()
-        .take(MAX_WHISPER_PROMPT_TERMS)
-        .rev()
-        .map(|s| s.as_str())
-        .collect();
-    format!("Important Vocabulary: {}", terms.join(", "))
+    let mut total_bytes = WHISPER_PROMPT_PREFIX.len();
+    let mut terms: Vec<&str> = Vec::new();
+    for term in term_list {
+        let separator_bytes = if terms.is_empty() { 0 } else { 2 };
+        let next_bytes = total_bytes + separator_bytes + term.len();
+        if next_bytes > MAX_WHISPER_PROMPT_BYTES {
+            continue;
+        }
+        total_bytes = next_bytes;
+        terms.push(term.as_str());
+        if terms.len() == MAX_WHISPER_PROMPT_TERMS {
+            break;
+        }
+    }
+    terms.reverse();
+    format!("{WHISPER_PROMPT_PREFIX}{}", terms.join(", "))
 }
 
 // ========== Retry Classification (gh-10) ==========
@@ -550,6 +563,51 @@ mod tests {
         assert_eq!(parts.len(), MAX_WHISPER_PROMPT_TERMS);
         assert_eq!(parts[0], format!("term{}", MAX_WHISPER_PROMPT_TERMS - 1));
         assert_eq!(parts[MAX_WHISPER_PROMPT_TERMS - 1], "term0");
+    }
+
+    #[test]
+    fn test_format_whisper_prompt_caps_bytes_keeping_top_priority_at_end() {
+        // 日文長片假名 50 個（每個 24 位元組以上）遠超 Groq 896 位元組上限
+        let terms: Vec<String> = (0..50).map(|i| format!("アクセシビリティ{i:02}")).collect();
+        let result = format_whisper_prompt(&terms);
+        assert!(result.len() <= MAX_WHISPER_PROMPT_BYTES, "len={}", result.len());
+        let parts: Vec<&str> = result
+            .strip_prefix(WHISPER_PROMPT_PREFIX)
+            .unwrap()
+            .split(", ")
+            .collect();
+        // 優先度最高的在尾端，收不下的是優先度低的
+        assert_eq!(*parts.last().unwrap(), "アクセシビリティ00");
+        assert!(parts.len() < 50);
+        // 再多收一個就會超過上限
+        let next_term = &terms[parts.len()];
+        assert!(result.len() + 2 + next_term.len() > MAX_WHISPER_PROMPT_BYTES);
+    }
+
+    #[test]
+    fn test_format_whisper_prompt_skips_oversized_term_and_keeps_later_ones() {
+        let too_long = "a".repeat(MAX_WHISPER_PROMPT_BYTES);
+        let terms = vec![too_long, "Tauri".to_string(), "Vue".to_string()];
+        assert_eq!(
+            format_whisper_prompt(&terms),
+            "Important Vocabulary: Vue, Tauri"
+        );
+    }
+
+    #[test]
+    fn test_format_whisper_prompt_tries_terms_after_fifty_oversized_ones() {
+        let mut terms = vec!["a".repeat(MAX_WHISPER_PROMPT_BYTES); MAX_WHISPER_PROMPT_TERMS];
+        terms.push("Tauri".to_string());
+        assert_eq!(format_whisper_prompt(&terms), "Important Vocabulary: Tauri");
+    }
+
+    #[test]
+    fn test_format_whisper_prompt_exactly_at_byte_cap_is_kept() {
+        let filler_len = MAX_WHISPER_PROMPT_BYTES - WHISPER_PROMPT_PREFIX.len();
+        let terms = vec!["a".repeat(filler_len)];
+        assert_eq!(format_whisper_prompt(&terms).len(), MAX_WHISPER_PROMPT_BYTES);
+        let too_long = vec!["a".repeat(filler_len + 1)];
+        assert_eq!(format_whisper_prompt(&too_long), WHISPER_PROMPT_PREFIX);
     }
 
     #[test]

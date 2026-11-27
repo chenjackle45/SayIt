@@ -7,6 +7,7 @@ const h = vi.hoisted(() => {
   const mockInvoke = vi.fn();
   const mockEnhanceGuard = vi.fn();
   const mockGetTopTerms = vi.fn();
+  const mockGetAiTerms = vi.fn();
   const mockTransform = vi.fn();
   const settingsStub = {
     getApiKey: () => "whisper-key",
@@ -20,12 +21,14 @@ const h = vi.hoisted(() => {
     selectedLlmModelId: "llama-3.3-70b-versatile",
     getAiPrompt: () => "prompt",
     getAiPromptLocale: () => "ja",
+    promptMode: "minimal",
   };
   return {
     mockDbExecute,
     mockInvoke,
     mockEnhanceGuard,
     mockGetTopTerms,
+    mockGetAiTerms,
     mockTransform,
     settingsStub,
   };
@@ -50,7 +53,7 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
   useSettingsStore: () => h.settingsStub,
 }));
 vi.mock("../../src/stores/useVocabularyStore", () => ({
-  useVocabularyStore: () => ({ getTopTermListByWeight: h.mockGetTopTerms }),
+  useVocabularyStore: () => ({ getWhisperTermList: h.mockGetTopTerms, getAiTermList: h.mockGetAiTerms }),
 }));
 
 import { useHistoryStore } from "../../src/stores/useHistoryStore";
@@ -96,6 +99,7 @@ describe("useHistoryStore retry", () => {
     h.mockInvoke.mockReset();
     h.mockEnhanceGuard.mockReset();
     h.mockGetTopTerms.mockReset().mockResolvedValue([]);
+    h.mockGetAiTerms.mockReset().mockResolvedValue([]);
     h.mockTransform.mockReset().mockImplementation((text: string) => text);
     h.settingsStub.selectedTranscriptionLocale = "en";
     h.settingsStub.selectedLocale = "en";
@@ -105,6 +109,7 @@ describe("useHistoryStore retry", () => {
 
   describe("retranscribeRecord", () => {
     it("[P1] 成功重新辨識 → flip success、更新原文、清空整理結果", async () => {
+      h.mockGetTopTerms.mockResolvedValue(["WhisperOnly"]);
       h.mockInvoke.mockResolvedValue(GOOD_TRANSCRIBE_RESULT);
       const store = useHistoryStore();
       const record = createRecord();
@@ -123,6 +128,9 @@ describe("useHistoryStore retry", () => {
       );
       expect(store.transcriptionList[0].processedText).toBeNull();
       expect(store.transcriptionList[0].wasEnhanced).toBe(false);
+      expect(h.mockGetTopTerms).toHaveBeenCalled();
+      expect(h.mockGetAiTerms).not.toHaveBeenCalled();
+      expect(h.mockInvoke).toHaveBeenCalledWith("retranscribe_from_file", expect.objectContaining({ vocabularyTermList: ["WhisperOnly"] }));
     });
 
     it("[P1] 無錄音檔 → 不呼叫後端並回 noRecordingFile", async () => {
@@ -369,6 +377,7 @@ describe("useHistoryStore retry", () => {
           expect.objectContaining({
             transcriptLocale: expected,
             promptLocale: "ja",
+            isRevisedBuiltinPrompt: true,
           }),
         );
       },
@@ -403,6 +412,7 @@ describe("useHistoryStore retry", () => {
     });
 
     it("[P1] 成功整理 → 寫入 processed_text、標記 was_enhanced", async () => {
+      h.mockGetAiTerms.mockResolvedValue(["AiOnly"]);
       h.mockEnhanceGuard.mockResolvedValue({
         text: "整理後的書面語句子。",
         usage: null,
@@ -421,6 +431,9 @@ describe("useHistoryStore retry", () => {
         "整理後的書面語句子。",
       );
       expect(store.transcriptionList[0].wasEnhanced).toBe(true);
+      expect(h.mockGetAiTerms).toHaveBeenCalledWith(record.rawText);
+      expect(h.mockGetTopTerms).not.toHaveBeenCalled();
+      expect(h.mockEnhanceGuard).toHaveBeenCalledWith(record.rawText, "llm-key", expect.objectContaining({ vocabularyTermList: ["AiOnly"] }));
     });
 
     it("[P1] 空原文 → 不呼叫 LLM 並回失敗", async () => {

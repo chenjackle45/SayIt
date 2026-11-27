@@ -60,6 +60,29 @@ describe("enhancer.ts", () => {
     vi.restoreAllMocks();
   });
 
+  describe("逐字稿標籤（v0.17）", () => {
+    it("[P0] 內建指示：逐字稿包進 <transcript>，輸出抄回的標籤會剝掉", async () => {
+      mockFetch.mockResolvedValue(createSuccessResponse("<transcript>\n整理後文字\n</transcript>"));
+      const { enhanceText } = await import("../../src/lib/enhancer");
+      const result = await enhanceText("原文", TEST_API_KEY, { isRevisedBuiltinPrompt: true });
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.messages[1].content).toBe("<transcript>\n原文\n</transcript>");
+      expect(result.text).toBe("整理後文字");
+    });
+
+    it("[P0] 自訂指示：user message 逐字不變，輸出裡的標籤不動", async () => {
+      mockFetch.mockResolvedValue(createSuccessResponse("<transcript>保留</transcript>"));
+      const { enhanceText } = await import("../../src/lib/enhancer");
+      const result = await enhanceText("原文", TEST_API_KEY, { systemPrompt: "自訂" });
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.messages).toEqual([
+        { role: "system", content: "自訂" },
+        { role: "user", content: "原文" },
+      ]);
+      expect(result.text).toBe("<transcript>保留</transcript>");
+    });
+  });
+
   describe("正常流程", () => {
     it("[P0] 應回傳 AI 整理後的文字", async () => {
       mockFetch.mockResolvedValue(

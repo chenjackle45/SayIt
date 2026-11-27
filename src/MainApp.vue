@@ -56,6 +56,7 @@ import {
   SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
+  SidebarMenuBadge,
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
@@ -279,6 +280,8 @@ onMounted(async () => {
     void vocabularyStore.fetchTermList();
   });
 
+  void vocabularyStore.fetchTermList().catch(() => { /* store 已記錄讀取錯誤 */ });
+
   // macOS 無障礙權限檢查
   const isMacOS = navigator.userAgent.includes("Macintosh");
   if (isMacOS) {
@@ -364,6 +367,9 @@ onUnmounted(() => {
                     <span>{{ item.label }}</span>
                   </RouterLink>
                 </SidebarMenuButton>
+                <SidebarMenuBadge v-if="item.path === '/dictionary' && vocabularyStore.inboxCount > 0" data-testid="vocabulary-inbox-count">
+                  {{ vocabularyStore.inboxCount }}
+                </SidebarMenuBadge>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

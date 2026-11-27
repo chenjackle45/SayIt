@@ -698,7 +698,7 @@ export const useHistoryStore = defineStore("history", () => {
       return { ok: false, errorKey: "errors.apiKeyMissing" };
     }
 
-    const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
+    const whisperTermList = await vocabularyStore.getWhisperTermList(settingsStore.isSmartDictionaryEnabled);
     const model = settingsStore.selectedWhisperModelId;
 
     let result: TranscriptionResult;
@@ -817,7 +817,7 @@ export const useHistoryStore = defineStore("history", () => {
       return { ok: false, errorKey: "errors.apiKeyMissing" };
     }
 
-    const termList = await vocabularyStore.getTopTermListByWeight(50);
+    const termList = await vocabularyStore.getAiTermList(record.rawText);
     const startTime = performance.now();
 
     let enhanceResult: EnhanceWithGuardResult;
@@ -831,6 +831,7 @@ export const useHistoryStore = defineStore("history", () => {
           modelId: settingsStore.selectedLlmModelId,
           transcriptLocale: getEffectiveTranscriptLocale(settingsStore),
           promptLocale: settingsStore.getAiPromptLocale(),
+          isRevisedBuiltinPrompt: settingsStore.promptMode === "minimal",
         },
       );
     } catch (err) {

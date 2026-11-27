@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { getVocabularyNoteForLocale } from "../../src/i18n/prompts";
 
-// #84：字典清單前的說明句。zh-TW 版是真模型實測過的措辭（docs/plan-vocabulary-prompt-instruction.md），改動要重測。
+// #84：字典清單前的說明句；v0.17 改版措辭的實測見 docs/plan-vocab-prompt-optimization.md 評估。
 describe("prompts — 字典說明句（#84）", () => {
-  it("zh-TW 與實測措辭逐字相同", () => {
-    expect(getVocabularyNoteForLocale("zh-TW")).toBe(
-      "以下是使用者字典裡的專有名詞與正確寫法。逐字稿中與這些詞發音或拼法相近的詞，一律改成字典裡的寫法；這條優先於『不確定就不改』。例外：該詞在句中明顯是一般單字，或屬於另一個完整姓名（名加姓）時，保留原文。",
-    );
+  // v0.17：改兩段（聽錯配對＋可能的專有名詞），不再壓過「不確定就不改」；新措辭由 v0.17 評估重測
+  it("zh-TW 說明聽錯配對、且不再優先於「不確定就不改」", () => {
+    const note = getVocabularyNoteForLocale("zh-TW");
+    expect(note).toContain("「A → B」是已知的聽錯配對");
+    expect(note).toContain("依上下文確實指這個詞時才改");
+    expect(note).not.toContain("優先於");
   });
 
   it("粵語沿用 zh-TW 句", () => {

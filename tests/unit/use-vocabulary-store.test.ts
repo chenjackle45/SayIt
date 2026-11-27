@@ -35,6 +35,7 @@ function createRawVocabularyRow(overrides: Record<string, unknown> = {}) {
     term: "Vue.js",
     weight: 1,
     source: "manual",
+    is_reviewed: 1,
     created_at: "2026-03-09 00:00:00",
     ...overrides,
   };
@@ -298,9 +299,10 @@ describe("useVocabularyStore", () => {
         string,
         unknown[],
       ];
-      expect(sql).toContain("INSERT INTO vocabulary (id, term, weight, source)");
+      expect(sql).toContain("INSERT INTO vocabulary (id, term, weight, source, correction_count, last_corrected_at, is_reviewed)");
       expect(sql).toContain("ON CONFLICT(term) DO UPDATE");
-      expect(sql).toContain("($1, $2, $3, $4), ($5, $6, $7, $8)");
+      expect(sql).toContain("($1, $2, $3, $4, CASE WHEN $4");
+      expect(sql).toContain("($5, $6, $7, $8, CASE WHEN $8");
       expect(params).toEqual([
         expect.any(String),
         "A",
@@ -313,7 +315,7 @@ describe("useVocabularyStore", () => {
       ]);
     });
 
-    it("已存在：weight 較大時 upsert 更新（merged），否則略過不寫入（skipped）", async () => {
+    it("已存在：weight 較大時 upsert 更新（merged），否則保留權重但標已檢視（skipped）", async () => {
       mockDbSelect.mockResolvedValueOnce([
         { id: "x", term: "A", weight: 2 },
         { id: "y", term: "B", weight: 10 },
@@ -335,10 +337,10 @@ describe("useVocabularyStore", () => {
         string,
         unknown[],
       ];
-      // 只有 A 進入 upsert；B 完全不寫入
-      expect(sql).toContain("($1, $2, $3, $4)");
-      expect(sql).not.toContain("$5");
-      expect(params).toEqual([expect.any(String), "A", 5, "manual"]);
+      // A、B 都進入 upsert，skipped 也要標已檢視
+      expect(sql).toContain("($1, $2, $3, $4, CASE WHEN $4");
+      expect(sql).toContain("$5");
+      expect(params).toEqual([expect.any(String), "A", 5, "manual", expect.any(String), "B", 3, "manual"]);
     });
 
     it("term 比對大小寫不敏感，合併時沿用 DB 既有的 term 字串", async () => {
@@ -361,7 +363,7 @@ describe("useVocabularyStore", () => {
       expect(params[1]).toBe("Tauri");
     });
 
-    it("全部略過時不執行任何寫入", async () => {
+    it("全部略過時仍寫入已檢視", async () => {
       mockDbSelect.mockResolvedValueOnce([{ id: "x", term: "A", weight: 5 }]);
 
       const { useVocabularyStore } = await import(
@@ -374,7 +376,8 @@ describe("useVocabularyStore", () => {
       ]);
 
       expect(result).toEqual({ added: 0, merged: 0, skipped: 1 });
-      expect(mockDbExecute).not.toHaveBeenCalled();
+      expect(mockDbExecute).toHaveBeenCalledTimes(1);
+      expect(mockDbExecute.mock.calls[0][0]).toContain("is_reviewed = 1");
     });
 
     it("超過 500 筆時分批，每批一個語句", async () => {
@@ -546,10 +549,10 @@ describe("updateTerm（#81 編輯）", () => {
 
     expect(mockDbExecute).toHaveBeenCalledTimes(1);
     expect(mockDbExecute).toHaveBeenCalledWith(
-      "UPDATE vocabulary SET term = $1, source = 'manual' WHERE id = $2",
+      "UPDATE vocabulary SET term = $1, source = 'manual', is_reviewed = 1 WHERE id = $2",
       ["未來誌", "a"],
     );
-    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
     expect(mockEmit).toHaveBeenCalledWith(
       "vocabulary:changed",
       expect.anything(),
@@ -580,7 +583,7 @@ describe("updateTerm（#81 編輯）", () => {
     const store = await setupStore();
     await store.updateTerm("b", "HeptaBase");
     expect(mockDbExecute).toHaveBeenCalledWith(
-      "UPDATE vocabulary SET term = $1, source = 'manual' WHERE id = $2",
+      "UPDATE vocabulary SET term = $1, source = 'manual', is_reviewed = 1 WHERE id = $2",
       ["HeptaBase", "b"],
     );
   });

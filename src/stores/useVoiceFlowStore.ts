@@ -16,6 +16,7 @@ import { logInfoLine, logErrorLine } from "../lib/logger";
 import { enhanceText, buildSystemPrompt } from "../lib/enhancer";
 import { getEditModePromptForLocale } from "../i18n/prompts";
 import type { SupportedLocale } from "../i18n/languageConfig";
+import { hasInternalCorrection, learnVocabularyCorrections } from "../lib/vocabularyLearning";
 import { analyzeCorrections } from "../lib/vocabularyAnalyzer";
 import { applyTranscriptTextTransforms as applySharedTranscriptTextTransforms } from "../lib/transcriptTextTransforms";
 import i18n from "../i18n";
@@ -672,37 +673,13 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     );
                     return;
                   }
-                  // fieldText 為游標附近的「excerpt」（非整欄文字），故需雙向比對：
-                  // 整欄仍含 pasted（短輸入）→ includes；或 excerpt 是 pasted 的子字串（長輸入未改）→ 反向 includes。
-                  const trimmedField = fieldText.trim();
-                  if (
-                    fieldText.includes(pastedText) ||
-                    pastedText.includes(trimmedField)
-                  ) {
-                    writeInfoLog(
-                      "[correction] text unchanged — skipping analysis",
-                    );
-                    return;
-                  }
-
-                  // 相似度檢查：以 excerpt 為基準（excerpt 多數字元應來自 pasted 區域）。
-                  // 若 excerpt 與 pasted 幾乎無關（AX/UIA 讀到錯的欄位），跳過。
-                  const overlapCharCount = [...trimmedField].filter((ch) =>
-                    pastedText.includes(ch),
-                  ).length;
-                  const overlapRatio =
-                    trimmedField.length > 0
-                      ? overlapCharCount / trimmedField.length
-                      : 0;
-                  if (overlapRatio < 0.3) {
-                    writeInfoLog(
-                      `[correction] field text unrelated to original (overlap=${Math.round(overlapRatio * 100)}%) — skipping analysis`,
-                    );
+                  if (!hasInternalCorrection(pastedText, fieldText)) {
+                    writeInfoLog("[correction] 沒有內部改正，略過分析");
                     return;
                   }
 
                   writeInfoLog(
-                    `[correction] text modified (overlap=${Math.round(overlapRatio * 100)}%) — sending to AI analysis\n  original:  ${pastedText.slice(0, 80)}\n  corrected: ${fieldText.slice(0, 80)}`,
+                    `[correction] 文字已修改，送交 AI 分析\n  原文: ${pastedText.slice(0, 80)}\n  改後: ${fieldText.slice(0, 80)}`,
                   );
 
                   const analysisResult = await analyzeCorrections(
@@ -711,6 +688,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     apiKey,
                     {
                       modelId: settingsStore.selectedLlmModelId,
+                      locale: settingsStore.selectedLocale,
                     },
                   );
 
@@ -724,30 +702,8 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                   if (analysisResult.suggestedTermList.length === 0) return;
 
                   const vocabularyStore = useVocabularyStore();
-                  const newTermList: string[] = [];
-
-                  for (const term of analysisResult.suggestedTermList) {
-                    if (vocabularyStore.isDuplicateTerm(term)) {
-                      // 已存在的詞 weight +1
-                      const existingEntry = vocabularyStore.termList.find(
-                        (e) =>
-                          e.term.trim().toLowerCase() ===
-                          term.trim().toLowerCase(),
-                      );
-                      if (existingEntry) {
-                        void vocabularyStore
-                          .batchIncrementWeights([existingEntry.id])
-                          .catch((err) =>
-                            writeErrorLog(
-                              `useVoiceFlowStore: batchIncrementWeights failed: ${extractErrorMessage(err)}`,
-                            ),
-                          );
-                      }
-                    } else {
-                      await vocabularyStore.addAiSuggestedTerm(term);
-                      newTermList.push(term);
-                    }
-                  }
+                  const pairs = learnVocabularyCorrections(pastedText, fieldText, analysisResult.suggestedTermList);
+                  const newTermList = await vocabularyStore.recordCorrections(pairs);
 
                   // 記錄 API 用量
                   if (analysisResult.usage) {
@@ -1293,7 +1249,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       }
 
       const vocabularyStore = useVocabularyStore();
-      const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
+      const whisperTermList = await vocabularyStore.getWhisperTermList(settingsStore.isSmartDictionaryEnabled);
       const hasVocabulary = whisperTermList.length > 0;
 
       const result = await invoke<TranscriptionResult>("transcribe_audio", {
@@ -1443,7 +1399,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           }
 
           const enhancementTermList =
-            await vocabularyStore.getTopTermListByWeight(50);
+            await vocabularyStore.getAiTermList(result.rawText);
           const enhanceOptions = {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
@@ -1452,6 +1408,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             signal: abortController?.signal,
             transcriptLocale: getEffectiveTranscriptLocale(),
             promptLocale: settingsStore.getAiPromptLocale(),
+            isRevisedBuiltinPrompt: settingsStore.promptMode === "minimal",
           };
 
           let enhanceResult = await enhanceText(
@@ -1736,7 +1693,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
       }
 
       const vocabularyStore = useVocabularyStore();
-      const whisperTermList = await vocabularyStore.getTopTermListByWeight(50);
+      const whisperTermList = await vocabularyStore.getWhisperTermList(settingsStore.isSmartDictionaryEnabled);
       const hasVocabulary = whisperTermList.length > 0;
 
       const result = await invoke<TranscriptionResult>(
@@ -1801,7 +1758,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
           }
 
           const enhancementTermList =
-            await vocabularyStore.getTopTermListByWeight(50);
+            await vocabularyStore.getAiTermList(result.rawText);
           let enhanceResult = await enhanceText(result.rawText, llmApiKey, {
             systemPrompt: settingsStore.getAiPrompt(),
             vocabularyTermList:
@@ -1810,6 +1767,7 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
             signal: abortController?.signal,
             transcriptLocale: getEffectiveTranscriptLocale(),
             promptLocale: settingsStore.getAiPromptLocale(),
+            isRevisedBuiltinPrompt: settingsStore.promptMode === "minimal",
           });
           if (isAborted.value) return;
 

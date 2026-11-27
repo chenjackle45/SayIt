@@ -316,6 +316,18 @@
     }
   },
   "dictionary": {
+    "inbox": {
+      "title": "수신함",
+      "keep": "유지",
+      "delete": "삭제",
+      "undo": "되돌리기",
+      "apply": "적용",
+      "dismiss": "거절",
+      "replacement": "“{misheard}”(으)로 인식 → “{term}”(으)로 수정",
+      "empty": "수신함이 비었습니다. AI가 새로 학습한 단어는 즉시 사용되며 여기에서 검토할 수 있습니다.",
+      "restoreConflict": "같은 이름의 단어가 있어 복원하지 않았습니다.",
+      "restored": "단어를 복원했습니다"
+    },
     "termCount": "{count} 단어",
     "inputPlaceholder": "새 단어 입력...",
     "duplicateEntry": "이미 존재하는 단어입니다",

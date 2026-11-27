@@ -316,6 +316,18 @@
     }
   },
   "dictionary": {
+    "inbox": {
+      "title": "受信トレイ",
+      "keep": "保持",
+      "delete": "削除",
+      "undo": "元に戻す",
+      "apply": "適用",
+      "dismiss": "却下",
+      "replacement": "「{misheard}」と認識 →「{term}」に修正",
+      "empty": "受信トレイは空です。AI が今後学習する新しい単語はすぐに使用され、ここで確認できます。",
+      "restoreConflict": "同じ名前の単語があるため、復元しませんでした。",
+      "restored": "単語を復元しました"
+    },
     "termCount": "{count} 語",
     "inputPlaceholder": "新しい語彙を入力...",
     "duplicateEntry": "この語彙はすでに存在します",

@@ -9,6 +9,8 @@ import type {
   VocabularyEntry,
   VocabularyExportEntry,
   VocabularySource,
+  VocabularyReplacementEntry,
+  VocabularySnapshot,
 } from "../types/vocabulary";
 import {
   MAX_IMPORT_ENTRIES,
@@ -18,6 +20,8 @@ import {
 } from "../lib/vocabularyTransfer";
 import type { VocabularyChangedPayload } from "../types/events";
 import i18n from "../i18n";
+import { selectWhisperVocabulary, selectAiVocabulary } from "../lib/vocabularySelection";
+import type { LearnedVocabularyPair } from "../lib/vocabularyLearning";
 
 /** 匯入時每批 upsert 的詞條數（500 × 4 個參數，遠低於 SQLite 變數上限） */
 const IMPORT_BATCH_SIZE = 500;
@@ -44,7 +48,10 @@ interface RawVocabularyRow {
   term: string;
   weight: number;
   source: string;
+  is_reviewed: number;
   created_at: string;
+  correction_count: number;
+  last_corrected_at: string | null;
 }
 
 function mapRowToEntry(row: RawVocabularyRow): VocabularyEntry {
@@ -53,13 +60,19 @@ function mapRowToEntry(row: RawVocabularyRow): VocabularyEntry {
     term: row.term,
     weight: row.weight,
     source: row.source as VocabularySource,
+    isReviewed: row.is_reviewed === 1,
     createdAt: row.created_at,
+    correctionCount: row.correction_count,
+    lastCorrectedAt: row.last_corrected_at,
   };
 }
 
 export const useVocabularyStore = defineStore("vocabulary", () => {
   const termList = ref<VocabularyEntry[]>([]);
+  const suggestedReplacementList = ref<(VocabularyReplacementEntry & { term: string })[]>([]);
   const isLoading = ref(false);
+  const inboxTermList = computed(() => termList.value.filter((entry) => entry.source === "ai" && !entry.isReviewed));
+  const inboxCount = computed(() => inboxTermList.value.length + suggestedReplacementList.value.length);
 
   const termCount = computed(() => termList.value.length);
 
@@ -75,9 +88,16 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     try {
       const db = getDatabase();
       const rows = await db.select<RawVocabularyRow[]>(
-        "SELECT id, term, weight, source, created_at FROM vocabulary ORDER BY weight DESC, created_at DESC",
+        "SELECT id, term, weight, source, created_at, is_reviewed, correction_count, last_corrected_at FROM vocabulary ORDER BY weight DESC, created_at DESC",
+      );
+      const replacements = await db.select<(VocabularyReplacementEntry & { term: string })[]>(
+        `SELECT r.id, r.vocabulary_id AS vocabularyId, r.misheard, r.hit_count AS hitCount,
+          r.status, r.created_at AS createdAt, r.updated_at AS updatedAt, v.term
+         FROM vocabulary_replacements r JOIN vocabulary v ON v.id = r.vocabulary_id
+         WHERE r.status = 'suggested' ORDER BY r.created_at, r.id`,
       );
       termList.value = rows.map(mapRowToEntry);
+      suggestedReplacementList.value = replacements;
     } catch (error) {
       console.error(
         `[vocabulary-store] fetchTermList failed: ${extractErrorMessage(error)}`,
@@ -101,7 +121,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     try {
       const db = getDatabase();
       await db.execute(
-        "INSERT INTO vocabulary (id, term, source) VALUES ($1, $2, 'manual')",
+        "INSERT INTO vocabulary (id, term, source, is_reviewed) VALUES ($1, $2, 'manual', 1)",
         [id, trimmedTerm],
       );
       await fetchTermList();
@@ -143,6 +163,66 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     }
   }
 
+  async function markTermReviewed(id: string) {
+    await getDatabase().execute("UPDATE vocabulary SET is_reviewed = 1 WHERE id = $1", [id]);
+    await refreshInbox();
+  }
+
+  async function removeTermWithUndo(id: string): Promise<VocabularySnapshot | null> {
+    const rows = await getDatabase().select<(RawVocabularyRow & { replacements: string })[]>(
+      "DELETE FROM vocabulary_snapshots WHERE id = $1 RETURNING *", [id],
+    );
+    if (rows.length === 0) return null;
+    const snapshot = { entry: mapRowToEntry(rows[0]), replacements: JSON.parse(rows[0].replacements) };
+    await refreshInbox();
+    return snapshot;
+  }
+
+  async function restoreTerm(snapshot: VocabularySnapshot) {
+    const { entry, replacements } = snapshot;
+    const db = getDatabase();
+    while (true) {
+      // 大小寫比對沿用 JS 的 Unicode 語意；SQLite lower 只處理 ASCII。
+      const [{ terms }] = await db.select<{ terms: string }[]>(
+        "SELECT json_group_array(term) AS terms FROM (SELECT term FROM vocabulary ORDER BY term)",
+      );
+      if ((JSON.parse(terms) as string[]).some((term) => term.toLowerCase() === entry.term.toLowerCase())) {
+        throw new Error(i18n.global.t("dictionary.inbox.restoreConflict"));
+      }
+      const restored = await db.select<{ id: string }[]>(
+        `INSERT INTO vocabulary_snapshots
+          (id, term, source, weight, created_at, is_reviewed, correction_count, last_corrected_at, replacements)
+         SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9
+         WHERE (SELECT json_group_array(term) FROM (SELECT term FROM vocabulary ORDER BY term)) = $10
+         RETURNING id`,
+        [entry.id, entry.term, entry.source, entry.weight, entry.createdAt, Number(entry.isReviewed),
+          entry.correctionCount, entry.lastCorrectedAt, JSON.stringify(replacements), terms],
+      );
+      // HUD 若在讀寫間改了詞集合，這次不寫入，重讀後再判斷同名。
+      if (restored.length > 0) break;
+    }
+    await refreshInbox();
+  }
+
+  async function applyReplacement(id: string) {
+    await getDatabase().execute("UPDATE vocabulary_replacements SET status = 'applied', updated_at = datetime('now') WHERE id = $1", [id]);
+    await refreshInbox();
+  }
+
+  async function dismissReplacement(id: string) {
+    await getDatabase().execute("UPDATE vocabulary_replacements SET status = 'dismissed', updated_at = datetime('now') WHERE id = $1", [id]);
+    await refreshInbox();
+  }
+
+  async function refreshInbox() {
+    try {
+      await fetchTermList();
+    } catch {
+      // 寫入已提交；讀取錯誤由 fetchTermList 記錄，仍保留操作結果並通知其他視窗。
+    }
+    emitVocabularyChanged();
+  }
+
   /** 改詞（#81）：改 term 並轉為手動詞（使用者拍板：改過＝使用者指定）；權重、新增時間保留 */
   async function updateTerm(id: string, newTerm: string) {
     const entry = termList.value.find((e) => e.id === id);
@@ -160,7 +240,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     try {
       const db = getDatabase();
       await db.execute(
-        "UPDATE vocabulary SET term = $1, source = 'manual' WHERE id = $2",
+        "UPDATE vocabulary SET term = $1, source = 'manual', is_reviewed = 1 WHERE id = $2",
         [trimmedTerm, id],
       );
       await fetchTermList();
@@ -194,7 +274,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     try {
       const db = getDatabase();
       await db.execute(
-        "INSERT INTO vocabulary (id, term, source) VALUES ($1, $2, 'ai')",
+        "INSERT INTO vocabulary (id, term, source, correction_count, last_corrected_at, is_reviewed) VALUES ($1, $2, 'ai', 1, datetime('now'), 0)",
         [id, trimmedTerm],
       );
       await fetchTermList();
@@ -277,7 +357,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
       });
     }
 
-    // 先在記憶體分類：只把需要寫入的（新增 / 合併）收進 upsert 清單。
+    // 分類只決定統計；三個分支都寫入 is_reviewed=1。
     // 合併時沿用 DB 既有的 term 字串（UNIQUE(term) 大小寫敏感），讓 ON CONFLICT 命中。
     const rowsToUpsert: VocabularyExportEntry[] = [];
     for (const entry of entries) {
@@ -293,6 +373,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
         existing.weight = entry.weight;
         result.merged += 1;
       } else {
+        rowsToUpsert.push({ ...entry, term: existing.term });
         result.skipped += 1;
       }
     }
@@ -305,7 +386,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
         batch.forEach((entry, index) => {
           const base = index * 4;
           placeholders.push(
-            `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`,
+            `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, CASE WHEN $${base + 4} = 'ai' THEN 1 ELSE 0 END, CASE WHEN $${base + 4} = 'ai' THEN datetime('now') ELSE NULL END, 1)`,
           );
           params.push(
             crypto.randomUUID(),
@@ -315,8 +396,8 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
           );
         });
         await db.execute(
-          `INSERT INTO vocabulary (id, term, weight, source) VALUES ${placeholders.join(", ")} ` +
-            "ON CONFLICT(term) DO UPDATE SET weight = MAX(vocabulary.weight, excluded.weight)",
+          `INSERT INTO vocabulary (id, term, weight, source, correction_count, last_corrected_at, is_reviewed) VALUES ${placeholders.join(", ")} ` +
+            "ON CONFLICT(term) DO UPDATE SET weight = MAX(vocabulary.weight, excluded.weight), is_reviewed = 1",
           params,
         );
       }
@@ -375,6 +456,71 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     return importEntries(entries);
   }
 
+  /** 每次改正同一詞只累計一次；不同聽錯寫法分別保留。 */
+  async function recordCorrections(pairs: LearnedVocabularyPair[]): Promise<string[]> {
+    if (pairs.length === 0) return [];
+    const db = getDatabase();
+    const newTerms: string[] = [];
+    for (const term of new Set(pairs.map((pair) => pair.term))) {
+      const existing = termList.value.find((entry) => entry.term.toLowerCase() === term.toLowerCase());
+      const storedTerm = existing?.term ?? term;
+      await db.execute(
+        `INSERT INTO vocabulary (id, term, source, correction_count, last_corrected_at, is_reviewed)
+         VALUES ($1, $2, 'ai', 1, datetime('now'), 0)
+         ON CONFLICT(term) DO UPDATE SET correction_count = vocabulary.correction_count + 1,
+           last_corrected_at = excluded.last_corrected_at`,
+        [crypto.randomUUID(), storedTerm],
+      );
+      if (!existing) newTerms.push(term);
+      for (const pair of pairs.filter((pair) => pair.term === term)) {
+        await db.execute(
+          `INSERT INTO vocabulary_replacements (id, vocabulary_id, misheard)
+           SELECT $1, id, $2 FROM vocabulary WHERE term = $3
+           ON CONFLICT(vocabulary_id, misheard) DO UPDATE SET
+             hit_count = vocabulary_replacements.hit_count + 1, updated_at = datetime('now')`,
+          [crypto.randomUUID(), pair.misheard, storedTerm],
+        );
+      }
+    }
+    await fetchTermList();
+    emitVocabularyChanged();
+    return newTerms;
+  }
+
+  async function getWhisperTermList(smartLearningEnabled: boolean): Promise<string[]> {
+    try {
+      await fetchTermList();
+      const recent = await getDatabase().select<{ raw_text: string }[]>(
+        "SELECT raw_text FROM transcriptions ORDER BY timestamp DESC LIMIT 300",
+      );
+      return selectWhisperVocabulary(termList.value, recent.map((row) => row.raw_text), smartLearningEnabled, Date.now());
+    } catch (error) {
+      captureError(error, { source: "vocabulary", step: "whisper-selection" });
+      return [];
+    }
+  }
+
+  async function getAiTermList(rawText: string): Promise<string[]> {
+    try {
+      await fetchTermList();
+      const rows = await getDatabase().select<{
+        id: string; vocabulary_id: string; misheard: string; hit_count: number;
+        status: VocabularyReplacementEntry["status"]; created_at: string; updated_at: string;
+      }[]>("SELECT * FROM vocabulary_replacements");
+      const replacements = rows.map((row) => ({
+        id: row.id, vocabularyId: row.vocabulary_id, misheard: row.misheard,
+        hitCount: row.hit_count, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at,
+      }));
+      return selectAiVocabulary(termList.value, replacements, rawText).map((candidate) =>
+        candidate.replacements.length === 0 ? candidate.term :
+          `${candidate.term} (${candidate.replacements.map((misheard) => `${misheard} → ${candidate.term}`).join("; ")})`,
+      );
+    } catch (error) {
+      captureError(error, { source: "vocabulary", step: "ai-selection" });
+      return [];
+    }
+  }
+
   async function getTopTermListByWeight(limit: number): Promise<string[]> {
     try {
       const db = getDatabase();
@@ -393,6 +539,14 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
 
   return {
     termList,
+    inboxTermList,
+    suggestedReplacementList,
+    inboxCount,
+    markTermReviewed,
+    removeTermWithUndo,
+    restoreTerm,
+    applyReplacement,
+    dismissReplacement,
     isLoading,
     termCount,
     manualTermList,
@@ -403,6 +557,9 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     addAiSuggestedTerm,
     batchIncrementWeights,
     getTopTermListByWeight,
+    recordCorrections,
+    getWhisperTermList,
+    getAiTermList,
     removeTerm,
     updateTerm,
     exportEntries,

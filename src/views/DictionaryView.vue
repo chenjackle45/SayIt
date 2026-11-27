@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import InboxSection from "@/components/vocabulary/InboxSection.vue";
 import { captureError } from "../lib/sentry";
 
 const vocabularyStore = useVocabularyStore();
@@ -282,9 +283,11 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="p-6">
+    <InboxSection />
+
     <!-- Page header -->
     <div class="flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{{ $t("dictionary.termCount", { count: vocabularyStore.termCount }) }}</Badge>
         <Button
           variant="outline"
@@ -311,7 +314,7 @@ onBeforeUnmount(() => {
         />
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <div class="relative">
           <Search class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input

@@ -1,3 +1,4 @@
+import type { SupportedLocale } from "../i18n/languageConfig";
 import { fetch } from "@tauri-apps/plugin-http";
 import { DEFAULT_LLM_MODEL_ID } from "./modelRegistry";
 import {
@@ -30,6 +31,14 @@ original: "用view js寫的" → corrected: "用Vue.js寫的" → ["Vue.js"]
 original: "今天天氣很好" → corrected: "今天天氣不錯" → []
 
 回傳格式：JSON array，沒有符合的就回 []。只要 JSON，不要解釋。`;
+
+const SYSTEM_PROMPTS: Record<SupportedLocale, string> = {
+  "zh-TW": SYSTEM_PROMPT,
+  "zh-CN": `你是语音转录词典助手。比较 <original> 和 <corrected>，只返回用户改正后的专有名词或领域术语（人名、地名、品牌、产品、技术术语）。摘录可能包含多余或截断内容，只关注原文对应的位置。排除新增内容、常用词、标点、空格、语序和语气变化。含汉字的词至少两个汉字，其他词至少两个字符。只返回 JSON 字符串数组，没有符合项返回 []，不作解释。`,
+  en: `You are a speech transcription dictionary assistant. Compare <original> and <corrected>. Return only corrected proper nouns or specialist terms (names, places, brands, products, technical terms). The excerpt may contain extra or truncated text; use only positions corresponding to the original. Exclude added content, common words, punctuation, spacing, word order and tone changes. Terms containing Han characters need at least two Han characters; other terms need at least two characters. Return only a JSON string array, or [] when none qualify.`,
+  ja: `音声文字起こしの辞書アシスタントです。<original> と <corrected> を比較し、ユーザーが訂正した固有名詞・専門用語（人名、地名、ブランド、製品、技術用語）の訂正後の表記だけを返してください。抜粋には余分な内容や途切れた箇所があります。原文に対応する位置だけを対象とし、追加内容、一般語、句読点、空白、語順、語気の変化は除外してください。漢字を含む語は漢字2文字以上、その他は2文字以上。JSON文字列配列のみ、該当なしは []。説明は不要です。`,
+  ko: `음성 전사 사전 도우미입니다. <original>과 <corrected>를 비교하여 사용자가 수정한 고유 명사나 전문 용어(인명, 지명, 브랜드, 제품, 기술 용어)의 수정 후 표기만 반환하세요. 발췌문에는 추가되거나 잘린 내용이 있을 수 있으므로 원문에 대응하는 위치만 검토하세요. 추가 내용, 일상 단어, 문장 부호, 공백, 어순 및 어조 변화는 제외하세요. 한자가 포함된 단어는 한자 두 자 이상, 그 외에는 두 글자 이상이어야 합니다. JSON 문자열 배열만 반환하고 해당 항목이 없으면 []를 반환하세요. 설명은 하지 마세요.`,
+};
 
 export interface ApiUsageInfo {
   promptTokens: number;
@@ -105,7 +114,7 @@ export async function analyzeCorrections(
   pastedText: string,
   fieldText: string,
   apiKey: string,
-  options?: { modelId?: string },
+  options?: { modelId?: string; locale?: SupportedLocale },
 ): Promise<VocabularyAnalysisResult> {
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
   const providerId = getProviderIdForModel(modelId);
@@ -113,7 +122,7 @@ export async function analyzeCorrections(
   const request: LlmChatRequest = {
     model: modelId,
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: SYSTEM_PROMPTS[options?.locale ?? "zh-TW"] },
       {
         role: "user",
         content: `<original>${pastedText}</original>\n<corrected>${fieldText}</corrected>`,

@@ -448,6 +448,76 @@ async function doInitializeDatabase(): Promise<Database> {
     }
   }
 
+  // --- Migration v8 → v9：改正次數與聽錯配對（必須在缺欄恢復之後） ---
+  await addColumnIfNotExists(
+    connection,
+    "vocabulary",
+    "correction_count INTEGER NOT NULL DEFAULT 0",
+  );
+  await addColumnIfNotExists(connection, "vocabulary", "last_corrected_at TEXT");
+  await connection.execute(`
+    CREATE TABLE IF NOT EXISTS vocabulary_replacements (
+      id TEXT PRIMARY KEY,
+      vocabulary_id TEXT NOT NULL,
+      misheard TEXT NOT NULL,
+      hit_count INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'suggested'
+        CHECK(status IN ('suggested', 'applied', 'dismissed')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(vocabulary_id, misheard),
+      FOREIGN KEY (vocabulary_id) REFERENCES vocabulary(id)
+    );
+  `);
+  await connection.execute(`
+    CREATE TRIGGER IF NOT EXISTS delete_vocabulary_replacements
+    AFTER DELETE ON vocabulary
+    BEGIN
+      DELETE FROM vocabulary_replacements WHERE vocabulary_id = OLD.id;
+    END;
+  `);
+  // 同一 execute 借用同一連線；由版本條件限制回填，重啟不覆蓋學習累計。
+  await connection.execute(`
+    UPDATE vocabulary SET correction_count = 1, last_corrected_at = datetime('now')
+    WHERE source = 'ai' AND correction_count = 0
+      AND NOT EXISTS (SELECT 1 FROM schema_version WHERE version >= 9);
+    INSERT OR IGNORE INTO schema_version (version) VALUES (9);
+  `);
+
+  // Migration v10：舊詞已檢視；必須在 v9 一次性回填之後記錄版本。
+  await addColumnIfNotExists(connection, "vocabulary", "is_reviewed INTEGER NOT NULL DEFAULT 1");
+  // view 的 INSTEAD OF trigger 讓刪除取快照／完整復原各是一個原子語句。
+  // 不跨 execute 開交易，避免連線池切換連線；trigger 失敗會回滾整個外層語句。
+  await connection.execute(`
+    CREATE VIEW IF NOT EXISTS vocabulary_snapshots AS
+    SELECT v.*, (
+      SELECT json_group_array(json_object(
+        'id', r.id, 'vocabularyId', r.vocabulary_id, 'misheard', r.misheard,
+        'hitCount', r.hit_count, 'status', r.status,
+        'createdAt', r.created_at, 'updatedAt', r.updated_at
+      )) FROM vocabulary_replacements r WHERE r.vocabulary_id = v.id
+    ) AS replacements FROM vocabulary v;
+
+    CREATE TRIGGER IF NOT EXISTS delete_vocabulary_snapshot
+    INSTEAD OF DELETE ON vocabulary_snapshots
+    BEGIN
+      DELETE FROM vocabulary WHERE id = OLD.id;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS restore_vocabulary_snapshot
+    INSTEAD OF INSERT ON vocabulary_snapshots
+    BEGIN
+      INSERT INTO vocabulary (id, term, source, weight, created_at, is_reviewed, correction_count, last_corrected_at)
+        VALUES (NEW.id, NEW.term, NEW.source, NEW.weight, NEW.created_at, NEW.is_reviewed, NEW.correction_count, NEW.last_corrected_at);
+      INSERT INTO vocabulary_replacements (id, vocabulary_id, misheard, hit_count, status, created_at, updated_at)
+        SELECT json_extract(value, '$.id'), json_extract(value, '$.vocabularyId'),
+          json_extract(value, '$.misheard'), json_extract(value, '$.hitCount'),
+          json_extract(value, '$.status'), json_extract(value, '$.createdAt'), json_extract(value, '$.updatedAt')
+        FROM json_each(NEW.replacements);
+    END;
+    INSERT OR IGNORE INTO schema_version (version) VALUES (10);
+  `);
+
   // 只有全部 schema 建立成功才設定 singleton
   db = connection;
   console.log("[database] SQLite initialized with WAL mode");

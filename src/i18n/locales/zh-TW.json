@@ -316,6 +316,18 @@
     }
   },
   "dictionary": {
+    "inbox": {
+      "title": "收件匣",
+      "keep": "保留",
+      "delete": "刪除",
+      "undo": "復原",
+      "apply": "套用",
+      "dismiss": "不要",
+      "replacement": "聽成「{misheard}」→ 改成「{term}」",
+      "empty": "收件匣清空了。AI 之後學到的新詞會馬上開始使用，也會出現在這裡讓你檢視。",
+      "restoreConflict": "已有同名詞，未復原",
+      "restored": "已復原"
+    },
     "termCount": "{count} 詞彙",
     "inputPlaceholder": "輸入新詞彙...",
     "duplicateEntry": "此詞彙已存在",

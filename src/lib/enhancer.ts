@@ -9,11 +9,10 @@ import {
   getDefaultMaxTokens,
   type LlmChatRequest,
 } from "./llmProvider";
-import {
-  getMinimalPromptForLocale,
-  getVocabularyNoteForLocale,
-  type PromptLocale,
-} from "../i18n/prompts";
+import { getMinimalPromptForLocale, type PromptLocale } from "../i18n/prompts";
+import { buildEnhanceMessages, stripTranscriptTags } from "./enhanceMessages";
+
+export { buildSystemPrompt } from "./enhanceMessages";
 import type { SupportedLocale } from "../i18n/languageConfig";
 import i18n from "../i18n";
 import {
@@ -22,7 +21,6 @@ import {
 } from "./hallucinationDetector";
 import { applyTranscriptTextTransforms } from "./transcriptTextTransforms";
 
-const MAX_VOCABULARY_TERMS = 50;
 const DEFAULT_ENHANCEMENT_RETRY_COUNT = 3;
 
 export class EnhancerApiError extends Error {
@@ -53,6 +51,8 @@ export interface EnhanceOptions {
   transcriptLocale?: string;
   /** 指示本體的語言，決定字典說明句用哪個語言（#84）；有字典時才用得到 */
   promptLocale?: PromptLocale;
+  /** 內建指示（精簡／積極）＝true：逐字稿包進 <transcript>；自訂指示與編輯模式不傳，訊息逐字不變 */
+  isRevisedBuiltinPrompt?: boolean;
 }
 
 async function withTimeout<T>(
@@ -95,21 +95,6 @@ async function withTimeout<T>(
   }
 }
 
-export function buildSystemPrompt(
-  basePrompt: string,
-  vocabularyTermList?: string[],
-  promptLocale: PromptLocale = "zh-TW",
-): string {
-  let prompt = basePrompt;
-
-  if (vocabularyTermList && vocabularyTermList.length > 0) {
-    const truncatedTermList = vocabularyTermList.slice(0, MAX_VOCABULARY_TERMS);
-    prompt += `\n\n${getVocabularyNoteForLocale(promptLocale)}\n<vocabulary>\n${truncatedTermList.join(", ")}\n</vocabulary>`;
-  }
-
-  return prompt;
-}
-
 /**
  * 移除 reasoning model（如 Qwen3）回應中的 <think>...</think> 區塊，
  * 只保留最終輸出內容。
@@ -130,19 +115,12 @@ export async function enhanceText(
   const modelId = options?.modelId ?? DEFAULT_LLM_MODEL_ID;
   const providerId = getProviderIdForModel(modelId);
 
-  const basePrompt = options?.systemPrompt || getDefaultSystemPrompt();
-  const fullPrompt = buildSystemPrompt(
-    basePrompt,
-    options?.vocabularyTermList,
-    options?.promptLocale,
-  );
-
   const request: LlmChatRequest = {
     model: modelId,
-    messages: [
-      { role: "system", content: fullPrompt },
-      { role: "user", content: rawText },
-    ],
+    messages: buildEnhanceMessages(rawText, {
+      ...options,
+      systemPrompt: options?.systemPrompt || getDefaultSystemPrompt(),
+    }),
     temperature: 0.1,
     maxTokens: options?.maxTokens ?? getDefaultMaxTokens(providerId),
   };
@@ -186,7 +164,8 @@ export async function enhanceText(
     return { text: rawText, usage, isRawFallback: true };
   }
 
-  const enhancedContent = stripReasoningTags(result.text);
+  const withoutReasoning = stripReasoningTags(result.text);
+  const enhancedContent = options?.isRevisedBuiltinPrompt ? stripTranscriptTags(withoutReasoning) : withoutReasoning;
   if (!enhancedContent) {
     return { text: rawText, usage, isRawFallback: true };
   }

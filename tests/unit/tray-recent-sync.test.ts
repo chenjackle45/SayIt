@@ -45,7 +45,7 @@ vi.mock("../../src/lib/transcriptTextTransforms", () => ({
 }));
 vi.mock("../../src/stores/useSettingsStore", () => ({ useSettingsStore: () => h.settingsStub }));
 vi.mock("../../src/stores/useVocabularyStore", () => ({
-  useVocabularyStore: () => ({ getTopTermListByWeight: vi.fn().mockResolvedValue([]) }),
+  useVocabularyStore: () => ({ getWhisperTermList: vi.fn().mockResolvedValue([]), getAiTermList: vi.fn().mockResolvedValue([]) }),
 }));
 
 import i18n from "../../src/i18n";

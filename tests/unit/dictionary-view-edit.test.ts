@@ -33,6 +33,7 @@ interface Row {
   source: string;
   weight: number;
   created_at: string;
+  is_reviewed: number;
 }
 
 function deferred<T = void>() {
@@ -47,7 +48,7 @@ let rows: Row[];
 let wrappers: VueWrapper[] = [];
 
 function row(id: string, term: string, source = "manual"): Row {
-  return { id, term, source, weight: 7, created_at: "2026-11-16 00:00:00" };
+  return { id, term, source, weight: 7, is_reviewed: 1, created_at: "2026-11-16 00:00:00" };
 }
 function editInput(wrapper: VueWrapper) {
   return wrapper.find("tbody input");
@@ -80,7 +81,7 @@ beforeEach(() => {
     const found = rows.find((r) => r.id === id);
     if (found) found.term = term;
   });
-  select.mockReset().mockImplementation(async () => structuredClone(rows));
+  select.mockReset().mockImplementation(async (sql: string) => sql.includes("vocabulary_replacements") ? [] : structuredClone(rows));
   emit.mockReset().mockResolvedValue(undefined);
 });
 
@@ -202,7 +203,7 @@ describe("DictionaryView 搜尋＋編輯（#81）", () => {
     await editInput(wrapper).trigger("keydown", { key: "Enter" });
     await flushPromises();
     expect(execute).toHaveBeenCalledWith(
-      "UPDATE vocabulary SET term = $1, source = 'manual' WHERE id = $2",
+      "UPDATE vocabulary SET term = $1, source = 'manual', is_reviewed = 1 WHERE id = $2",
       ["AI New", "c"],
     );
     expect(editInput(wrapper).exists()).toBe(false);

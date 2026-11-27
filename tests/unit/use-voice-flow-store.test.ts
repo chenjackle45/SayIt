@@ -104,7 +104,9 @@ const {
         source: string;
         createdAt: string;
       }>,
-      getTopTermListByWeight: vi.fn().mockResolvedValue([]),
+      getWhisperTermList: vi.fn().mockResolvedValue([]),
+      getAiTermList: vi.fn().mockResolvedValue([]),
+      recordCorrections: vi.fn().mockResolvedValue([]),
       batchIncrementWeights: vi.fn().mockResolvedValue(undefined),
     },
     mockAddTranscription: vi.fn().mockResolvedValue(undefined),
@@ -226,7 +228,9 @@ vi.mock("../../src/stores/useSettingsStore", () => ({
 vi.mock("../../src/stores/useVocabularyStore", () => ({
   useVocabularyStore: () => ({
     termList: mockVocabularyState.termList,
-    getTopTermListByWeight: mockVocabularyState.getTopTermListByWeight,
+    getWhisperTermList: mockVocabularyState.getWhisperTermList,
+    getAiTermList: mockVocabularyState.getAiTermList,
+    recordCorrections: mockVocabularyState.recordCorrections,
     batchIncrementWeights: mockVocabularyState.batchIncrementWeights,
     isDuplicateTerm: () => false,
     addAiSuggestedTerm: vi.fn().mockResolvedValue(undefined),
@@ -348,9 +352,12 @@ describe("useVoiceFlowStore", () => {
     mockSettingsState.selectedTranscriptionLocale = "auto";
     mockSettingsState.selectedLocale = "zh-TW";
     mockVocabularyState.termList = [];
-    mockVocabularyState.getTopTermListByWeight
+    mockVocabularyState.getWhisperTermList
       .mockClear()
       .mockResolvedValue([]);
+    mockVocabularyState.getAiTermList.mockReset().mockResolvedValue([]);
+    mockVocabularyState.recordCorrections.mockReset().mockResolvedValue([]);
+    vi.mocked(analyzeCorrections).mockReset().mockResolvedValue({ suggestedTermList: [], usage: null, rawResponse: "[]" });
     mockVocabularyState.batchIncrementWeights
       .mockClear()
       .mockResolvedValue(undefined);
@@ -1267,6 +1274,7 @@ describe("useVoiceFlowStore", () => {
           expect.objectContaining({
             transcriptLocale: expected,
             promptLocale: "ja",
+            isRevisedBuiltinPrompt: true,
           }),
         );
       },
@@ -1628,7 +1636,11 @@ describe("useVoiceFlowStore", () => {
           createdAt: "2026-01-01",
         },
       ];
-      mockVocabularyState.getTopTermListByWeight.mockResolvedValue([
+      mockVocabularyState.getWhisperTermList.mockResolvedValue([
+        "TypeScript",
+        "Vue.js",
+      ]);
+      mockVocabularyState.getAiTermList.mockResolvedValue([
         "TypeScript",
         "Vue.js",
       ]);
@@ -1722,7 +1734,7 @@ describe("useVoiceFlowStore", () => {
           createdAt: "2026-01-01",
         },
       ];
-      mockVocabularyState.getTopTermListByWeight.mockResolvedValue([
+      mockVocabularyState.getWhisperTermList.mockResolvedValue([
         "TypeScript",
         "Tauri",
       ]);
@@ -1782,7 +1794,7 @@ describe("useVoiceFlowStore", () => {
       });
     });
 
-    it("[P0] 詞彙清單應同時傳給 transcriber 和 enhancer", async () => {
+    it("[P0] Whisper 與 AI 清單分開，AI 按這次原始辨識取詞", async () => {
       const longText = "這是一段超過十個字的測試轉錄文字內容";
       mockInvoke.mockImplementation(
         createMockInvokeHandler({
@@ -1814,11 +1826,12 @@ describe("useVoiceFlowStore", () => {
           createdAt: "2026-01-01",
         },
       ];
-      mockVocabularyState.getTopTermListByWeight.mockResolvedValue([
+      mockVocabularyState.getWhisperTermList.mockResolvedValue([
         "Pinia",
         "Vitest",
       ]);
 
+      mockVocabularyState.getAiTermList.mockResolvedValue(["Vitest"]);
       const store = useVoiceFlowStore();
       await store.initialize();
 
@@ -1842,15 +1855,47 @@ describe("useVoiceFlowStore", () => {
         language: "zh",
       });
 
-      // enhancer 也收到詞彙
+      // enhancer 取得與 Whisper 不同的相關詞
+      expect(mockVocabularyState.getWhisperTermList).toHaveBeenCalledWith(false);
+      expect(mockVocabularyState.getAiTermList).toHaveBeenCalledWith(longText);
       expect(mockEnhanceText).toHaveBeenCalledWith(
         longText,
         "test-api-key-123",
         expect.objectContaining({
-          vocabularyTermList: ["Pinia", "Vitest"],
+          vocabularyTermList: ["Vitest"],
           modelId: "llama-3.3-70b-versatile",
         }),
       );
+    });
+  });
+
+  describe("B 改正監聽接線", () => {
+    it.each([
+      ["用陶里打包", "用 Tauri 打包", ["Tauri"], [{ term: "Tauri", misheard: "陶里" }], true],
+      ["用陶里", "用 Tauri 和 React", ["Tauri", "React"], [], true],
+      ["前面原文不變後面", "原文不變", ["原文"], [], false],
+    ])("%s → %s", async (pasted, corrected, suggestions, pairs, shouldAnalyze) => {
+      mockSettingsState.isSmartDictionaryEnabled = true;
+      mockSettingsState.selectedLocale = "ja";
+      const base = createMockInvokeHandler({ transcribeResult: { ...DEFAULT_TRANSCRIBE_RESULT, rawText: pasted } });
+      mockInvoke.mockImplementation(async (command: string, args?: unknown) =>
+        command === "read_focused_text_field" ? corrected : base(command, args));
+      vi.mocked(analyzeCorrections).mockResolvedValue({ suggestedTermList: suggestions, usage: null, rawResponse: JSON.stringify(suggestions) });
+      const store = useVoiceFlowStore();
+      await store.initialize();
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => expect(store.status).toBe("recording"));
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => expect(listenerCallbackMap.has("correction-monitor:result")).toBe(true));
+      triggerHotkeyEvent("correction-monitor:result", { anyKeyPressed: true, enterPressed: false });
+      await vi.waitFor(() => expect(mockInvoke).toHaveBeenCalledWith("read_focused_text_field"));
+      if (shouldAnalyze) {
+        await vi.waitFor(() => expect(mockVocabularyState.recordCorrections).toHaveBeenCalledWith(pairs));
+        expect(analyzeCorrections).toHaveBeenCalledWith(pasted, corrected, "test-api-key-123", expect.objectContaining({ locale: "ja" }));
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(analyzeCorrections).not.toHaveBeenCalled();
+      }
     });
   });
 
@@ -2516,6 +2561,8 @@ describe("useVoiceFlowStore", () => {
 
       await setupFailedTranscription(store);
 
+      mockVocabularyState.getWhisperTermList.mockResolvedValue(["WhisperOnly"]);
+      mockVocabularyState.getAiTermList.mockResolvedValue(["AiOnly"]);
       const longText = "這是一段超過十個字的重送轉錄文字內容";
       mockInvoke.mockImplementation(
         createMockInvokeHandler({
@@ -2536,6 +2583,10 @@ describe("useVoiceFlowStore", () => {
           expect.objectContaining({ transcriptLocale: "en", promptLocale: "ja" }),
         );
       });
+      expect(mockVocabularyState.getWhisperTermList).toHaveBeenCalledWith(false);
+      expect(mockVocabularyState.getAiTermList).toHaveBeenCalledWith(longText);
+      expect(mockInvoke).toHaveBeenCalledWith("retranscribe_from_file", expect.objectContaining({ vocabularyTermList: ["WhisperOnly"] }));
+      expect(mockEnhanceText).toHaveBeenCalledWith(longText, expect.any(String), expect.objectContaining({ vocabularyTermList: ["AiOnly"] }));
     });
 
     it("[P0] 重送失敗（空轉錄）不再提供重送按鈕", async () => {
@@ -2914,9 +2965,10 @@ describe("useVoiceFlowStore", () => {
       mockSettingsState.isSmartDictionaryEnabled = true;
       stubTopmost(async () => undefined);
       vi.mocked(analyzeCorrections).mockResolvedValueOnce({
-        suggestedTermList: ["Anny"],
+        suggestedTermList: ["測試專錄"],
         usage: null,
       } as never);
+      mockVocabularyState.recordCorrections.mockResolvedValueOnce(["測試專錄"]);
       const store = useVoiceFlowStore();
       await store.initialize();
 

@@ -316,6 +316,18 @@
     }
   },
   "dictionary": {
+    "inbox": {
+      "title": "Inbox",
+      "keep": "Keep",
+      "delete": "Delete",
+      "undo": "Undo",
+      "apply": "Apply",
+      "dismiss": "Dismiss",
+      "replacement": "Heard “{misheard}” → Use “{term}”",
+      "empty": "Inbox cleared. New words learned by AI take effect immediately and will appear here for your review.",
+      "restoreConflict": "A word with the same name already exists. Nothing was restored.",
+      "restored": "Word restored"
+    },
     "termCount": "{count} terms",
     "inputPlaceholder": "Enter a new term...",
     "duplicateEntry": "This term already exists",

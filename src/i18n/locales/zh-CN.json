@@ -316,6 +316,18 @@
     }
   },
   "dictionary": {
+    "inbox": {
+      "title": "收件箱",
+      "keep": "保留",
+      "delete": "删除",
+      "undo": "撤销",
+      "apply": "应用",
+      "dismiss": "不要",
+      "replacement": "听成“{misheard}”→ 改成“{term}”",
+      "empty": "收件箱清空了。AI 之后学到的新词会马上开始使用，也会出现在这里供你查看。",
+      "restoreConflict": "已有同名词，未恢复",
+      "restored": "已恢复"
+    },
     "termCount": "{count} 词汇",
     "inputPlaceholder": "输入新词汇...",
     "duplicateEntry": "此词汇已存在",
