@@ -327,6 +327,13 @@ export const useHistoryStore = defineStore("history", () => {
     }
   }
 
+  async function fetchLatestSuccessfulText(): Promise<string | null> {
+    const rows = await getDatabase().select<
+      Array<{ raw_text: string; processed_text: string | null }>
+    >(TRAY_RECENT_SQL, [1]);
+    return rows[0] ? rows[0].processed_text ?? rows[0].raw_text : null;
+  }
+
   async function loadMore() {
     if (!hasMore.value || isLoading.value) return;
     isLoading.value = true;
@@ -933,6 +940,7 @@ export const useHistoryStore = defineStore("history", () => {
     dashboardStats,
     fetchTranscriptionList,
     searchTranscriptionList,
+    fetchLatestSuccessfulText,
     resetAndFetch,
     loadMore,
     addTranscription,

@@ -546,5 +546,27 @@
     "recentHint": "最近说的话・点一下复制",
     "openMain": "打开 SayIt",
     "quit": "退出 SayIt"
+  },
+  "commandPalette": {
+    "title": "命令面板",
+    "description": "搜索记录或选择常用操作",
+    "placeholder": "搜索记录与命令…",
+    "noResults": "没有匹配的结果",
+    "records": "记录",
+    "actions": "常用操作",
+    "settings": "偏好设置",
+    "copyLast": "复制上一句",
+    "addTerm": "把“{term}”加入词库",
+    "modeSettings": "到设置页调整整理模式",
+    "currentMode": "当前模式",
+    "copied": "已复制",
+    "added": "已加入",
+    "loadFailed": "无法加载上一句，请稍后重试",
+    "searchFailed": "搜索失败，请稍后重试",
+    "actionFailed": "操作失败，请稍后重试",
+    "mode": {
+      "minimal": "切换为精简整理",
+      "active": "切换为积极整理"
+    }
   }
 }

@@ -17,6 +17,7 @@ import { useI18n } from "vue-i18n";
 import { computed, markRaw, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import AccessibilityGuide from "./components/AccessibilityGuide.vue";
+import CommandPalette from "./components/CommandPalette.vue";
 import SiteHeader from "./components/SiteHeader.vue";
 import SidebarStatus from "./components/SidebarStatus.vue";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import {
   VOCABULARY_CHANGED,
 } from "./composables/useTauriEvents";
 import { useSettingsNavigation } from "./composables/useSettingsNavigation";
+import { isAnyHotkeyRecording } from "./composables/useHotkeyRecordingSession";
 import type { PreferencesTab } from "./types/settings";
 import { useSettingsStore } from "./stores/useSettingsStore";
 import { useVocabularyStore } from "./stores/useVocabularyStore";
@@ -259,12 +261,21 @@ const vocabularyStore = useVocabularyStore();
 let unlistenVocabularyChanged: UnlistenFn | null = null;
 let unlistenMainWindowNavigate: UnlistenFn | null = null;
 
+const isCommandPaletteOpen = ref(false);
 // ⌘, / Ctrl+,：進入設定模式（已在設定模式就不動，不打斷目前分頁）
+// ⌘K（macOS）／Ctrl+K（其他平台）：開關指令面板；macOS 的 Ctrl+K 是文字框「刪到行尾」，不攔
 function handlePreferencesShortcut(event: KeyboardEvent) {
-  if (event.isComposing || event.key !== ",") return;
+  if (event.isComposing || event.repeat || isAnyHotkeyRecording.value) return;
   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-  event.preventDefault();
-  void openSettings();
+  const isMacOS = navigator.userAgent.includes("Macintosh");
+  const isPaletteModifier = isMacOS ? event.metaKey : event.ctrlKey;
+  if (event.key.toLowerCase() === "k" && isPaletteModifier) {
+    event.preventDefault();
+    isCommandPaletteOpen.value = !isCommandPaletteOpen.value;
+  } else if (event.key === ",") {
+    event.preventDefault();
+    void openSettings();
+  }
 }
 
 onMounted(async () => {
@@ -438,6 +449,7 @@ onUnmounted(() => {
 
   <!-- 成功類回饋（儲存、切換、刪除…）統一由這裡淡出 -->
   <Toaster position="bottom-right" :duration="2500" />
+  <CommandPalette v-model:open="isCommandPaletteOpen" />
 
   <AccessibilityGuide
     :visible="showAccessibilityGuide"

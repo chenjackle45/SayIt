@@ -4,7 +4,7 @@
  * 終態進入前先檢查「仍在錄製且是當輪」，通過即同步完成本地終止再回呼；
  * 晚到的（另一來源、舊輪 callback、舊 timeout、舊 start 的 resolve／reject、舊 listener 註冊）全部被擋或自卸。
  */
-import { ref } from "vue";
+import { readonly, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import {
@@ -16,6 +16,9 @@ import { createDomHotkeyRecorder } from "./useDomHotkeyRecorder";
 import type { RecordingCapturedPayload, RecordingRejectedPayload } from "../types/events";
 
 const RECORDING_TIMEOUT_MS = 10_000;
+const isRecording = ref(false);
+export const isAnyHotkeyRecording = readonly(isRecording);
+let requestSeq = 0;
 
 export interface HotkeyRecordingSessionOptions {
   /** Windows 才開：SayIt 視窗有焦點時 hook 收不到鍵（gh-78）。 */
@@ -30,8 +33,6 @@ export interface HotkeyRecordingSessionOptions {
 const LOG_PREFIX = "[SettingsView] hotkey recording:";
 
 export function useHotkeyRecordingSession(options: HotkeyRecordingSessionOptions) {
-  const isRecording = ref(false);
-  let requestSeq = 0;
   let unlisteners: UnlistenFn[] = [];
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const domRecorder = createDomHotkeyRecorder();

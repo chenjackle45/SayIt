@@ -546,5 +546,27 @@
     "recentHint": "最近說的話・點一下複製",
     "openMain": "開啟 SayIt",
     "quit": "結束 SayIt"
+  },
+  "commandPalette": {
+    "title": "指令面板",
+    "description": "搜尋記錄或選擇常用操作",
+    "placeholder": "搜尋記錄與指令…",
+    "noResults": "沒有符合的結果",
+    "records": "記錄",
+    "actions": "常用操作",
+    "settings": "偏好設定",
+    "copyLast": "複製上一句",
+    "addTerm": "把「{term}」加進詞庫",
+    "modeSettings": "到設定頁調整整理模式",
+    "currentMode": "目前模式",
+    "copied": "已複製",
+    "added": "已加入",
+    "loadFailed": "無法載入上一句，請稍後再試",
+    "searchFailed": "搜尋失敗，請稍後再試",
+    "actionFailed": "操作失敗，請稍後再試",
+    "mode": {
+      "minimal": "切換為精簡整理",
+      "active": "切換為積極整理"
+    }
   }
 }

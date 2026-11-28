@@ -546,5 +546,27 @@
     "recentHint": "最近の発言・クリックでコピー",
     "openMain": "SayIt を開く",
     "quit": "SayIt を終了"
+  },
+  "commandPalette": {
+    "title": "コマンドパレット",
+    "description": "記録を検索するか、よく使う操作を選択します",
+    "placeholder": "記録とコマンドを検索…",
+    "noResults": "一致する結果はありません",
+    "records": "記録",
+    "actions": "よく使う操作",
+    "settings": "環境設定",
+    "copyLast": "直前の文字起こしをコピー",
+    "addTerm": "「{term}」を単語帳に追加",
+    "modeSettings": "設定で整理モードを調整",
+    "currentMode": "現在のモード",
+    "copied": "コピーしました",
+    "added": "追加しました",
+    "loadFailed": "直前の文字起こしを読み込めませんでした。もう一度お試しください",
+    "searchFailed": "検索に失敗しました。もう一度お試しください",
+    "actionFailed": "操作に失敗しました。もう一度お試しください",
+    "mode": {
+      "minimal": "簡潔な整理に切り替え",
+      "active": "積極的な整理に切り替え"
+    }
   }
 }

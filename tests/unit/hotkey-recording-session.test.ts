@@ -122,6 +122,22 @@ describe("useHotkeyRecordingSession（每輪最多一個終態回呼）", () => 
     expect(session.isRecording.value).toBe(false);
   });
 
+  it("舊設定頁卸載後的 start 失敗，不得終結重掛設定頁的新錄鍵", async () => {
+    const old = makeSession(false);
+    const oldStart = old.session.start();
+    await settleListeners();
+    const oldDeferred = startDeferred!;
+    old.session.stop();
+    const current = makeSession(false);
+    await startAndArm(current.session);
+    oldDeferred.reject(new Error("舊頁的延遲失敗"));
+    await oldStart;
+    expect(current.session.isRecording.value).toBe(true);
+    expect(old.cb.onStartFailed).not.toHaveBeenCalled();
+    emitTauri(CAPTURED_EVENT, CAPTURED_K);
+    expect(current.cb.onCaptured).toHaveBeenCalledWith(CAPTURED_K);
+  });
+
   it("[P0] enableDomSource=false → 不掛 window 監聽", () => {
     const { session, cb } = makeSession(false);
     void session.start();

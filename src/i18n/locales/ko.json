@@ -546,5 +546,27 @@
     "recentHint": "최근 말한 내용 · 클릭하여 복사",
     "openMain": "SayIt 열기",
     "quit": "SayIt 종료"
+  },
+  "commandPalette": {
+    "title": "명령 팔레트",
+    "description": "기록을 검색하거나 자주 쓰는 작업을 선택하세요",
+    "placeholder": "기록 및 명령 검색…",
+    "noResults": "일치하는 결과가 없습니다",
+    "records": "기록",
+    "actions": "자주 쓰는 작업",
+    "settings": "환경설정",
+    "copyLast": "최근 받아쓰기 복사",
+    "addTerm": "“{term}” 단어장에 추가",
+    "modeSettings": "설정에서 정리 모드 조정",
+    "currentMode": "현재 모드",
+    "copied": "복사됨",
+    "added": "추가됨",
+    "loadFailed": "최근 받아쓰기를 불러오지 못했습니다. 다시 시도해 주세요",
+    "searchFailed": "검색에 실패했습니다. 다시 시도해 주세요",
+    "actionFailed": "작업에 실패했습니다. 다시 시도해 주세요",
+    "mode": {
+      "minimal": "간결한 정리로 전환",
+      "active": "적극적인 정리로 전환"
+    }
   }
 }

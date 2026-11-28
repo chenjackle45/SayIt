@@ -546,5 +546,27 @@
     "recentHint": "Recent · click to copy",
     "openMain": "Open SayIt",
     "quit": "Quit SayIt"
+  },
+  "commandPalette": {
+    "title": "Command palette",
+    "description": "Search records or choose a common action",
+    "placeholder": "Search records and commands…",
+    "noResults": "No matching results",
+    "records": "Records",
+    "actions": "Actions",
+    "settings": "Preferences",
+    "copyLast": "Copy last transcript",
+    "addTerm": "Add “{term}” to vocabulary",
+    "modeSettings": "Adjust cleanup mode in settings",
+    "currentMode": "Current mode",
+    "copied": "Copied",
+    "added": "Added",
+    "loadFailed": "Could not load the last transcript. Please try again.",
+    "searchFailed": "Search failed. Please try again.",
+    "actionFailed": "Action failed. Please try again.",
+    "mode": {
+      "minimal": "Switch to minimal cleanup",
+      "active": "Switch to active cleanup"
+    }
   }
 }
