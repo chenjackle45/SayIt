@@ -64,3 +64,15 @@
 
 ## 改動檔案（預估）
 `src/components/OnboardingDialog.vue`（新）、`src/composables/useAccessibilityPermission.ts`（自 AccessibilityGuide 抽出）、`src/components/AccessibilityGuide.vue`、`src/stores/useSettingsStore.ts`、`src/main-window.ts`、`src/MainApp.vue`、`src/router.ts`、`src/views/PreferencesView.vue`、刪 `src/views/FeatureGuideView.vue`、`src/i18n/locales/*.json`、對應 tests。
+
+## M5 探針前置紀錄（2026-11-28）
+
+- 此次受派環境無法啟動原生 App 或送出真實觸發鍵；macOS／Windows 的「觸發 → 錄音 → HUD → 貼上 → 主視窗輸入框」皆**未實跑**，不能以元件測試代替。
+- 依派工指示，第④步本次只交付真實空輸入框與依實際觸發模式顯示的提示；不增加錄音、貼上、模擬成功或外部 App 替代流程。
+- 派工端實跑：以 `tauri dev --config` 覆寫測試專用 identifier，先印出解析後 appData／appConfig 路徑，確認皆非 `com.sayit.app`；主視窗開引導至④，自動聚焦空框後按真實觸發鍵，逐段記錄錄音、HUD、貼上與輸入框收到文字。Windows 另用記事本對照；任一平台不成立即停下回報，不改 C2 流程。macOS 未授權情境須另用測試身分驗 TCC。
+
+## M5 探針結果（2026-11-28，Mac 實機，測試身分 com.sayit.app.hwtest-new）
+- 第一次：觸發 → 錄音 → 轉錄 → 整理 → 送出 Cmd+V 皆有日誌，但**輸入框沒收到**。根因：HUD 以 `window.show()` 顯示，在 macOS 會成為 key window；使用者在 SayIt 主視窗內錄音時，鍵盤焦點被 HUD 搶走，Cmd+V 送進 HUD（外部 App 不受影響，因 SayIt 不在前景）。
+- 修法：`tauri.conf.json` 的 HUD 視窗加 `"focusable": false`（Tauri 2.10 支援；Windows 原本已以 `reassert_hud_topmost` 不搶焦點）。
+- 第二次（修後）：使用者確認文字**已貼進試講輸入框** → **Mac M5 成立**。Windows 待實機驗。
+- 同場實機回饋：觸發鍵按鈕「錄製」易誤會成錄音 → 共用字串 `settings.hotkey.record` 改為「更換按鍵」（五語系；偏好設定頁同步受惠），引導說明改「可以換成其他按鍵」。

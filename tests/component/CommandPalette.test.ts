@@ -86,6 +86,7 @@ function seed(id: string, timestamp: number, raw = "原始句", processed: strin
     VALUES (?, ?, ?, ?, 1000, 100, 3, 'hold', 1, ?)`).run(id, timestamp, raw, processed, status);
 }
 async function render(component: typeof CommandPalette | typeof MainApp = CommandPalette, path = "/records") {
+  useSettingsStore().onboardingState = "done";
   const router = createRouter({ history: createMemoryHistory(), routes: [
     { path: "/records", component: { template: "<input id='original-focus' />" } },
     { path: "/dictionary", component: { template: "<p>詞庫</p>" } },

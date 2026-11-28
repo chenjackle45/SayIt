@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { invoke } from "@tauri-apps/api/core";
-import { nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { nextTick, ref, watch } from "vue";
 import { Button } from "@/components/ui/button";
-import { captureError } from "@/lib/sentry";
+import { useAccessibilityPermission } from "@/composables/useAccessibilityPermission";
 import { ShieldCheck, ExternalLink } from "lucide-vue-next";
-
-const PERMISSION_CHECK_INTERVAL_MS = 2000;
 
 const props = defineProps<{
   visible: boolean;
@@ -18,78 +14,26 @@ const emit = defineEmits<{
 
 const dialogRef = ref<HTMLDivElement | null>(null);
 const primaryButtonRef = ref<InstanceType<typeof Button> | null>(null);
-const isReinitializing = ref(false);
-const reinitializeError = ref<string | null>(null);
-const { t } = useI18n();
+const { isReinitializing, reinitializeError, openSettings } =
+  useAccessibilityPermission(() => props.visible, () => emit("close"));
 const stepKeyList = [
   "accessibility.step1",
   "accessibility.step2",
   "accessibility.step3",
 ] as const;
 
-let pollingTimer: ReturnType<typeof setInterval> | null = null;
-
-function startPermissionPolling() {
-  stopPermissionPolling();
-  pollingTimer = setInterval(async () => {
-    if (isReinitializing.value) return;
-    try {
-      const hasPermission = await invoke<boolean>(
-        "check_accessibility_permission_command",
-      );
-      if (hasPermission) {
-        stopPermissionPolling();
-        await handlePermissionGranted();
-      }
-    } catch (error) {
-      console.error("[accessibility-guide] Permission check failed:", error);
-      captureError(error, { source: "accessibility", step: "check-permission" });
-    }
-  }, PERMISSION_CHECK_INTERVAL_MS);
-}
-
-function stopPermissionPolling() {
-  if (pollingTimer !== null) {
-    clearInterval(pollingTimer);
-    pollingTimer = null;
-  }
-}
-
-async function handlePermissionGranted() {
-  isReinitializing.value = true;
-  reinitializeError.value = null;
-  try {
-    await invoke("reinitialize_hotkey_listener");
-    emit("close");
-  } catch (error) {
-    console.error("[accessibility-guide] Reinitialize failed:", error);
-    captureError(error, { source: "accessibility", step: "reinitialize" });
-    reinitializeError.value = t("accessibility.reinitializeError");
-  } finally {
-    isReinitializing.value = false;
-  }
-}
-
 watch(
   () => props.visible,
   (visible) => {
     if (visible) {
-      reinitializeError.value = null;
       nextTick(() => {
         const el = primaryButtonRef.value?.$el as HTMLElement | undefined;
         el?.focus();
       });
-      startPermissionPolling();
-    } else {
-      stopPermissionPolling();
     }
   },
   { immediate: true },
 );
-
-onBeforeUnmount(() => {
-  stopPermissionPolling();
-});
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.key === "Escape") {
@@ -112,15 +56,6 @@ function handleKeydown(event: KeyboardEvent) {
       event.preventDefault();
       firstElement.focus();
     }
-  }
-}
-
-async function handleOpenAccessibilitySettings() {
-  try {
-    await invoke("open_accessibility_settings");
-  } catch (error) {
-    console.error("[accessibility-guide] Failed to open settings:", error);
-    captureError(error, { source: "accessibility", step: "open-settings" });
   }
 }
 </script>
@@ -172,7 +107,7 @@ async function handleOpenAccessibilitySettings() {
           ref="primaryButtonRef"
           class="h-11 w-full rounded-[10px]"
           :disabled="isReinitializing"
-          @click="handleOpenAccessibilitySettings"
+          @click="openSettings"
         >
           <ExternalLink class="h-4 w-4" />
           {{ $t("accessibility.openSettings") }}

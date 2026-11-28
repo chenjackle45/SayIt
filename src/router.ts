@@ -2,7 +2,6 @@ import { createRouter, createWebHashHistory } from "vue-router";
 import RecordsView from "./views/RecordsView.vue";
 import DictionaryView from "./views/DictionaryView.vue";
 import PreferencesView from "./views/PreferencesView.vue";
-import FeatureGuideView from "./views/FeatureGuideView.vue";
 import { guardSettingsNavigation } from "./composables/useSettingsNavigation";
 
 const router = createRouter({
@@ -17,7 +16,6 @@ const router = createRouter({
     // 設定模式：側欄換成設定分類，一個分類一個網址
     { path: "/settings", redirect: "/settings/general" },
     { path: "/settings/:tab", component: PreferencesView, props: true },
-    { path: "/guide", component: FeatureGuideView },
   ],
 });
 

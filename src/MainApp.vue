@@ -17,6 +17,7 @@ import { useI18n } from "vue-i18n";
 import { computed, markRaw, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute } from "vue-router";
 import AccessibilityGuide from "./components/AccessibilityGuide.vue";
+import OnboardingDialog from "./components/OnboardingDialog.vue";
 import CommandPalette from "./components/CommandPalette.vue";
 import SiteHeader from "./components/SiteHeader.vue";
 import SidebarStatus from "./components/SidebarStatus.vue";
@@ -68,7 +69,6 @@ const appVersion = __APP_VERSION__;
 const { t } = useI18n();
 
 // 改版側欄只留兩項；偏好設定在側欄底部，按下進入「設定模式」（側欄換成設定分類）。
-// 功能介紹 v0.17 才移除、路由保留（設定「關於」有連結）。
 const navItems = computed(() => [
   { path: "/records", label: t("mainApp.nav.records"), icon: markRaw(AudioLines) },
   { path: "/dictionary", label: t("mainApp.nav.words"), icon: markRaw(BookOpen) },
@@ -89,7 +89,6 @@ const { isInSettings, openSettings, exitSettings } = useSettingsNavigation();
 const PAGE_TITLE_KEYS: Record<string, string> = {
   "/records": "mainApp.nav.records",
   "/dictionary": "mainApp.nav.words",
-  "/guide": "mainApp.nav.guide",
 };
 const currentPageTitle = computed(() => {
   if (isInSettings.value) return t(`preferences.tabs.${String(route.params.tab ?? "general")}`);
@@ -262,9 +261,47 @@ let unlistenVocabularyChanged: UnlistenFn | null = null;
 let unlistenMainWindowNavigate: UnlistenFn | null = null;
 
 const isCommandPaletteOpen = ref(false);
+const permissionChecked = ref(false);
+// 只掛載最高優先的模態，避免對話框離場動畫與下一個面板疊在一起。
+const activeModal = computed(() => {
+  if (settingsStore.onboardingState === "showing") return "onboarding";
+  if (!permissionChecked.value) return null;
+  if (showAccessibilityGuide.value) return "accessibility";
+  if (showUpgradeNoticeDialog.value) return "upgrade";
+  if (showManualUpdateDialog.value) return "manual-update";
+  if (showAutoInstallDialog.value) return "auto-install";
+  return null;
+});
+
+watch(activeModal, (modal) => {
+  if (modal !== null) isCommandPaletteOpen.value = false;
+}, { flush: "sync" });
+
+watch(() => settingsStore.onboardingState, async (state, _previous, onCleanup) => {
+  let isCurrent = true;
+  onCleanup(() => { isCurrent = false; });
+  permissionChecked.value = false;
+  if (state !== "done") return;
+  let hasPermission = true;
+  if (navigator.userAgent.includes("Macintosh")) {
+    try {
+      hasPermission = await invoke<boolean>("check_accessibility_permission_command");
+    } catch (error) {
+      console.error("[main-window] Failed to check accessibility permission:", error);
+      captureError(error, { source: "accessibility", step: "check-permission" });
+    }
+  }
+  if (isCurrent) {
+    showAccessibilityGuide.value = !hasPermission;
+    permissionChecked.value = true;
+  }
+}, { immediate: true, flush: "sync" });
+
 // ⌘, / Ctrl+,：進入設定模式（已在設定模式就不動，不打斷目前分頁）
 // ⌘K（macOS）／Ctrl+K（其他平台）：開關指令面板；macOS 的 Ctrl+K 是文字框「刪到行尾」，不攔
 function handlePreferencesShortcut(event: KeyboardEvent) {
+  if (settingsStore.onboardingState !== "done" ||
+      activeModal.value !== null) return;
   if (event.isComposing || event.repeat || isAnyHotkeyRecording.value) return;
   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
   const isMacOS = navigator.userAgent.includes("Macintosh");
@@ -282,7 +319,7 @@ onMounted(async () => {
   window.addEventListener("keydown", handlePreferencesShortcut);
   // macOS 應用程式選單「Settings… ⌘,」：Rust 已叫出主視窗，這裡只進入設定模式
   unlistenMainWindowNavigate = await listenToEvent(MAIN_WINDOW_NAVIGATE, () => {
-    void openSettings();
+    if (settingsStore.onboardingState === "done" && activeModal.value === null) void openSettings();
   });
 
   // 監聽詞彙變更（HUD 視窗 AI 新增詞彙時同步 Dashboard）
@@ -292,23 +329,6 @@ onMounted(async () => {
   });
 
   void vocabularyStore.fetchTermList().catch(() => { /* store 已記錄讀取錯誤 */ });
-
-  // macOS 無障礙權限檢查
-  const isMacOS = navigator.userAgent.includes("Macintosh");
-  if (isMacOS) {
-    try {
-      const hasAccessibilityPermission = await invoke<boolean>(
-        "check_accessibility_permission_command",
-      );
-      showAccessibilityGuide.value = !hasAccessibilityPermission;
-    } catch (error) {
-      console.error(
-        "[main-window] Failed to check accessibility permission:",
-        error,
-      );
-      captureError(error, { source: "accessibility", step: "check-permission" });
-    }
-  }
 
   // 自動檢查更新：啟動 5 秒後首次檢查，之後每 15 分鐘重查
   autoCheckTimeoutId = setTimeout(() => {
@@ -449,15 +469,17 @@ onUnmounted(() => {
 
   <!-- 成功類回饋（儲存、切換、刪除…）統一由這裡淡出 -->
   <Toaster position="bottom-right" :duration="2500" />
-  <CommandPalette v-model:open="isCommandPaletteOpen" />
+  <OnboardingDialog v-if="activeModal === 'onboarding'" />
+  <CommandPalette v-if="activeModal === null" v-model:open="isCommandPaletteOpen" />
 
   <AccessibilityGuide
-    :visible="showAccessibilityGuide"
+    v-if="activeModal === 'accessibility'"
+    :visible="true"
     @close="showAccessibilityGuide = false"
   />
 
   <!-- 自動流程 AlertDialog：更新已下載，詢問是否安裝重啟 -->
-  <AlertDialog :open="showAutoInstallDialog">
+  <AlertDialog v-if="activeModal === 'auto-install'" :open="true">
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t("mainApp.update.autoInstallTitle") }}</AlertDialogTitle>
@@ -473,7 +495,7 @@ onUnmounted(() => {
   </AlertDialog>
 
   <!-- 升級提示 AlertDialog -->
-  <AlertDialog :open="showUpgradeNoticeDialog">
+  <AlertDialog v-if="activeModal === 'upgrade'" :open="true">
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t("mainApp.upgradeNotice.title") }}</AlertDialogTitle>
@@ -492,7 +514,7 @@ onUnmounted(() => {
   </AlertDialog>
 
   <!-- 手動流程 AlertDialog：發現新版本，詢問是否開始更新 -->
-  <AlertDialog :open="showManualUpdateDialog">
+  <AlertDialog v-if="activeModal === 'manual-update'" :open="true">
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{ $t("mainApp.update.newVersionTitle") }}</AlertDialogTitle>

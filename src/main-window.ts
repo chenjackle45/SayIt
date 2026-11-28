@@ -67,7 +67,7 @@ async function bootstrap() {
 
   const settingsStore = useSettingsStore();
   await settingsStore.loadSettings();
-  await settingsStore.consumeUpgradeNotice();
+  await settingsStore.prepareOnboarding();
   await settingsStore.initializeAutoStart();
 
   // 選單列最近 5 句：設定載入後（語系已定）才建，標題才是使用者的語言
@@ -75,14 +75,13 @@ async function bootstrap() {
     await useHistoryStore().startTrayRecentSync();
   }
 
-  // C2 過渡（v0.16）：沒有 Groq Key 就進設定模式「轉錄與整理」；v0.17 改接第一次啟動引導
-  if (!settingsStore.hasApiKey) {
-    await router.push("/settings/ai");
+  if (settingsStore.onboardingState === "showing" || !settingsStore.hasApiKey) {
+    if (settingsStore.onboardingState !== "showing") await router.push("/settings/ai");
     await nextTick();
     const currentWindow = getCurrentWindow();
     await currentWindow.show();
     await currentWindow.setFocus();
-    console.log("[main-window] API Key missing, redirected to settings");
+    console.log("[main-window] Opened onboarding or API key settings");
   }
 
   // 錄音檔自動清理（背景執行，不阻斷啟動）

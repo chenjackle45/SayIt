@@ -23,7 +23,7 @@
       "releaseAllHint": "请先松开所有按键，再按下想设置的组合",
       "notSet": "未设置",
       "pressKey": "请按下按键...",
-      "record": "录制",
+      "record": "更换按键",
       "systemKeyHint": "Fn、媒体键等系统键请使用简易模式",
       "triggerMode": "触发模式",
       "modeHold": "按住",
@@ -464,7 +464,6 @@
   },
   "mainApp": {
     "nav": {
-      "guide": "功能介绍",
       "records": "记录",
       "words": "词库",
       "preferences": "偏好设置"
@@ -505,43 +504,6 @@
       "pressToTalk": "按一下开始说话"
     }
   },
-  "featureGuide": {
-    "subtitle": "以下是 SayIt 所有可用的操作功能，帮助你快速上手。",
-    "voiceInput": {
-      "title": "语音输入",
-      "description": "想打字？不用打，直接说。按住快捷键说话，放开后 AI 会自动整理好文字，直接贴到你光标的位置。打消息、写笔记、回邮件都可以用。",
-      "steps": "操作：按住快捷键 → 说话 → 松开 → 文字自动粘贴"
-    },
-    "editSelection": {
-      "title": "编辑选取文字",
-      "description": "看到一段英文想翻译？选起来，按快捷键，说「翻成中文」，就好了。也可以说「帮我改正式一点」「缩短成一句话」之类的，AI 会直接改好放回去。",
-      "steps": "操作：选取文字 → 按快捷键 → 说你想怎么改 → 改好自动贴回"
-    },
-    "hotkey": {
-      "title": "快捷键设置",
-      "description": "怕按错键不小心触发？可以设成组合键，像 ⌘+J 这样要两个键一起按才会启动。也可以用单颗键，看你习惯。到设置里就能改。"
-    },
-    "triggerMode": {
-      "title": "触发模式",
-      "description": "两种用法：「按住说话」就像对讲机，按着才录，放开就停。「按一下开始」适合讲比较长的话，按一次开始录，再按一次才停。"
-    },
-    "quickModeSwitch": {
-      "title": "快速切换 AI 模式",
-      "description": "觉得 AI 整理太少或太多？不用进设置，连按两下快捷键就能在「精简」和「积极」之间切换，屏幕上方会告诉你现在是哪个模式。"
-    },
-    "promptMode": {
-      "title": "AI 整理模式",
-      "description": "「精简」只帮你修错字加标点，原话不太动。「积极」会顺便整理排版，让文字更好读。觉得都不够？用「自定义」写你自己的指令给 AI。"
-    },
-    "dictionary": {
-      "title": "自定义字典",
-      "description": "手动添加专有名词、品牌名称等，AI 整理时会优先采用正确写法。开启「智能学习」后，AI 会自动从你的修正中收录新词。"
-    },
-    "history": {
-      "title": "历史记录",
-      "description": "所有转录结果都会保存，可搜索、复制文字、删除记录，也可以重新播放录音文件。"
-    }
-  },
   "tray": {
     "recentHint": "最近说的话・点一下复制",
     "openMain": "打开 SayIt",
@@ -567,6 +529,34 @@
     "mode": {
       "minimal": "切换为精简整理",
       "active": "切换为积极整理"
+    }
+  },
+  "onboarding": {
+    "title": "开始使用 SayIt",
+    "reopen": "重新显示引导",
+    "completed": "已完成",
+    "skip": "跳过引导",
+    "back": "上一步",
+    "next": "下一步",
+    "finish": "完成",
+    "permission": {
+      "title": "先开启辅助功能权限",
+      "description": "SayIt 需要此权限，才能将文字粘贴到你正在使用的 App。允许后会自动检测。"
+    },
+    "key": {
+      "title": "设置 Groq 密钥",
+      "description": "输入密钥并测试连接，测试与保存成功后即可继续。"
+    },
+    "hotkey": {
+      "title": "选一个说话用的快捷键",
+      "description": "这是当前使用的触发键。可以换成其他按键，之后也能在偏好设置中更改。"
+    },
+    "try": {
+      "title": "说出第一句话",
+      "description": "让光标留在下方输入框，使用刚才设置的触发键。",
+      "hold": "按住 {key} 说一句话，松开后就会粘贴。",
+      "toggle": "按一下 {key} 开始说话，再按一下停止并粘贴。",
+      "input": "试讲输入框"
     }
   }
 }

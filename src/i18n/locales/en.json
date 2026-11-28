@@ -23,7 +23,7 @@
       "releaseAllHint": "Release all keys first, then press the combination you want",
       "notSet": "Not Set",
       "pressKey": "Press a key...",
-      "record": "Record",
+      "record": "Change key",
       "systemKeyHint": "For Fn, media keys, etc., use Preset mode",
       "triggerMode": "Trigger Mode",
       "modeHold": "Hold",
@@ -464,7 +464,6 @@
   },
   "mainApp": {
     "nav": {
-      "guide": "Feature Guide",
       "records": "Records",
       "words": "Words",
       "preferences": "Preferences"
@@ -505,43 +504,6 @@
       "pressToTalk": "Press to start talking"
     }
   },
-  "featureGuide": {
-    "subtitle": "Here are all available features in SayIt to help you get started.",
-    "voiceInput": {
-      "title": "Voice Input",
-      "description": "Don't want to type? Just talk. Hold the hotkey, say what you want, let go — AI cleans it up and pastes it right where your cursor is. Great for messages, notes, and emails.",
-      "steps": "How to: hold hotkey → speak → release → text is pasted automatically"
-    },
-    "editSelection": {
-      "title": "Edit Selected Text",
-      "description": "See a paragraph you want to translate? Select it, press the hotkey, and say \"translate to Chinese.\" You can also say things like \"make it more formal\" or \"shorten to one sentence\" — AI will edit it and put it right back.",
-      "steps": "How to: select text → press hotkey → say what you want → edited text replaces the original"
-    },
-    "hotkey": {
-      "title": "Hotkey Setup",
-      "description": "Worried about triggering it by accident? Set a combo key like ⌘+J so it only activates when you press both keys. Or keep it simple with a single key. Change it anytime in Settings."
-    },
-    "triggerMode": {
-      "title": "Trigger Mode",
-      "description": "Two styles: \"Hold to talk\" works like a walkie-talkie — hold the key to record, let go to stop. \"Tap to start\" is better for longer speech — press once to start, press again to stop."
-    },
-    "quickModeSwitch": {
-      "title": "Quick Mode Switch",
-      "description": "Want AI to do more or less with your text? Double-tap the hotkey to switch between Minimal and Active modes on the fly. You'll see a confirmation pop up on screen. No need to dig into Settings."
-    },
-    "promptMode": {
-      "title": "AI Processing Mode",
-      "description": "\"Minimal\" just fixes typos and adds punctuation — keeps your words mostly as-is. \"Active\" also tidies up the layout so it reads better. Want full control? Use \"Custom\" to write your own instructions for AI."
-    },
-    "dictionary": {
-      "title": "Custom Dictionary",
-      "description": "Add proper nouns, brand names, and jargon so AI uses the correct spelling. Enable Smart Learning to let AI automatically pick up new terms from your corrections."
-    },
-    "history": {
-      "title": "History",
-      "description": "All transcriptions are saved. Search, copy text, delete records, or replay the original audio recording."
-    }
-  },
   "tray": {
     "recentHint": "Recent · click to copy",
     "openMain": "Open SayIt",
@@ -567,6 +529,34 @@
     "mode": {
       "minimal": "Switch to minimal cleanup",
       "active": "Switch to active cleanup"
+    }
+  },
+  "onboarding": {
+    "title": "Get started with SayIt",
+    "reopen": "Show onboarding again",
+    "completed": "Complete",
+    "skip": "Skip onboarding",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish",
+    "permission": {
+      "title": "Enable Accessibility permission",
+      "description": "SayIt needs permission to paste text into the app you are using. Permission is detected automatically after you allow it."
+    },
+    "key": {
+      "title": "Set up your Groq key",
+      "description": "Enter your key and test the connection. Continue after the test and save succeed."
+    },
+    "hotkey": {
+      "title": "Choose a key for speaking",
+      "description": "This is your current trigger key. Change it here or later in Preferences."
+    },
+    "try": {
+      "title": "Say your first sentence",
+      "description": "Keep the cursor in the field below and use your trigger key.",
+      "hold": "Hold {key} and say a sentence. Release to paste.",
+      "toggle": "Press {key} to start speaking. Press again to stop and paste.",
+      "input": "Try speaking here"
     }
   }
 }

@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { load } from "@tauri-apps/plugin-store";
+import { getDatabase } from "../lib/database";
 import type { TriggerMode } from "../types";
 import {
   type HotkeyConfig,
@@ -114,6 +115,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const aiPrompt = ref<string>(getDefaultSystemPrompt());
   const promptMode = ref<PromptMode>(DEFAULT_PROMPT_MODE);
   const showPromptUpgradeNotice = ref(false);
+  const onboardingState = ref("pending");
   const isAutoStartEnabled = ref(false);
   const isEnhancementThresholdEnabled = ref(
     DEFAULT_ENHANCEMENT_THRESHOLD_ENABLED,
@@ -678,6 +680,60 @@ export const useSettingsStore = defineStore("settings", () => {
       );
       captureError(err, { source: "settings", step: "save-prompt-mode" });
       throw err;
+    }
+  }
+
+  /** 在 consumeUpgradeNotice 寫版本前判斷；此函式不寫設定。 */
+  /** null＝判不出來（例：DB 讀取失敗），本次不顯示但也不寫完成旗標 */
+  async function shouldShowOnboarding(): Promise<boolean | null> {
+    try {
+      const store = await load(STORE_NAME);
+      if (await store.get<boolean>("onboardingCompleted")) return false;
+      const lastSeenVersion = await store.get<string>("lastSeenVersion");
+      const existingKey = await store.get<string>("groqApiKey");
+      // 設定就能判定是舊使用者時不讀 DB；DB 只用來區分「全新」與「無設定但有歷史」
+      if (lastSeenVersion != null || existingKey?.trim()) return false;
+      const rows = await getDatabase().select<{ count: number }[]>(
+        "SELECT COUNT(*) AS count FROM transcriptions",
+      );
+      return rows[0].count === 0;
+    } catch (err) {
+      console.error("[useSettingsStore] Onboarding eligibility failed:", extractErrorMessage(err));
+      return null;
+    }
+  }
+
+  async function completeOnboarding() {
+    const store = await load(STORE_NAME);
+    await store.set("onboardingCompleted", true);
+    await store.save();
+    onboardingState.value = "done";
+  }
+
+  function reopenOnboarding() {
+    onboardingState.value = "showing";
+  }
+
+  async function prepareOnboarding() {
+    try {
+      const shouldShow = await shouldShowOnboarding();
+      if (shouldShow) {
+        const store = await load(STORE_NAME);
+        // 必須早於引導儲存金鑰：新安裝不顯示本版摘要。
+        await store.set("lastSeenVersion", __APP_VERSION__);
+        await store.save();
+        onboardingState.value = "showing";
+      } else if (shouldShow === null) {
+        // 疑似新安裝但 DB 判不出：本次不顯示，也不寫任何旗標或版本（摘要流程會寫版本，下次就被當成升級），留給下次啟動重判
+        onboardingState.value = "done";
+      } else {
+        await completeOnboarding();
+        await consumeUpgradeNotice();
+      }
+    } catch (err) {
+      onboardingState.value = "done";
+      console.error("[useSettingsStore] Prepare onboarding failed:", extractErrorMessage(err));
+      captureError(err, { source: "settings", step: "prepare-onboarding" });
     }
   }
 
@@ -1577,6 +1633,11 @@ export const useSettingsStore = defineStore("settings", () => {
     aiPrompt,
     promptMode,
     showPromptUpgradeNotice,
+    onboardingState,
+    shouldShowOnboarding,
+    prepareOnboarding,
+    completeOnboarding,
+    reopenOnboarding,
     isAutoStartEnabled,
     isEnhancementThresholdEnabled,
     enhancementThresholdCharCount,
