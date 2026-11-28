@@ -673,6 +673,20 @@ export const useVoiceFlowStore = defineStore("voice-flow", () => {
                     );
                     return;
                   }
+                  // 摘錄多數字元應來自貼上區段；換欄位或讀到別行時不送 AI。
+                  // 分母用完整讀回區段（含首尾空白），trim 會讓無關內容的重疊率被高估而放行
+                  const fieldCharacters = Array.from(fieldText);
+                  // 空白只進分母、永不算重疊：原文含空白時，縮排很多的無關區段才不會被空白撐過門檻
+                  const overlapCharCount = fieldCharacters.filter(
+                    (ch) => !/\s/.test(ch) && pastedText.includes(ch),
+                  ).length;
+                  const overlapRatio = overlapCharCount / fieldCharacters.length;
+                  if (overlapRatio < 0.3) {
+                    writeInfoLog(
+                      `[correction] 讀回區段與原文無關（重疊=${Math.round(overlapRatio * 100)}%），略過分析`,
+                    );
+                    return;
+                  }
                   if (!hasInternalCorrection(pastedText, fieldText)) {
                     writeInfoLog("[correction] 沒有內部改正，略過分析");
                     return;

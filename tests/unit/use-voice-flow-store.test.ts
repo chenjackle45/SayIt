@@ -176,6 +176,11 @@ vi.mock("../../src/lib/sentry", () => ({
   captureError: vi.fn(),
 }));
 
+vi.mock("../../src/lib/logger", () => ({
+  logInfoLine: vi.fn(),
+  logErrorLine: vi.fn(),
+}));
+
 vi.mock("../../src/stores/useSettingsStore", () => ({
   useSettingsStore: () => ({
     loadSettings: mockLoadSettings,
@@ -247,6 +252,7 @@ vi.mock("../../src/stores/useHistoryStore", () => ({
 
 import { useVoiceFlowStore } from "../../src/stores/useVoiceFlowStore";
 import { analyzeCorrections } from "../../src/lib/vocabularyAnalyzer";
+import { logInfoLine, logErrorLine } from "../../src/lib/logger";
 
 function triggerHotkeyEvent(eventName: string, payload: unknown = undefined) {
   const callback = listenerCallbackMap.get(eventName);
@@ -358,6 +364,8 @@ describe("useVoiceFlowStore", () => {
     mockVocabularyState.getAiTermList.mockReset().mockResolvedValue([]);
     mockVocabularyState.recordCorrections.mockReset().mockResolvedValue([]);
     vi.mocked(analyzeCorrections).mockReset().mockResolvedValue({ suggestedTermList: [], usage: null, rawResponse: "[]" });
+    vi.mocked(logInfoLine).mockClear();
+    vi.mocked(logErrorLine).mockClear();
     mockVocabularyState.batchIncrementWeights
       .mockClear()
       .mockResolvedValue(undefined);
@@ -1871,11 +1879,83 @@ describe("useVoiceFlowStore", () => {
 
   describe("B 改正監聽接線", () => {
     it.each([
+      ["純空白", "請找 李明哲開會", " \t\n   ", false],
+      ["含換行無關摘錄", "請找李明哲開會", "\n\n明天開會討論預算\n\n", false],
+      ["含換行正常改字", "請用陶里打包專案", "\n請用 Tauri 打包專案\n", true],
+      ["原文含空格且換欄讀到無關縮排", "請找 李明哲開會", "        財務密件預算資料        ", false],
+      ["原文含換行且換欄讀到無關空行", "請找\n李明哲開會", "\n\n\n\n\n\n\n\n財務密件預算資料\n\n\n\n\n\n\n\n", false],
+    ])("審查追加：%s", async (_label, pasted, fieldText, shouldAnalyze) => {
+      mockSettingsState.selectedLocale = "ja";
+      mockSettingsState.isSmartDictionaryEnabled = true;
+      mockSettingsState.enhancementThresholdCharCount = 1000;
+      const base = createMockInvokeHandler({ transcribeResult: { ...DEFAULT_TRANSCRIBE_RESULT, rawText: pasted } });
+      mockInvoke.mockImplementation(async (command: string, args?: unknown) =>
+        command === "read_focused_text_field" ? fieldText : base(command, args));
+      const store = useVoiceFlowStore();
+      try {
+        await store.initialize();
+        triggerHotkeyEvent("hotkey:pressed");
+        await vi.waitFor(() => expect(store.status).toBe("recording"));
+        triggerHotkeyEvent("hotkey:released");
+        await vi.waitFor(() => expect(listenerCallbackMap.has("correction-monitor:result")).toBe(true));
+        expect(mockInvoke).toHaveBeenCalledWith("paste_text", expect.objectContaining({ text: pasted }));
+        triggerHotkeyEvent("correction-monitor:result", { anyKeyPressed: true, enterPressed: false });
+        await vi.waitFor(() => expect(logInfoLine).toHaveBeenCalledWith(expect.stringMatching(/略過分析|skipping analysis|AI raw:/)));
+        if (shouldAnalyze) {
+          expect(analyzeCorrections).toHaveBeenCalledExactlyOnceWith(pasted, fieldText, "test-api-key-123", expect.any(Object));
+        } else {
+          expect.soft(analyzeCorrections).not.toHaveBeenCalled();
+          expect.soft(mockVocabularyState.recordCorrections).not.toHaveBeenCalled();
+          if (fieldText.includes("財務密件")) {
+            expect.soft(JSON.stringify(vi.mocked(logInfoLine).mock.calls)).not.toContain("財務密件");
+          }
+        }
+      } finally {
+        store.cleanup();
+      }
+    });
+
+    it("審查重現：含首尾空白的無關區段仍以完整 Unicode 字元數計算重疊率", async () => {
+      const pasted = "請找李明哲開會";
+      const fieldText = "        明天開會討論預算        ";
+      const count = Array.from(fieldText).filter((ch) => pasted.includes(ch)).length;
+      expect(count / Array.from(fieldText).length).toBeLessThan(0.3);
+      expect(count / Array.from(fieldText.trim()).length).toBeGreaterThanOrEqual(0.3);
+      mockSettingsState.isSmartDictionaryEnabled = true;
+      mockSettingsState.enhancementThresholdCharCount = 1000;
+      const base = createMockInvokeHandler({ transcribeResult: { ...DEFAULT_TRANSCRIBE_RESULT, rawText: pasted } });
+      mockInvoke.mockImplementation(async (command: string, args?: unknown) =>
+        command === "read_focused_text_field" ? fieldText : base(command, args));
+      const store = useVoiceFlowStore();
+      try {
+        await store.initialize();
+        triggerHotkeyEvent("hotkey:pressed");
+        await vi.waitFor(() => expect(store.status).toBe("recording"));
+        triggerHotkeyEvent("hotkey:released");
+        await vi.waitFor(() => expect(listenerCallbackMap.has("correction-monitor:result")).toBe(true));
+        triggerHotkeyEvent("correction-monitor:result", { anyKeyPressed: true, enterPressed: false });
+        await vi.waitFor(() => expect(logInfoLine).toHaveBeenCalledWith(expect.stringMatching(/略過分析|AI raw:/)));
+        expect.soft(analyzeCorrections).not.toHaveBeenCalled();
+        expect.soft(mockVocabularyState.recordCorrections).not.toHaveBeenCalled();
+        expect.soft(JSON.stringify(vi.mocked(logInfoLine).mock.calls)).not.toContain("明天開會討論預算");
+      } finally {
+        store.cleanup();
+      }
+    });
+    it.each([
       ["用陶里打包", "用 Tauri 打包", ["Tauri"], [{ term: "Tauri", misheard: "陶里" }], true],
-      ["用陶里", "用 Tauri 和 React", ["Tauri", "React"], [], true],
+      ["用陶里", "用 Tauri 和 React", ["Tauri", "React"], [], false],
       ["前面原文不變後面", "原文不變", ["原文"], [], false],
+      ["請找李明哲開會", "今天不想開電腦，只想吃飯", ["電腦"], [], false],
+      // A 欄貼上後，滑鼠換到 B 欄打字停手：有效游標仍可能讀到無關內容。
+      ["請找李明哲開會", "他明天晚上要吃火鍋", ["火鍋"], [], false],
+      ["扣伯涅提斯", "Kubernetes", ["Kubernetes"], [], false],
+      // 3/10 恰為 30%；emoji 必須按 Unicode 字元計數，不能用 UTF-16 長度。
+      ["😀😃😄扣伯涅提斯", "😀😃😄abcdefg", ["abcdefg"], [], true],
+      ["abc扣伯涅提斯", "abc😀😃😄😆😅😂🤣", ["abc😀😃😄😆😅😂🤣"], [], true],
     ])("%s → %s", async (pasted, corrected, suggestions, pairs, shouldAnalyze) => {
       mockSettingsState.isSmartDictionaryEnabled = true;
+      mockSettingsState.enhancementThresholdCharCount = 1000;
       mockSettingsState.selectedLocale = "ja";
       const base = createMockInvokeHandler({ transcribeResult: { ...DEFAULT_TRANSCRIBE_RESULT, rawText: pasted } });
       mockInvoke.mockImplementation(async (command: string, args?: unknown) =>
@@ -1891,11 +1971,53 @@ describe("useVoiceFlowStore", () => {
       await vi.waitFor(() => expect(mockInvoke).toHaveBeenCalledWith("read_focused_text_field"));
       if (shouldAnalyze) {
         await vi.waitFor(() => expect(mockVocabularyState.recordCorrections).toHaveBeenCalledWith(pairs));
+        expect(analyzeCorrections).toHaveBeenCalledTimes(1);
         expect(analyzeCorrections).toHaveBeenCalledWith(pasted, corrected, "test-api-key-123", expect.objectContaining({ locale: "ja" }));
       } else {
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await vi.waitFor(() => expect(logInfoLine).toHaveBeenCalledWith(
+          expect.stringMatching(/略過分析|AI raw:/),
+        ));
         expect(analyzeCorrections).not.toHaveBeenCalled();
+        await vi.waitFor(() => expect(logInfoLine).toHaveBeenCalledWith(
+          expect.stringMatching(/重疊=\d+%|沒有內部改正/),
+        ));
+        expect(mockVocabularyState.recordCorrections).not.toHaveBeenCalled();
       }
+      store.cleanup();
+    });
+
+    it("讀回區段外的哨兵不進 AI、日誌與配對", async () => {
+      const pasted = "用陶里打包";
+      const corrected = "用 Tauri 打包";
+      const surroundingText = `PRIVATE_BEFORE${"前".repeat(60)}${corrected}${"後".repeat(60)}PRIVATE_AFTER`;
+      // IPC 邊界已是本機游標摘錄，前端不得改用其它畫面文字。
+      const start = surroundingText.indexOf(corrected);
+      const excerpt = surroundingText.slice(start, start + corrected.length);
+      mockSettingsState.isSmartDictionaryEnabled = true;
+      mockSettingsState.selectedLocale = "ja";
+      const base = createMockInvokeHandler({ transcribeResult: { ...DEFAULT_TRANSCRIBE_RESULT, rawText: pasted } });
+      mockInvoke.mockImplementation(async (command: string, args?: unknown) =>
+        command === "read_focused_text_field" ? excerpt : base(command, args));
+      vi.mocked(analyzeCorrections).mockResolvedValue({ suggestedTermList: ["Tauri"], usage: null, rawResponse: '["Tauri"]' });
+      const store = useVoiceFlowStore();
+      await store.initialize();
+      triggerHotkeyEvent("hotkey:pressed");
+      await vi.waitFor(() => expect(store.status).toBe("recording"));
+      triggerHotkeyEvent("hotkey:released");
+      await vi.waitFor(() => expect(listenerCallbackMap.has("correction-monitor:result")).toBe(true));
+      triggerHotkeyEvent("correction-monitor:result", { anyKeyPressed: true, enterPressed: false });
+      await vi.waitFor(() => expect(mockVocabularyState.recordCorrections).toHaveBeenCalledWith([{ term: "Tauri", misheard: "陶里" }]));
+      expect(analyzeCorrections).toHaveBeenCalledExactlyOnceWith(pasted, excerpt, "test-api-key-123", expect.any(Object));
+      expect(logInfoLine).toHaveBeenCalledWith(expect.stringContaining(`改後: ${excerpt}`));
+      const captured = JSON.stringify([
+        vi.mocked(analyzeCorrections).mock.calls,
+        vi.mocked(logInfoLine).mock.calls,
+        vi.mocked(logErrorLine).mock.calls,
+        mockVocabularyState.recordCorrections.mock.calls,
+      ]);
+      expect(captured).not.toContain("PRIVATE_BEFORE");
+      expect(captured).not.toContain("PRIVATE_AFTER");
+      store.cleanup();
     });
   });
 

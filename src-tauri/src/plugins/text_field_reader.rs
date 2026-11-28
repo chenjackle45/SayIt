@@ -142,6 +142,7 @@ mod macos {
 
     extern "C" {
         fn AXUIElementCreateSystemWide() -> AXUIElementRef;
+        fn AXUIElementCreateApplication(pid: i32) -> AXUIElementRef;
         fn AXUIElementCopyAttributeValue(
             element: AXUIElementRef,
             attribute: CFTypeRef,
@@ -277,13 +278,18 @@ mod macos {
 
     /// 走訪 AX 樹取得當前聚焦的文字輸入元素。
     /// 共用邏輯：system-wide → focused app → focused element → role check → WebArea child。
-    fn resolve_focused_text_element() -> Option<FocusedElementContext> {
+    fn resolve_focused_text_element(
+        on_unresolved: impl Fn(AXUIElementRef, Option<AXUIElementRef>),
+    ) -> Option<FocusedElementContext> {
         let system_wide = unsafe { AXUIElementCreateSystemWide() };
         if system_wide.is_null() {
             return None;
         }
 
-        let app = match get_ax_attribute(system_wide, K_AX_FOCUSED_APPLICATION_ATTRIBUTE) {
+        // 系統層聚焦 App 在冷啟動的 Chrome 會回空（2026-11-28 探針），退回 NSWorkspace 前景 App，才走得到喚醒
+        let app = match get_ax_attribute(system_wide, K_AX_FOCUSED_APPLICATION_ATTRIBUTE)
+            .or_else(create_frontmost_app_element)
+        {
             Some(a) => a,
             None => {
                 unsafe { CFRelease(system_wide) };
@@ -294,6 +300,7 @@ mod macos {
         let element = match get_ax_attribute(app, K_AX_FOCUSED_UI_ELEMENT_ATTRIBUTE) {
             Some(e) => e,
             None => {
+                on_unresolved(app, None);
                 unsafe {
                     CFRelease(app);
                     CFRelease(system_wide);
@@ -315,6 +322,7 @@ mod macos {
                 }
             }
             _ => {
+                on_unresolved(app, Some(element));
                 unsafe {
                     CFRelease(element);
                     CFRelease(app);
@@ -332,27 +340,66 @@ mod macos {
         })
     }
 
+    /// 僅無聚焦元素或無文字值才喚醒；空文字仍是可讀值。
+    fn read_text_value_or_wake<T, V>(
+        element: Option<T>,
+        read_value: impl FnOnce(T) -> Option<V>,
+        wake: impl FnOnce(),
+    ) -> Option<V> {
+        let value = element.and_then(read_value);
+        if value.is_none() {
+            wake();
+        }
+        value
+    }
+
+    fn read_cursor_excerpt(
+        cursor_pos: Option<usize>,
+        read_text: impl FnOnce() -> Option<String>,
+    ) -> Option<String> {
+        // 游標 0 可能是終端機回報的失真位置，不能把畫面頂端當成改字區段。
+        if cursor_pos == Some(0) {
+            return None;
+        }
+        let text = read_text()?;
+        let excerpt = extract_excerpt(&text, cursor_pos, CONTEXT_CHARS);
+        if excerpt.is_empty() {
+            None
+        } else {
+            Some(excerpt)
+        }
+    }
+
+    const TEXT_FIELD_ACCESSIBILITY_ATTRIBUTES: &[&str] =
+        &["AXManualAccessibility", "AXEnhancedUserInterface"];
+    const SELECTION_ACCESSIBILITY_ATTRIBUTES: &[&str] = &["AXManualAccessibility"];
+
     pub fn read_focused_text_field_impl() -> Result<Option<String>, String> {
-        let ctx = match resolve_focused_text_element() {
+        let ctx = match resolve_focused_text_element(|app, element| {
+            // 非文字 role 只檢查屬性是否存在，不把可能的非字串值轉成 CFString。
+            let value = read_text_value_or_wake(
+                element,
+                |element| get_ax_attribute(element, K_AX_VALUE_ATTRIBUTE),
+                || wake_text_field_app(app),
+            );
+            if let Some(value) = value {
+                unsafe { CFRelease(value) };
+            }
+        }) {
             Some(c) => c,
             None => return Ok(None),
         };
 
         let cursor_pos = get_cursor_position(ctx.target_element);
-        let full_text = get_ax_string_attribute(ctx.target_element, K_AX_VALUE_ATTRIBUTE);
+        let excerpt = read_cursor_excerpt(cursor_pos, || {
+            read_text_value_or_wake(
+                Some(ctx.target_element),
+                |element| get_ax_string_attribute(element, K_AX_VALUE_ATTRIBUTE),
+                || wake_text_field_app(ctx.app),
+            )
+        });
         ctx.cleanup();
-
-        match full_text {
-            Some(text) if !text.is_empty() => {
-                let excerpt = extract_excerpt(&text, cursor_pos, CONTEXT_CHARS);
-                if excerpt.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(excerpt))
-                }
-            }
-            _ => Ok(None),
-        }
+        Ok(excerpt)
     }
 
     // ========== 選取狀態偵測（#24/#25 編輯模式判定） ==========
@@ -375,19 +422,82 @@ mod macos {
         read_selected_text_range(element).map(|range| range.length)
     }
 
-    /// Electron/Chromium 的無障礙樹是惰性啟用的：對焦點 App 設
-    /// AXManualAccessibility=true 可強制喚醒完整樹（Electron 官方支援的旗標）。
-    /// 對原生 App 設此屬性會失敗，無副作用。
+    /// 兩條讀取路徑共用設定操作，各自保留需要的 AX 旗標。
+    fn set_app_accessibility(
+        app: AXUIElementRef,
+        attributes: &[&str],
+        set_attribute: unsafe extern "C" fn(AXUIElementRef, CFTypeRef, CFTypeRef) -> AXError,
+    ) {
+        let value = core_foundation::boolean::CFBoolean::true_value();
+        for name in attributes {
+            let attr = CFString::new(name);
+            unsafe {
+                set_attribute(app, attr.as_CFTypeRef(), value.as_CFTypeRef());
+            }
+        }
+    }
+
+    /// 讀不到聚焦文字時的喚醒：App 本身（Electron 認 AXManualAccessibility）＋每個視窗（Chrome 認視窗上的 AXEnhancedUserInterface）。
+    fn wake_text_field_app(app: AXUIElementRef) {
+        set_app_accessibility(
+            app,
+            TEXT_FIELD_ACCESSIBILITY_ATTRIBUTES,
+            AXUIElementSetAttributeValue,
+        );
+        set_window_accessibility(app, TEXT_FIELD_ACCESSIBILITY_ATTRIBUTES);
+    }
+
+    /// NSWorkspace 前景 App 的 AX 元素（Create 規則，呼叫端負責 CFRelease）。
+    fn create_frontmost_app_element() -> Option<AXUIElementRef> {
+        use objc::runtime::Object;
+        use objc::{class, msg_send};
+        let pid: i32 = unsafe {
+            let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+            let app: *mut Object = msg_send![workspace, frontmostApplication];
+            if app.is_null() {
+                return None;
+            }
+            msg_send![app, processIdentifier]
+        };
+        if pid <= 0 {
+            return None;
+        }
+        let element = unsafe { AXUIElementCreateApplication(pid) };
+        (!element.is_null()).then_some(element)
+    }
+
+    /// Chrome 以「主視窗被設 AXEnhancedUserInterface」判斷有輔助工具（Chromium 文件），只設 App 不會醒（2026-11-28 實機）。
+    fn set_window_accessibility(app: AXUIElementRef, attributes: &[&str]) {
+        let Some(windows) = get_ax_attribute(app, "AXWindows") else {
+            return;
+        };
+        let windows = unsafe {
+            core_foundation::array::CFArray::<*const c_void>::wrap_under_create_rule(
+                windows as core_foundation::array::CFArrayRef,
+            )
+        };
+        for window in windows.iter() {
+            set_app_accessibility(
+                *window as AXUIElementRef,
+                attributes,
+                AXUIElementSetAttributeValue,
+            );
+        }
+    }
+
+    /// Electron/Chromium 的無障礙樹是惰性啟用的，選取路徑維持原有單旗標喚醒。
     fn poke_focused_app_manual_accessibility() {
         let system_wide = unsafe { AXUIElementCreateSystemWide() };
         if system_wide.is_null() {
             return;
         }
         if let Some(app) = get_ax_attribute(system_wide, K_AX_FOCUSED_APPLICATION_ATTRIBUTE) {
-            let attr = CFString::new("AXManualAccessibility");
-            let value = core_foundation::boolean::CFBoolean::true_value();
+            set_app_accessibility(
+                app,
+                SELECTION_ACCESSIBILITY_ATTRIBUTES,
+                AXUIElementSetAttributeValue,
+            );
             unsafe {
-                AXUIElementSetAttributeValue(app, attr.as_CFTypeRef(), value.as_CFTypeRef());
                 CFRelease(app);
             }
         }
@@ -416,12 +526,12 @@ mod macos {
     /// 阻塞式選取偵測：第一次解析失敗時戳醒 Electron 樹再試一次。
     /// 全程只做被動 AX 查詢，不模擬任何按鍵。
     fn selection_probe_blocking() -> SelectionState {
-        if let Some(ctx) = resolve_focused_text_element() {
+        if let Some(ctx) = resolve_focused_text_element(|_, _| {}) {
             return classify_selection(ctx);
         }
         poke_focused_app_manual_accessibility();
         std::thread::sleep(Duration::from_millis(POKE_SETTLE_MS));
-        match resolve_focused_text_element() {
+        match resolve_focused_text_element(|_, _| {}) {
             Some(ctx) => classify_selection(ctx),
             None => SelectionState::unavailable(),
         }
@@ -488,6 +598,136 @@ mod macos {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use std::cell::Cell;
+
+        #[test]
+        fn cursor_zero_returns_none_without_reading_or_waking() {
+            let read_count = Cell::new(0);
+            let wake_count = Cell::new(0);
+            let result = read_cursor_excerpt(Some(0), || {
+                read_count.set(read_count.get() + 1);
+                read_text_value_or_wake(
+                    Some(()),
+                    |_| None::<String>,
+                    || wake_count.set(wake_count.get() + 1),
+                )
+            });
+            assert_eq!(result, None);
+            assert_eq!(read_count.get(), 0);
+            assert_eq!(wake_count.get(), 0);
+        }
+
+        #[test]
+        fn missing_focused_element_wakes_without_reading_a_value() {
+            let read_count = Cell::new(0);
+            let wake_count = Cell::new(0);
+            let result = read_text_value_or_wake(
+                None::<()>,
+                |_| {
+                    read_count.set(read_count.get() + 1);
+                    Some("不應讀取")
+                },
+                || wake_count.set(wake_count.get() + 1),
+            );
+            assert_eq!(result, None);
+            assert_eq!(read_count.get(), 0);
+            assert_eq!(wake_count.get(), 1);
+        }
+
+        #[test]
+        fn only_missing_text_value_wakes() {
+            for value in [None, Some(""), Some("可讀文字")] {
+                let wake_count = Cell::new(0);
+                assert_eq!(
+                    read_text_value_or_wake(
+                        Some(()),
+                        |_| value,
+                        || wake_count.set(wake_count.get() + 1),
+                    ),
+                    value,
+                );
+                assert_eq!(wake_count.get(), usize::from(value.is_none()));
+            }
+        }
+
+        #[test]
+        fn wake_returns_none_then_next_poll_reads_ready_text() {
+            let ready = Cell::new(false);
+            let wake_count = Cell::new(0);
+            let read_once = || {
+                read_cursor_excerpt(Some(5), || {
+                    read_text_value_or_wake(
+                        Some(()),
+                        |_| ready.get().then(|| "用 Tauri 打包".to_string()),
+                        || {
+                            wake_count.set(wake_count.get() + 1);
+                            ready.set(true);
+                        },
+                    )
+                })
+            };
+            assert_eq!(read_once(), None);
+            assert_eq!(wake_count.get(), 1);
+            assert_eq!(read_once(), Some("用 Tauri 打包".to_string()));
+            assert_eq!(wake_count.get(), 1);
+        }
+
+        #[test]
+        fn empty_field_does_not_wake_or_return_an_excerpt() {
+            assert_eq!(
+                read_cursor_excerpt(Some(1), || read_text_value_or_wake(
+                    Some(()),
+                    |_| Some(String::new()),
+                    || panic!("空文字不可喚醒"),
+                )),
+                None,
+            );
+        }
+
+        #[test]
+        fn excerpt_excludes_surrounding_sentinels() {
+            let text = format!(
+                "PRIVATE_BEFORE{}用 Tauri 打包{}PRIVATE_AFTER",
+                "前".repeat(60),
+                "後".repeat(60)
+            );
+            let excerpt = read_cursor_excerpt(Some(80), || Some(text)).unwrap();
+            assert_eq!(excerpt.chars().count(), CONTEXT_CHARS * 2);
+            assert!(excerpt.contains("用 Tauri 打包"));
+            assert!(!excerpt.contains("PRIVATE_BEFORE"));
+            assert!(!excerpt.contains("PRIVATE_AFTER"));
+        }
+
+        #[test]
+        fn selection_keeps_manual_only_while_field_wakes_both_attributes() {
+            unsafe extern "C" fn record_attribute(
+                app: AXUIElementRef,
+                attribute: CFTypeRef,
+                value: CFTypeRef,
+            ) -> AXError {
+                let calls = &mut *(app as *mut Vec<(String, bool)>);
+                let name = CFString::wrap_under_get_rule(attribute as *const _);
+                calls.push((
+                    name.to_string(),
+                    value == core_foundation::boolean::CFBoolean::true_value().as_CFTypeRef(),
+                ));
+                K_AX_ERROR_SUCCESS
+            }
+            let mut calls = Vec::<(String, bool)>::new();
+            let app = &mut calls as *mut _ as AXUIElementRef;
+            set_app_accessibility(app, SELECTION_ACCESSIBILITY_ATTRIBUTES, record_attribute);
+            assert_eq!(calls, vec![("AXManualAccessibility".to_string(), true)]);
+            calls.clear();
+            let app = &mut calls as *mut _ as AXUIElementRef;
+            set_app_accessibility(app, TEXT_FIELD_ACCESSIBILITY_ATTRIBUTES, record_attribute);
+            assert_eq!(
+                calls,
+                vec![
+                    ("AXManualAccessibility".to_string(), true),
+                    ("AXEnhancedUserInterface".to_string(), true)
+                ]
+            );
+        }
 
         #[test]
         fn test_extract_excerpt_empty() {
