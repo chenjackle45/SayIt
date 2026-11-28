@@ -456,7 +456,10 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
     return importEntries(entries);
   }
 
-  /** 每次改正同一詞只累計一次；不同聽錯寫法分別保留。 */
+  /**
+   * 每次改正同一詞只累計一次；不同聽錯寫法分別保留。
+   * 詞一學到就生效並直接列入 AI 推薦（is_reviewed=1，不進收件匣）；收件匣只放待使用者套用的配對（2026-11-28 使用者拍板）。
+   */
   async function recordCorrections(pairs: LearnedVocabularyPair[]): Promise<string[]> {
     if (pairs.length === 0) return [];
     const db = getDatabase();
@@ -466,7 +469,7 @@ export const useVocabularyStore = defineStore("vocabulary", () => {
       const storedTerm = existing?.term ?? term;
       await db.execute(
         `INSERT INTO vocabulary (id, term, source, correction_count, last_corrected_at, is_reviewed)
-         VALUES ($1, $2, 'ai', 1, datetime('now'), 0)
+         VALUES ($1, $2, 'ai', 1, datetime('now'), 1)
          ON CONFLICT(term) DO UPDATE SET correction_count = vocabulary.correction_count + 1,
            last_corrected_at = excluded.last_corrected_at`,
         [crypto.randomUUID(), storedTerm],

@@ -116,6 +116,7 @@ describe("migration v10", () => {
   });
   it("重跑保留 reviewed=0、次數、時間與配對狀態，DDL 不重複", async () => {
     await initialize(); const s = await store();
+    await s.addAiSuggestedTerm("Tauri");
     await s.recordCorrections([{ term: "Tauri", misheard: "陶里" }]);
     await s.dismissReplacement(s.suggestedReplacementList[0].id);
     const before = row("Tauri"); const pairs = replacements();
@@ -138,7 +139,7 @@ describe("v10 寫入點與提示", () => {
     expect(s.inboxCount).toBe(1);
     expect(s.termCount).toBe(3);
   });
-  it("手動1／AI新增0；AI重學、UNIQUE與加權都不改檢視狀態；改詞1", async () => {
+  it("手動1／改字新詞1／AI建議新詞0；重學、UNIQUE與加權不改檢視狀態；改詞1", async () => {
     await initialize(); const s = await store();
     await s.addTerm("Manual"); expect(row("Manual")).toMatchObject({ is_reviewed: 1 });
     // 規格 A 要求各寫入點明寫，不能只依賴 migration 的 DEFAULT 1。
@@ -146,24 +147,41 @@ describe("v10 寫入點與提示", () => {
     await s.addAiSuggestedTerm("AI"); expect(row("AI")).toMatchObject({ is_reviewed: 0 });
     await s.addAiSuggestedTerm("AI"); expect(row("AI")).toMatchObject({ is_reviewed: 0 });
     await s.recordCorrections([{ term: "Tauri", misheard: "陶里" }]);
-    expect(row("Tauri")).toMatchObject({ is_reviewed: 0 });
+    expect(row("Tauri")).toMatchObject({ is_reviewed: 1, correction_count: 1 });
     await s.batchIncrementWeights([String(row("Tauri")!.id)]);
-    expect(row("Tauri")).toMatchObject({ is_reviewed: 0, weight: 2 });
+    expect(row("Tauri")).toMatchObject({ is_reviewed: 1, weight: 2 });
     await s.markTermReviewed(String(row("AI")!.id));
     await s.addAiSuggestedTerm("AI"); expect(row("AI")).toMatchObject({ is_reviewed: 1 });
-    await s.markTermReviewed(String(row("Tauri")!.id));
+    state.connection.exec("UPDATE vocabulary SET last_corrected_at='2020-01-01' WHERE term='Tauri'");
+    const before = row("Tauri")!;
     await s.recordCorrections([{ term: "Tauri", misheard: "桃里" }]);
-    expect(row("Tauri")).toMatchObject({ is_reviewed: 1, correction_count: 2 });
+    expect(row("Tauri")).toEqual({ ...before, correction_count: 2, last_corrected_at: expect.any(String) });
+    expect(row("Tauri")!.last_corrected_at).not.toBe(before.last_corrected_at);
     await s.recordCorrections([{ term: "Manual", misheard: "曼紐" }]);
     expect(row("Manual")).toMatchObject({ is_reviewed: 1, source: "manual" });
     await s.addAiSuggestedTerm("AIEdit");
     await s.updateTerm(String(row("AIEdit")!.id), "Edited");
     expect(row("Edited")).toMatchObject({ is_reviewed: 1, source: "manual" });
   });
+  it.each(["addAiSuggestedTerm", "舊資料"])("重學 reviewed=0 的詞（%s）只更新次數與時間，仍在收件匣", async (producer) => {
+    await initialize(); const s = await store();
+    if (producer === "addAiSuggestedTerm") await s.addAiSuggestedTerm("Tauri");
+    else state.connection.exec("INSERT INTO vocabulary (id, term, source, is_reviewed, correction_count) VALUES ('old', 'Tauri', 'ai', 0, 7)");
+    state.connection.exec("UPDATE vocabulary SET last_corrected_at='2020-01-01' WHERE term='Tauri'");
+    const before = row("Tauri")!;
+    await s.recordCorrections([{ term: "Tauri", misheard: "陶里" }]);
+    expect(row("Tauri")).toEqual({ ...before, correction_count: Number(before.correction_count) + 1, last_corrected_at: expect.any(String) });
+    expect(row("Tauri")!.last_corrected_at).not.toBe(before.last_corrected_at);
+    expect(s.inboxTermList.map((entry) => entry.term)).toEqual(["Tauri"]);
+    expect(s.suggestedReplacementList[0]).toMatchObject({ term: "Tauri", misheard: "陶里", status: "suggested" });
+    expect(s.inboxCount).toBe(2);
+  });
   it("匯入新增／合併／略過一律1，保留既有次數、時間、配對與來源", async () => {
     await initialize(); const s = await store();
+    await s.addAiSuggestedTerm("Merged"); await s.addAiSuggestedTerm("Skipped");
     await s.recordCorrections([{ term: "Merged", misheard: "合併" }, { term: "Skipped", misheard: "略過" }]);
     const before = row("Merged")!; const pairs = replacements();
+    expect(before.is_reviewed).toBe(0); expect(row("Skipped")!.is_reviewed).toBe(0);
     expect(await s.importEntries([{ term: "New", source: "ai", weight: 1 }, { term: "merged", source: "manual", weight: 9 }, { term: "skipped", source: "manual", weight: 0 }])).toEqual({ added: 1, merged: 1, skipped: 1 });
     expect(row("New")).toMatchObject({ is_reviewed: 1 });
     expect(state.calls.find((sql) => sql.startsWith("INSERT INTO vocabulary (id, term, weight, source,"))).toContain("last_corrected_at, is_reviewed");
@@ -171,8 +189,9 @@ describe("v10 寫入點與提示", () => {
     expect(row("Skipped")).toMatchObject({ is_reviewed: 1, weight: 1 });
     expect(replacements()).toEqual(pairs);
   });
-  it("新詞立即入選；只有 applied 送箭頭；保留詞不套用，dismissed重學不復活", async () => {
+  it("未檢視詞立即入選；只有 applied 送箭頭；保留詞不套用，dismissed重學不復活", async () => {
     await initialize(); const s = await store();
+    await s.addAiSuggestedTerm("Tauri");
     await s.recordCorrections([{ term: "Tauri", misheard: "陶里" }]);
     const id = s.suggestedReplacementList[0].id;
     expect(await s.getWhisperTermList(true)).toContain("Tauri");
@@ -208,13 +227,13 @@ describe("原子快照、刪除與復原", () => {
   it("完整還原8欄主詞與所有7欄配對（含三種狀態），其他詞不受影響", async () => {
     const s = await seed(); const before = row("Tauri"); const pairs = replacements(); const other = row("Other");
     const snapshot = await s.removeTermWithUndo(String(before!.id));
-    expect(snapshot!.entry).toMatchObject({ isReviewed: false, weight: 17, correctionCount: 1 });
+    expect(snapshot!.entry).toMatchObject({ isReviewed: true, weight: 17, correctionCount: 1 });
     expect(snapshot!.replacements).toHaveLength(3);
     expect(row("Tauri")).toBeUndefined(); expect(s.termCount).toBe(1);
     expect(replacements()).toHaveLength(1);
     await s.restoreTerm(snapshot!);
     expect(row("Tauri")).toEqual(before); expect(replacements()).toEqual(pairs); expect(row("Other")).toEqual(other);
-    expect(s.termCount).toBe(2); expect(s.inboxCount).toBe(4);
+    expect(s.termCount).toBe(2); expect(s.inboxCount).toBe(2);
   });
   it("快照操作前完成的 HUD 學習完整入快照，沒有讀後刪除的交錯窗口", async () => {
     const s = await seed();

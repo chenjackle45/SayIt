@@ -63,10 +63,9 @@ afterEach(() => { wrappers.forEach((w) => w.unmount()); wrappers = []; vi.unstub
 
 async function seed(kind: "empty" | "term" | "pair" | "both") {
   const store = useVocabularyStore();
-  if (kind === "term") await store.addAiSuggestedTerm("Tauri");
+  if (kind === "term" || kind === "both") await store.addAiSuggestedTerm("Tauri");
   if (kind === "pair" || kind === "both") {
     await store.recordCorrections([{ term: "Tauri", misheard: "陶里" }]);
-    if (kind === "pair") await store.markTermReviewed(store.termList[0].id);
   }
   return store;
 }
@@ -78,6 +77,20 @@ function button(wrapper: VueWrapper, text: string) { return wrapper.findAll("but
 async function click(wrapper: VueWrapper, text: string) { await button(wrapper, text).trigger("click"); await flushPromises(); }
 
 describe("收件匣元件與真 store", () => {
+  it("同一次改字後，收件匣只有配對列、徽章只算配對，AI 推薦有新詞", async () => {
+    const store = useVocabularyStore();
+    await store.recordCorrections([{ term: "陳泰呈", misheard: "陳太誠" }]);
+    const wrapper = render();
+    expect(state.connection.prepare("SELECT is_reviewed FROM vocabulary WHERE term = ?").get("陳泰呈")).toMatchObject({ is_reviewed: 1 });
+    expect(store.aiSuggestedTermList.map((entry) => entry.term)).toEqual(["陳泰呈"]);
+    expect(await store.getAiTermList("陳泰呈")).toEqual(["陳泰呈"]);
+    expect(store.inboxTermList).toEqual([]);
+    expect(wrapper.findAll("[data-inbox-term]")).toHaveLength(0);
+    expect(wrapper.findAll("[data-inbox-replacement]")).toHaveLength(1);
+    expect(wrapper.get("[data-inbox-replacement]").text()).toContain("聽成「陳太誠」→ 改成「陳泰呈」");
+    expect(store.suggestedReplacementList[0]).toMatchObject({ term: "陳泰呈", misheard: "陳太誠", status: "suggested" });
+    expect(store.inboxCount).toBe(1);
+  });
   it.each([ ["empty", 0, 0], ["term", 1, 0], ["pair", 0, 1], ["both", 1, 1] ] as const)("四態：%s", async (kind, terms, pairs) => {
     const store = await seed(kind); const wrapper = render();
     expect(wrapper.findAll("[data-inbox-term]")).toHaveLength(terms);
