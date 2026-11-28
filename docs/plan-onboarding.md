@@ -76,3 +76,5 @@
 - 修法：`tauri.conf.json` 的 HUD 視窗加 `"focusable": false`（Tauri 2.10 支援；Windows 原本已以 `reassert_hud_topmost` 不搶焦點）。
 - 第二次（修後）：使用者確認文字**已貼進試講輸入框** → **Mac M5 成立**。Windows 待實機驗。
 - 同場實機回饋：觸發鍵按鈕「錄製」易誤會成錄音 → 共用字串 `settings.hotkey.record` 改為「更換按鍵」（五語系；偏好設定頁同步受惠），引導說明改「可以換成其他按鍵」。
+
+- 2026-11-28 補驗：HUD 設 `focusable: false` 後，斷網造成轉錄失敗，恢復網路後第一下點「重試」即重新轉錄並貼上（使用者實機確認）→ 待證 MED 結案。

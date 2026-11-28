@@ -491,10 +491,9 @@
     },
     "upgradeNotice": {
       "title": "What's New in SayIt",
-      "item1": "Redesigned main window: the Records page combines the dashboard and history — search directly, pick a line with ↑↓ and press Enter to copy",
-      "item2": "Preferences now have their own settings mode with six categories: press ⌘/Ctrl+, to open, Esc to go back",
-      "item3": "Clearer recording overlay: Transcribing, Enhancing (current mode), Pasted N characters; failed recognitions point you to Records to retry",
-      "item4": "The menu bar (system tray on Windows) icon can copy your last 5 lines; success messages like saved or deleted now fade in at the bottom right",
+      "item1": "Smarter Words list — only terms that sound or look like what you said are sent, self-corrections keep just your final wording, and words you fix take effect right away",
+      "item2": "Inbox — learned \"heard X → meant Y\" pairs wait on the Words page; once you Apply one, X is always rewritten as Y",
+      "item3": "Press ⌘K (Ctrl+K on Windows) for the command palette — search records, copy the last line, or switch enhancement mode",
       "dismiss": "Got it"
     },
     "status": {
